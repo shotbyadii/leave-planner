@@ -7,11 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "push": "git add . && git commit -m \"UI/UX refinements and calendar revert\" && git push origin main"
   },
   "dependencies": {
+    "@fontsource/geist-mono": "^5.2.7",
+    "@fontsource/geist-sans": "^5.2.5",
     "@supabase/supabase-js": "^2.104.1",
     "cobe": "^2.0.1",
+    "framer-motion": "^12.38.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.11.0",
     "react": "^19.2.5",

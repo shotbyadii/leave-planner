@@ -1,31 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import { addLeave, removeLeave, createLeavePlan } from '../services/leaveService';
-import LeaveModal from './LeaveModal';
+import LeaveSelectionBar from './LeaveSelectionBar';
 import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
-  const [modalDate, setModalDate] = useState(null);
   const [viewingLeave, setViewingLeave] = useState(null);
-  const [selectionStart, setSelectionStart] = useState(null);
-  const [collapsedMonths, setCollapsedMonths] = useState([]);
+  const [localSelectionStart, setLocalSelectionStart] = useState(null);
+  const _selectionStart = selectionStart !== undefined ? selectionStart : localSelectionStart;
+  const _setSelectionStart = setSelectionStart || setLocalSelectionStart;
+
+  useEffect(() => {
+    if (setIsSelecting) {
+      setIsSelecting(!!_selectionStart);
+    }
+  }, [_selectionStart, setIsSelecting]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  useEffect(() => {
-    const past = [];
-    for(let m=0; m<12; m++) {
-      const lastDay = new Date(year, m + 1, 0);
-      if (lastDay < today) past.push(m);
-    }
-    setCollapsedMonths(past);
-  }, []);
 
   const getDaysInMonth = (month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (month) => new Date(year, month, 1).getDay();
@@ -35,22 +33,12 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     return lastDay < today;
   };
 
-  const toggleMonth = (monthIndex) => {
-    // Only allow collapsing past months
-    if (!isMonthPast(monthIndex) && !collapsedMonths.includes(monthIndex)) return;
-    setCollapsedMonths(prev => 
-      prev.includes(monthIndex) 
-        ? prev.filter(m => m !== monthIndex) 
-        : [...prev, monthIndex]
-    );
-  };
-
   const getAllDatesInRange = (startStr, endStr) => {
     const d1 = new Date(startStr);
     const d2 = new Date(endStr);
     const start = d1 < d2 ? d1 : d2;
     const end = d1 < d2 ? d2 : d1;
-    
+
     const allDates = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dateStr = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -61,7 +49,6 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
   const findTripForDate = (dateStr) => {
     let tripDates = [dateStr];
-    
     let d = new Date(dateStr);
     while (true) {
       d.setDate(d.getDate() - 1);
@@ -73,7 +60,6 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         break;
       }
     }
-    
     d = new Date(dateStr);
     while (true) {
       d.setDate(d.getDate() + 1);
@@ -85,62 +71,46 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         break;
       }
     }
-    
     return tripDates;
   };
 
   const handleDayClick = async (month, day) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
     const existingLeave = bookedDates.find(d => d.date === dateStr);
     if (existingLeave) {
       const tripDates = findTripForDate(dateStr);
-      setViewingLeave({
-        targetLeave: existingLeave,
-        tripDates: tripDates
-      });
+      setViewingLeave({ targetLeave: existingLeave, tripDates: tripDates });
       return;
     }
-
-    if (selectionStart) {
-      const range = getAllDatesInRange(selectionStart, dateStr);
+    if (_selectionStart) {
+      const range = getAllDatesInRange(_selectionStart, dateStr);
       setPreviewDates(range);
-      setSelectionStart(null);
+      _setSelectionStart(null);
     } else {
-      if (previewDates.length > 0) {
-        setPreviewDates([]);
-      }
-      setSelectionStart(dateStr);
+      if (previewDates.length > 0) setPreviewDates([]);
+      _setSelectionStart(dateStr);
     }
   };
 
   const handleModalApply = async (datesArray, type, note, planName, durationPerDay = 1) => {
     let planId = null;
     if (datesArray.length > 1) {
-      const plan = await createLeavePlan(
-        planName || 'Untitled Plan',
-        sortedDates[0],
-        sortedDates[sortedDates.length - 1]
-      );
+      const plan = await createLeavePlan(planName || 'Untitled Plan', datesArray[0], datesArray[datesArray.length - 1]);
       planId = plan?.id || null;
     }
-
     for (const dateStr of datesArray) {
       if (!isHoliday(dateStr) && !isWeekend(dateStr)) {
         await addLeave(dateStr, type, note, planId, durationPerDay);
       }
     }
     await loadLeaves();
-    setModalDate(null);
     setPreviewDates([]);
   };
 
   const handleCancelLeave = async (dateStrOrArray) => {
     if (Array.isArray(dateStrOrArray)) {
       for (const dateStr of dateStrOrArray) {
-        if (bookedDates.some(b => b.date === dateStr)) {
-          await removeLeave(dateStr);
-        }
+        if (bookedDates.some(b => b.date === dateStr)) await removeLeave(dateStr);
       }
     } else {
       await removeLeave(dateStrOrArray);
@@ -149,28 +119,21 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     setViewingLeave(null);
   };
 
-  const renderMonth = (monthIndex, isLarge = false, isInteractive = true, isCollapsedOverride = null) => {
-    const isCollapsed = isCollapsedOverride !== null ? isCollapsedOverride : (!isLarge && viewMode === 'yearly' && collapsedMonths.includes(monthIndex));
+  const renderMonth = (monthIndex, isLarge = false, isInteractive = true, isPastOverride = null, wrapperClasses = '', onClick = null) => {
+    const isMini = !isLarge;
+    const isPastMonth = isPastOverride !== null ? isPastOverride : isMonthPast(monthIndex);
+    const opacityClass = isPastMonth && !isLarge ? 'opacity-50 grayscale' : 'opacity-100';
     const daysInMonth = getDaysInMonth(monthIndex);
     const firstDay = getFirstDayOfMonth(monthIndex);
-    
-    if (isCollapsed) {
-      return (
-        <div key={monthIndex} onClick={() => toggleMonth(monthIndex)} className="bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl p-4 shadow-sm cursor-pointer flex justify-between items-center transition-colors h-16">
-          <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-slate-500">{monthNames[monthIndex]} {year}</h3>
-            <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">Past</span>
-          </div>
-          <ChevronRight size={18} className="text-slate-400" />
-        </div>
-      );
-    }
-
     const days = [];
     const monthHolidays = [];
 
-    const cellClass = isLarge ? "w-14 h-14 text-base" : "w-8 h-8 text-sm";
-    const headerClass = isLarge ? "w-14 text-xs" : "w-8 text-[10px]";
+    const cellClass = isLarge ? "w-10 h-10 md:w-12 md:h-12 text-sm md:text-base" : (isMini ? "w-1.5 h-1.5 md:w-6 md:h-6 text-[0px] md:text-sm" : "w-8 h-8 text-sm");
+    const headerClass = isLarge ? "w-10 md:w-12 text-[10px] md:text-xs" : (isMini ? "w-1.5 md:w-6 text-[0px] md:text-[10px]" : "w-8 text-[10px]");
+
+    const currentMonth = new Date().getMonth();
+    const isCurrentMonth = monthIndex === currentMonth;
+    const useNavy = isLarge || (isMini && isCurrentMonth && !isPastMonth);
 
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`e-${i}`} className={cellClass}></div>);
@@ -181,7 +144,6 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       const holidayInfo = isHoliday(dateStr);
       const weekend = isWeekend(dateStr);
       const bookedLeave = bookedDates.find(d => d.date === dateStr);
-      
       const cellDate = new Date(dateStr);
       cellDate.setHours(0,0,0,0);
       const isPast = cellDate < today;
@@ -199,222 +161,140 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       if (holidayInfo) monthHolidays.push({ day: i, name: holidayInfo.name });
 
       let baseClasses = `${cellClass} rounded-full flex items-center justify-center transition-all relative `;
-      
+
       if (isSelected) {
         if (holidayInfo || weekend) {
-          baseClasses += "bg-slate-300 text-slate-800 font-bold z-10 scale-105 shadow-md border border-slate-400 border-dashed";
+          baseClasses += useNavy
+            ? "bg-white/25 text-white font-bold z-10 scale-105 border border-white/40 border-dashed"
+            : "bg-muted text-foreground font-bold z-10 scale-105 shadow-apple-sm border border-border border-dashed";
         } else {
-          baseClasses += "bg-slate-800 text-white font-bold ring-4 ring-slate-200 z-10 scale-105 shadow-md";
+          baseClasses += useNavy
+            ? "bg-white text-blue-900 font-bold ring-4 ring-white/20 z-10 scale-105 shadow-apple-sm"
+            : "bg-primary text-primary-foreground font-bold ring-4 ring-border z-10 scale-105 shadow-apple-sm";
         }
       } else if (isToday) {
-         baseClasses += "bg-blue-600 text-white font-bold ring-2 ring-blue-200 z-10 scale-105 shadow-md animate-pulse-subtle";
+        baseClasses += useNavy
+          ? "bg-white text-blue-900 font-bold ring-2 ring-white/40 z-10 scale-105 shadow-apple-sm"
+          : "bg-blue-600 text-white font-bold ring-2 ring-blue-200 z-10 scale-105 shadow-apple-sm animate-pulse-subtle";
       } else if (isHovered) {
-         if (holidayInfo || weekend) {
-           baseClasses += "bg-yellow-100 text-yellow-900 border border-yellow-300 border-dashed scale-105 z-10";
-         } else {
-           baseClasses += "bg-yellow-300 text-yellow-900 font-bold ring-2 ring-yellow-400 scale-105 z-10 shadow-sm";
-         }
+        if (holidayInfo || weekend) {
+          baseClasses += useNavy
+            ? "bg-yellow-400/30 text-white border border-yellow-300/50 border-dashed scale-105 z-10"
+            : "bg-yellow-100 text-yellow-900 border border-yellow-300 border-dashed scale-105 z-10";
+        } else {
+          baseClasses += useNavy
+            ? "bg-yellow-400/50 text-white font-bold ring-2 ring-yellow-300/60 scale-105 z-10 shadow-sm"
+            : "bg-yellow-300 text-yellow-900 font-bold ring-2 ring-yellow-400 scale-105 z-10 shadow-sm";
+        }
       } else if (bookedLeave) {
-        if (bookedLeave.type === 'pl') baseClasses += "bg-blue-300 text-blue-900 font-medium cursor-pointer shadow-sm ring-1 ring-blue-400";
-        else if (bookedLeave.type === 'el') baseClasses += "bg-orange-300 text-orange-900 font-medium cursor-pointer shadow-sm ring-1 ring-orange-400";
-        else if (bookedLeave.type === 'rh') baseClasses += "bg-green-300 text-green-900 font-medium cursor-pointer shadow-sm ring-1 ring-green-400";
+        if (bookedLeave.type === 'pl') baseClasses += "bg-blue-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-blue-400";
+        else if (bookedLeave.type === 'el') baseClasses += "bg-orange-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-orange-400";
+        else if (bookedLeave.type === 'rh') baseClasses += "bg-green-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-green-400";
       } else if (holidayInfo) {
-        baseClasses += "bg-purple-200 text-purple-900 font-medium";
+        baseClasses += useNavy ? "bg-purple-500 text-white font-medium" : "bg-purple-200 text-purple-900 font-medium";
       } else if (weekend) {
-        baseClasses += "text-slate-400 bg-slate-50";
+        baseClasses += useNavy ? "text-white/50 bg-white/10" : "text-muted-foreground bg-muted";
       } else if (isPast) {
-        baseClasses += "text-slate-300 bg-slate-50/50 opacity-50 hover:opacity-70 hover:bg-slate-100 cursor-pointer";
+        baseClasses += useNavy ? "text-white/30 bg-white/5 opacity-50 hover:opacity-70 hover:bg-white/10 cursor-pointer" : "text-muted-foreground/60 bg-muted/50 opacity-50 hover:opacity-70 hover:bg-muted cursor-pointer";
       } else {
-        baseClasses += "hover:bg-slate-100 cursor-pointer text-slate-700";
+        baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
       }
 
       days.push(
-        <div 
-          key={`d-${i}`} 
-          className={baseClasses}
-          onClick={(e) => {
-            if (isInteractive) {
-              e.stopPropagation();
-              handleDayClick(monthIndex, i);
-            }
-          }}
-          title={holidayInfo ? holidayInfo.name : (isPast ? 'Past date — click to log retroactive leave' : '')}
-        >
-          {i}
+        <div key={`d-${i}`} className={baseClasses} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isPast ? 'Past date — click to log retroactive leave' : '')}>
+          <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
         </div>
       );
     }
 
+    const cardBg = useNavy
+      ? 'bg-gradient-to-br from-[#0f172a] via-[#1e3a6e] to-[#1d4ed8] border-blue-900/30 shadow-apple-md'
+      : 'bg-card border-border shadow-apple-sm';
+
     return (
-      <div key={monthIndex} className={`bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col ${isLarge ? 'p-8' : 'p-5 hover:border-slate-300 transition-colors'}`}>
-        <div 
-          className={`flex justify-between items-center mb-4 ${!isLarge && viewMode === 'yearly' ? 'cursor-pointer group' : ''}`} 
-          onClick={() => {
-            if (!isLarge && viewMode === 'yearly') toggleMonth(monthIndex);
-          }}
-        >
-          <h3 className={`font-semibold text-slate-800 ${isLarge ? 'text-2xl' : 'text-lg group-hover:text-slate-600 transition-colors'}`}>
-            {monthNames[monthIndex]}
+      <motion.div
+        layoutId={`month-card-${monthIndex}`}
+        key={monthIndex}
+        onClick={onClick}
+        whileHover={onClick ? { scale: 1.02 } : {}}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className={`${cardBg} border flex flex-col transition-colors origin-center ${isLarge ? 'p-4 md:p-6 rounded-2xl' : (isMini ? 'p-2.5 rounded-xl h-full aspect-[4/3] md:aspect-auto flex flex-col justify-between' : 'p-5 rounded-2xl hover:border-foreground/20')} ${opacityClass} ${wrapperClasses}`}
+      >
+        <div className={`flex justify-between items-center ${isLarge ? 'mb-4' : (isMini ? 'mb-2' : 'mb-4')}`}>
+          <h3 className={`font-semibold leading-none ${useNavy ? 'text-white' : 'text-foreground'} ${isLarge ? 'text-lg md:text-xl' : (isMini ? 'text-[11px] uppercase tracking-wider' : 'text-lg group-hover:text-muted-foreground')}`}>
+            {isMini ? monthNames[monthIndex].substring(0,3) : monthNames[monthIndex]}
           </h3>
           <div className="flex items-center gap-2">
-            <span className={`${isLarge ? 'text-sm' : 'text-xs'} font-medium text-slate-400`}>{year}</span>
-            {!isLarge && viewMode === 'yearly' && <ChevronDown size={14} className="text-slate-300 group-hover:text-slate-500 transition-colors" />}
+            <span className={`${isLarge ? 'text-xs md:text-sm' : (isMini ? 'text-[9px]' : 'text-xs')} font-medium leading-none ${useNavy ? 'text-white/60' : 'text-muted-foreground'}`}>
+              {isMini ? "'26" : year}
+            </span>
           </div>
         </div>
-        
-        <div className={`grid grid-cols-7 ${isLarge ? 'gap-2 mb-4' : 'gap-1 mb-2'}`}>
+
+        <div className={`grid grid-cols-7 ${isLarge ? 'gap-1 md:gap-2 mb-4' : 'gap-px md:gap-1 mb-2'} ${isMini ? 'md:mb-2' : ''}`}>
           {dayNames.map(d => (
-            <div key={d} className={`${headerClass} font-semibold text-slate-400 text-center`}>{d}</div>
+            <div key={d} className={`${headerClass} font-semibold flex items-center justify-center ${useNavy ? 'text-white/50' : 'text-muted-foreground'}`}>
+              <span className={isMini ? 'hidden md:inline' : ''}>{d}</span>
+            </div>
           ))}
         </div>
-        
-        <div className={`grid grid-cols-7 ${isLarge ? 'gap-2' : 'gap-1'}`}>
+
+        <div className={`grid grid-cols-7 ${isLarge ? 'gap-1 md:gap-2' : 'gap-px md:gap-1'}`}>
           {days}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-slate-100">
+        <div className={`mt-auto pt-2 border-t ${useNavy ? 'border-white/20' : 'border-border'} ${isMini ? 'hidden md:block' : ''}`}>
           {monthHolidays.length > 0 ? (
-            <div className={`grid ${isLarge ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-x-3 gap-y-1'}`}>
+            <div className={`grid ${isLarge ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-x-3 gap-y-1'} ${isMini ? 'hidden md:grid' : ''}`}>
               {monthHolidays.map((h, idx) => (
-                <div key={idx} className={`flex items-center gap-1.5 ${isLarge ? 'text-sm' : 'text-[10px]'} text-slate-500 min-w-0`}>
-                  <div className={`${isLarge ? 'w-1.5 h-1.5' : 'w-1 h-1'} rounded-full bg-purple-400 flex-shrink-0`}></div>
-                  <span className="font-bold text-slate-600 flex-shrink-0">{h.day}</span>
+                <div key={idx} className={`flex items-center gap-1.5 ${isLarge ? 'text-sm' : 'text-[10px]'} ${useNavy ? 'text-white/60' : 'text-muted-foreground'} min-w-0`}>
+                  <div className={`${isLarge ? 'w-1.5 h-1.5' : 'w-1 h-1'} rounded-full ${useNavy ? 'bg-purple-300' : 'bg-purple-400'} flex-shrink-0`}></div>
+                  <span className={`font-bold flex-shrink-0 ${useNavy ? 'text-white' : 'text-foreground'}`}>{h.day}</span>
                   <span className="truncate" title={h.name}>{h.name}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className={`text-slate-300 italic ${isLarge ? 'text-sm' : 'text-[10px]'}`}>No holidays</div>
+            <div className={`italic ${isLarge ? 'text-sm' : 'text-[10px]'} ${useNavy ? 'text-white/40' : 'text-muted-foreground/50'} ${isMini ? 'hidden md:block' : ''}`}>No holidays</div>
           )}
         </div>
-      </div>
+      </motion.div>
     );
   };
-
-  const actualLeavesNeeded = previewDates.filter(d => !isHoliday(d) && !isWeekend(d));
-  const hasMultiple = actualLeavesNeeded.length > 1;
 
   return (
     <>
       <div className="flex flex-col gap-6 relative z-10 h-full">
-        
-        {/* View Toggle Header */}
-        <div className="flex justify-between items-center bg-white border border-slate-200 rounded-lg p-1 w-fit shadow-sm">
-          <button 
-            onClick={() => setViewMode('monthly')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${viewMode === 'monthly' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <CalendarIcon size={16} /> Focused View
-          </button>
-          <button 
-            onClick={() => setViewMode('yearly')}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${viewMode === 'yearly' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <LayoutGrid size={16} /> Yearly Grid
-          </button>
+        <div className="flex justify-between items-center w-full">
+          <h2 className="text-lg font-bold text-foreground md:hidden">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
+          <div className="flex bg-muted p-1 rounded-xl w-fit ml-auto shadow-inner">
+            <button onClick={() => setViewMode('monthly')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'monthly' ? 'bg-background shadow-apple-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} title="Focused View">
+              <CalendarIcon size={18} />
+            </button>
+            <button onClick={() => setViewMode('yearly')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'yearly' ? 'bg-background shadow-apple-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} title="Yearly Grid">
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
         {viewMode === 'yearly' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 items-start pb-20">
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-              .sort((a, b) => {
-                const ap = isMonthPast(a);
-                const bp = isMonthPast(b);
-                if (ap === bp) return a - b;
-                return ap ? 1 : -1;
-              })
-              .map(m => (
-                <div key={m} id={`month-card-${m}`}>
-                  {renderMonth(m, false)}
-                </div>
-              ))}
-          </div>
+          <motion.div layout className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-start pb-4">
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, null, "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
+          </motion.div>
         ) : (
-          <div className="flex gap-6 items-start h-[calc(100vh-280px)]">
-            <div className="flex-1 flex justify-center">
-              <div className="w-full max-w-2xl">
-                {renderMonth(focusedMonth, true)}
-              </div>
+          <motion.div layout className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)]">
+            <div className="flex-1 flex justify-center w-full relative z-10">
+              <div className="w-full max-w-2xl">{renderMonth(focusedMonth, true)}</div>
             </div>
-            
-            <div className="w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto h-full pr-2 no-scrollbar pb-20">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                .filter(m => m !== focusedMonth)
-                .sort((a, b) => {
-                  const ap = isMonthPast(a);
-                  const bp = isMonthPast(b);
-                  if (ap === bp) return a - b;
-                  return ap ? 1 : -1;
-                })
-                .map(m => {
-                  const isPast = isMonthPast(m);
-                  return (
-                  <div key={m} onClick={() => setFocusedMonth(m)} className={`cursor-pointer hover:opacity-100 transition-opacity transform hover:scale-[1.02] ${isPast ? 'opacity-40' : 'opacity-70'}`}>
-                    {renderMonth(m, false, false, isPast)}
-                  </div>
-                  );
-                })}
+            <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto h-full pr-2 pb-20 no-scrollbar relative z-10">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full ${isMonthPast(m) ? 'opacity-40' : 'opacity-100'}`, () => setFocusedMonth(m)))}
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 
-      {(selectionStart || previewDates.length > 0) && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-2xl border border-slate-200 px-6 py-3 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
-          <div className="flex items-center gap-3">
-            {selectionStart && previewDates.length === 0 ? (
-              <>
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                <span className="text-sm font-semibold text-slate-700">Select an end date...</span>
-              </>
-            ) : (
-              <>
-                <div className="bg-slate-100 text-slate-800 text-xs font-bold px-3 py-1 rounded-full border border-slate-200">
-                  {actualLeavesNeeded.length} leave{hasMultiple ? 's' : ''} needed
-                </div>
-                <span className="text-sm font-medium text-slate-500">{previewDates.length} days total</span>
-              </>
-            )}
-          </div>
-          
-          <div className="flex gap-2 border-l border-slate-100 pl-6">
-            <button 
-              onClick={() => { setSelectionStart(null); setPreviewDates([]); }}
-              className="text-sm font-medium text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-full hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            {previewDates.length > 0 && (
-              <button 
-                onClick={() => setModalDate({ dates: previewDates })}
-                className="flex items-center gap-2 text-sm font-semibold text-white bg-slate-900 hover:bg-black px-4 py-1.5 rounded-full shadow-md transition-colors"
-              >
-                Continue <Check size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {modalDate && (
-        <LeaveModal 
-          dateObj={modalDate} 
-          onClose={() => { setModalDate(null); setPreviewDates([]); }} 
-          onApply={handleModalApply}
-          balances={{
-            pl: leaves.pl.total - leaves.pl.used,
-            el: leaves.el.total - leaves.el.used,
-            rh: leaves.rh.total - leaves.rh.used
-          }}
-        />
-      )}
-
       {viewingLeave && (
-        <ExistingLeaveModal 
-          leaveObj={viewingLeave}
-          onClose={() => setViewingLeave(null)}
-          onCancelLeave={handleCancelLeave}
-        />
+        <ExistingLeaveModal leaveObj={viewingLeave} onClose={() => setViewingLeave(null)} onCancelLeave={handleCancelLeave} />
       )}
     </>
   );
