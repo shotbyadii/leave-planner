@@ -64,24 +64,24 @@ const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates }) => {
 
     if (inRange) {
       if (isHol) return 'bg-purple-200 border-purple-300 text-purple-900 font-bold shadow-inner';
-      if (isWknd) return 'bg-slate-200 border-slate-300 text-slate-800 font-bold shadow-inner';
+      if (isWknd) return 'bg-muted border-border text-foreground font-bold shadow-inner';
       return 'bg-blue-300 border-blue-400 text-blue-900 font-bold shadow-inner';
     }
     if (isHol) return 'bg-purple-50 border-purple-100 text-purple-400';
-    if (isWknd) return 'bg-slate-50 border-slate-100 text-slate-400';
-    return 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50';
+    if (isWknd) return 'bg-muted border-border text-muted-foreground';
+    return 'bg-card border-border text-foreground hover:bg-muted';
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row gap-8 items-center h-full">
+    <div className="bg-card rounded-2xl border border-border p-6 shadow-apple-sm flex flex-col md:flex-row gap-8 items-center h-full">
       <div className="flex-1 w-full max-w-sm">
-        <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center justify-between">
+        <h4 className="text-sm font-bold text-foreground mb-4 flex items-center justify-between">
           <span>{startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-          <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Trip Calendar</span>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Trip Calendar</span>
         </h4>
         <div className="grid grid-cols-7 gap-1 mb-2">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-            <div key={i} className="text-center text-[10px] font-black text-slate-400">{d}</div>
+            <div key={i} className="text-center text-[10px] font-black text-muted-foreground">{d}</div>
           ))}
         </div>
         <div className="flex flex-col gap-1">
@@ -97,10 +97,10 @@ const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates }) => {
         </div>
       </div>
       
-      <div className="flex flex-row md:flex-col flex-wrap gap-4 md:gap-6 md:border-l md:border-slate-200 md:pl-8 flex-shrink-0 justify-center">
+      <div className="flex flex-row md:flex-col flex-wrap gap-4 md:gap-6 md:border-l md:border-border md:pl-8 flex-shrink-0 justify-center">
         <div className="text-center md:text-left">
-          <div className="text-3xl font-black text-slate-800">{totalDays}</div>
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Total Days</div>
+          <div className="text-3xl font-black text-foreground">{totalDays}</div>
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Total Days</div>
         </div>
         <div className="text-center md:text-left">
           <div className="text-3xl font-black text-blue-600">{leavesUsed}</div>
@@ -112,13 +112,38 @@ const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates }) => {
             <div className="text-[9px] font-bold text-purple-500 uppercase tracking-widest mt-1">Holidays</div>
           </div>
           <div className="text-center md:text-left">
-            <div className="text-xl font-black text-slate-600">{weekendCount}</div>
-            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Weekends</div>
+            <div className="text-xl font-black text-foreground">{weekendCount}</div>
+            <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Weekends</div>
           </div>
         </div>
       </div>
     </div>
   );
+};
+
+const Globe = ({ lat, lon }) => {
+  const canvasRef = useRef();
+  useEffect(() => {
+    let phi = 0;
+    const globe = createGlobe(canvasRef.current, {
+      devicePixelRatio: 2,
+      width: 400,
+      height: 400,
+      phi: 0,
+      theta: 0,
+      dark: 0,
+      diffuse: 1.2,
+      mapSamples: 16000,
+      mapBrightness: 6,
+      baseColor: [0.9, 0.9, 0.9],
+      markerColor: [0.1, 0.4, 1],
+      glowColor: [1, 1, 1],
+      markers: [{ location: [lat, lon], size: 0.1 }],
+      onRender: (state) => { state.phi = phi; phi += 0.005; }
+    });
+    return () => globe.destroy();
+  }, [lat, lon]);
+  return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><canvas ref={canvasRef} style={{ width: 250, height: 250 }} /></div>;
 };
 
 const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPreviewRange }) => {
@@ -292,68 +317,45 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
     return <CloudRain className="text-blue-500" size={28} />;
   };
 
-  const Globe = ({ lat, lon }) => {
-    const canvasRef = useRef();
-    useEffect(() => {
-      let phi = 0;
-      const globe = createGlobe(canvasRef.current, {
-        devicePixelRatio: 2,
-        width: 400,
-        height: 400,
-        phi: 0,
-        theta: 0,
-        dark: 0,
-        diffuse: 1.2,
-        mapSamples: 16000,
-        mapBrightness: 6,
-        baseColor: [0.9, 0.9, 0.9],
-        markerColor: [0.1, 0.4, 1],
-        glowColor: [1, 1, 1],
-        markers: [{ location: [lat, lon], size: 0.1 }],
-        onRender: (state) => { state.phi = phi; phi += 0.005; }
-      });
-      return () => globe.destroy();
-    }, [lat, lon]);
-    return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><canvas ref={canvasRef} style={{ width: 250, height: 250 }} /></div>;
-  };
+
 
   const currentActiveWindowData = selectedTrip ? selectedTrip.allWindows[activeWindowIndex] : null;
 
   return (
-    <div className="flex flex-col min-h-full bg-slate-50/30">
+    <div className="flex flex-col min-h-full bg-background">
       {!selectedTrip && (
         <div className={`flex flex-col items-center px-6 transition-all duration-700 ${hasSearchedExplicitly ? 'pt-4 pb-2' : 'pt-16 pb-8'}`}>
           {!hasSearchedExplicitly && (
             <div className="flex items-center gap-3 mb-8 animate-in fade-in slide-in-from-bottom-4">
               <Sparkles className="text-blue-500 animate-pulse" size={32} />
-              <h1 className="text-4xl font-black text-slate-800 tracking-tight">Where should we go next?</h1>
+              <h1 className="text-4xl font-black text-foreground tracking-tight">Where should we go next?</h1>
             </div>
           )}
           
           {/* Chatbot style Context Bar */}
-          <div className={`bg-white rounded-2xl shadow-lg border border-slate-200 p-3 max-w-5xl w-full flex flex-wrap lg:flex-nowrap gap-3 items-end transition-all duration-500 ease-out z-20 ${hasSearchedExplicitly ? 'shadow-sm sticky top-0' : 'hover:shadow-xl'}`}>
+          <div className={`bg-card rounded-2xl shadow-apple-lg border border-border p-3 max-w-5xl w-full flex flex-wrap lg:flex-nowrap gap-3 items-end transition-all duration-500 ease-out z-20 ${hasSearchedExplicitly ? 'shadow-sm sticky top-0' : 'hover:shadow-apple-xl'}`}>
             <div className="flex flex-col gap-1 w-full sm:w-auto flex-1 min-w-[120px]">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Origin</label>
-              <div className="flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 focus-within:border-blue-400 focus-within:bg-white transition-colors">
-                <MapPin size={16} className="text-slate-400 mr-2" />
-                <input value={origin} onChange={e=>setOrigin(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-slate-700 w-full" />
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Origin</label>
+              <div className="flex items-center bg-muted rounded-xl px-3 py-2 border border-border focus-within:border-foreground/50 focus-within:bg-card transition-colors">
+                <MapPin size={16} className="text-muted-foreground mr-2" />
+                <input value={origin} onChange={e=>setOrigin(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-foreground w-full" />
               </div>
             </div>
 
             <div className="flex flex-col gap-1 w-full sm:w-auto">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Passport</label>
-              <select value={passport} onChange={e=>setPassport(e.target.value)} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Passport</label>
+              <select value={passport} onChange={e=>setPassport(e.target.value)} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50">
                 <option value="IN">Indian (IN)</option>
                 <option value="US">American (US)</option>
                 <option value="EU">European (EU)</option>
               </select>
             </div>
 
-            <div className="w-px h-10 bg-slate-200 mx-1 hidden lg:block"></div>
+            <div className="w-px h-10 bg-border mx-1 hidden lg:block"></div>
 
             <div className="flex flex-col gap-1 w-full sm:w-auto">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Type</label>
-              <select value={destType} onChange={e=>setDestType(e.target.value)} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Type</label>
+              <select value={destType} onChange={e=>setDestType(e.target.value)} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50">
                 <option value="all">Anywhere</option>
                 <option value="domestic">Domestic</option>
                 <option value="international">International</option>
@@ -361,8 +363,8 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
             </div>
 
             <div className="flex flex-col gap-1 w-full sm:w-auto">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Mode</label>
-              <select value={mode} onChange={e=>setMode(e.target.value)} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Mode</label>
+              <select value={mode} onChange={e=>setMode(e.target.value)} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50">
                 <option value="optimize">Optimize Balance</option>
                 <option value="plan">Existing Plan</option>
                 <option value="custom">Custom Dates</option>
@@ -371,13 +373,13 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
 
             {mode === 'optimize' ? (
               <div className="flex flex-col gap-1 w-full sm:w-24">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Leaves</label>
-                <input type="number" min="1" max="30" value={targetLeaves} onChange={e=>setTargetLeaves(Number(e.target.value))} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400 w-full" />
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Leaves</label>
+                <input type="number" min="1" max="30" value={targetLeaves} onChange={e=>setTargetLeaves(Number(e.target.value))} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50 w-full" />
               </div>
             ) : mode === 'plan' ? (
               <div className="flex flex-col gap-1 w-full sm:w-40">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Select Plan</label>
-                <select value={selectedPlanId} onChange={e=>setSelectedPlanId(e.target.value)} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400 w-full">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Select Plan</label>
+                <select value={selectedPlanId} onChange={e=>setSelectedPlanId(e.target.value)} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50 w-full">
                   <option value="">Select...</option>
                   {leavePlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -385,18 +387,18 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
             ) : (
               <div className="flex gap-2 w-full sm:w-auto">
                 <div className="flex flex-col gap-1 flex-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Start</label>
-                  <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400 w-full" />
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Start</label>
+                  <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50 w-full" />
                 </div>
                 <div className="flex flex-col gap-1 flex-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">End</label>
-                  <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 text-sm font-bold text-slate-700 outline-none focus:border-blue-400 w-full" />
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">End</label>
+                  <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="bg-muted rounded-xl px-3 py-2 border border-border text-sm font-bold text-foreground outline-none focus:border-foreground/50 w-full" />
                 </div>
               </div>
             )}
 
             <div className="flex items-end h-full w-full sm:w-auto">
-              <button onClick={() => handleSearch(false)} disabled={loading} className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition-colors shadow-md disabled:opacity-50 w-full sm:w-auto flex justify-center">
+              <button onClick={() => handleSearch(false)} disabled={loading} className="bg-primary text-primary-foreground p-3 rounded-xl hover:bg-primary/90 transition-colors shadow-md disabled:opacity-50 w-full sm:w-auto flex justify-center">
                 <Search size={20} />
               </button>
             </div>
@@ -406,7 +408,7 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
 
       <div className="flex-1 w-full max-w-7xl mx-auto px-6 pb-20">
         {loading && !selectedTrip && (
-          <div className="flex flex-col items-center justify-center mt-20 text-slate-400">
+          <div className="flex flex-col items-center justify-center mt-20 text-muted-foreground">
              <Globe2 size={48} className="animate-spin mb-4 opacity-50" />
              <p className="font-medium animate-pulse">Calculating optimal routes and seasons...</p>
           </div>
@@ -415,7 +417,7 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
         {!selectedTrip && suggestions.length > 0 && !loading && (
           <div className="mt-2">
             {!hasSearchedExplicitly && (
-               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-6 px-2 flex items-center gap-2 animate-in fade-in">
+               <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-6 px-2 flex items-center gap-2 animate-in fade-in">
                  <Sparkles size={16} className="text-amber-500" /> Recommended for your Balance
                </h3>
             )}
@@ -423,12 +425,12 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
               {suggestions.map((s, i) => {
                 const bestW = s.allWindows[0]; // Card shows the best window by default
                 return (
-                  <div key={i} onClick={() => handleSelectTrip(s)} className={`bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer group flex flex-col ${hasSearchedExplicitly ? 'h-[260px]' : 'h-[320px]'}`}>
-                    <div className={`${hasSearchedExplicitly ? 'h-32' : 'h-48'} relative overflow-hidden bg-slate-100 flex-shrink-0`}>
+                  <div key={i} onClick={() => handleSelectTrip(s)} className={`bg-card rounded-2xl border border-border overflow-hidden shadow-apple-sm hover:shadow-apple-lg transition-all cursor-pointer group flex flex-col ${hasSearchedExplicitly ? 'h-auto min-h-[260px] md:h-[260px]' : 'h-auto min-h-[320px] md:h-[320px]'}`}>
+                    <div className={`${hasSearchedExplicitly ? 'h-32' : 'h-48'} relative overflow-hidden bg-muted flex-shrink-0`}>
                       <img src={s.image} alt={s.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                       <div className="absolute top-3 right-3">
-                         <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border border-white/30 shadow-sm">
+                         <span className="bg-background/20 backdrop-blur-md text-white text-[10px] md:text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border border-white/30 shadow-sm">
                           {bestW.window.totalDaysOff} Days Off
                         </span>
                       </div>
@@ -436,12 +438,12 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
                         <h3 className={`text-white font-black leading-tight drop-shadow-md ${hasSearchedExplicitly ? 'text-lg' : 'text-2xl'}`}>{s.name}</h3>
                       </div>
                     </div>
-                    <div className="p-3 md:p-4 flex flex-col gap-2 flex-1 bg-white relative z-10">
+                    <div className="p-3 md:p-4 flex flex-col gap-2 flex-1 bg-card relative z-10">
                       <div className="flex flex-wrap gap-1.5">
-                        <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider border border-emerald-100">{bestW.seasonMatch}</span>
-                        <span className="bg-blue-50 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider border border-blue-100">{bestW.travelCategory}</span>
+                        <span className="bg-emerald-50/50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider border border-emerald-100">{bestW.seasonMatch}</span>
+                        <span className="bg-blue-50/50 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider border border-blue-100">{bestW.travelCategory}</span>
                       </div>
-                      <div className="mt-auto flex items-center gap-2 text-slate-500">
+                      <div className="mt-auto flex items-center gap-2 text-muted-foreground">
                         <CalendarDays size={14} />
                         <p className="text-[10px] font-bold uppercase tracking-wider">{new Date(bestW.window.startDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})} - {new Date(bestW.window.endDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</p>
                       </div>
@@ -455,15 +457,15 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
 
         {selectedTrip && currentActiveWindowData && (
           <div className="animate-in fade-in slide-in-from-right-8 duration-500 w-full flex flex-col gap-6 pt-4">
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm sticky top-4 z-30">
-              <button onClick={() => setSelectedTrip(null)} className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 transition-colors">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-card p-4 rounded-2xl border border-border shadow-apple-sm sticky top-4 z-30 gap-4 sm:gap-0">
+              <button onClick={() => setSelectedTrip(null)} className="text-sm font-bold text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors">
                 <ArrowRight size={16} className="rotate-180" /> Back
               </button>
               
               <div className="flex items-center gap-4">
                 <div className="hidden md:flex gap-2">
                   <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider border border-emerald-100">{currentActiveWindowData.seasonMatch}</span>
-                  <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider border border-slate-200">Visa: {selectedTrip.visa}</span>
+                  <span className="bg-muted text-foreground text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider border border-border">Visa: {selectedTrip.visa}</span>
                 </div>
                 <button onClick={handleApplyTrip} className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95">
                   <CalendarDays size={16} /> Apply {currentActiveWindowData.window.totalDaysOff} Days to Calendar
@@ -471,31 +473,31 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
               </div>
             </div>
 
-            <div className="flex items-center justify-between bg-white rounded-3xl border border-slate-200 p-2 shadow-sm relative z-20">
+            <div className="flex items-center justify-between bg-card rounded-3xl border border-border p-2 shadow-apple-sm relative z-20">
               <button 
                 disabled={activeWindowIndex === 0} 
                 onClick={() => setActiveWindowIndex(p=>p-1)}
-                className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-2xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm font-bold text-foreground hover:bg-muted rounded-2xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
               >
-                <ChevronLeft size={18} /> Prev Window
+                <ChevronLeft size={16} className="md:w-[18px] md:h-[18px]" /> <span className="hidden sm:inline">Prev Window</span>
               </button>
               <div className="text-center flex flex-col items-center">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Option {activeWindowIndex + 1} of {selectedTrip.allWindows.length}</span>
-                <span className="text-sm font-black text-slate-800">{new Date(currentActiveWindowData.window.startDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})} - {new Date(currentActiveWindowData.window.endDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Option {activeWindowIndex + 1} of {selectedTrip.allWindows.length}</span>
+                <span className="text-sm font-black text-foreground">{new Date(currentActiveWindowData.window.startDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})} - {new Date(currentActiveWindowData.window.endDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
               </div>
               <button 
                 disabled={activeWindowIndex === selectedTrip.allWindows.length - 1} 
                 onClick={() => setActiveWindowIndex(p=>p+1)}
-                className="flex items-center gap-2 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-2xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 md:py-3 text-xs md:text-sm font-bold text-foreground hover:bg-muted rounded-2xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
               >
-                Next Window <ChevronRight size={18} />
+                <span className="hidden sm:inline">Next Window</span> <ChevronRight size={16} className="md:w-[18px] md:h-[18px]" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                <MonthlyCalendar startDate={currentActiveWindowData.window.startDate} endDate={currentActiveWindowData.window.endDate} holidays={holidays} bookedDates={bookedDates} />
                
-               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative p-4 h-full min-h-[300px]">
+               <div className="bg-card rounded-3xl border border-border shadow-apple-sm overflow-hidden relative p-4 h-full min-h-[300px]">
                   {selectedTrip.type === 'international' ? (
                     <Globe lat={selectedTrip.coordinates.lat} lon={selectedTrip.coordinates.lon} />
                   ) : (
@@ -506,18 +508,18 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
                       <Polyline positions={[[originCoords.lat, originCoords.lon], [selectedTrip.coordinates.lat, selectedTrip.coordinates.lon]]} color="#3b82f6" dashArray="5, 10" weight={3} />
                     </MapContainer>
                   )}
-                  <div className="absolute top-6 left-6 z-20 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-slate-200">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Distance</span>
-                    <span className="text-lg font-black text-slate-800 flex items-center gap-2"><MapIcon size={16} className="text-blue-500"/> {Math.round(selectedTrip.distance)} km</span>
+                  <div className="absolute top-6 left-6 z-20 bg-card/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-border">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-0.5">Distance</span>
+                    <span className="text-lg font-black text-foreground flex items-center gap-2"><MapIcon size={16} className="text-blue-500"/> {Math.round(selectedTrip.distance)} km</span>
                   </div>
                 </div>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 flex flex-col gap-6">
-                <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 relative group h-[400px]">
+                <div className="bg-card rounded-3xl overflow-hidden shadow-apple-sm border border-border relative group h-[250px] md:h-[400px]">
                   <img src={selectedTrip.image} alt={selectedTrip.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
                   <div className="absolute inset-0 z-10 p-10 flex flex-col justify-end">
                     <h1 className="text-5xl font-black text-white mb-4 tracking-tight drop-shadow-lg">{selectedTrip.name}, {selectedTrip.country}</h1>
                     <p className="text-white/90 text-sm max-w-2xl font-medium leading-relaxed">
@@ -526,8 +528,8 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
                   </div>
                 </div>
 
-                <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <div className="bg-card rounded-3xl border border-border p-8 shadow-apple-sm">
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
                     <TrendingUp size={16} className="text-blue-500" /> Seasonal Pricing Trend
                   </h3>
                   <div className="h-64 w-full">
@@ -556,14 +558,14 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
 
               <div className="lg:col-span-1 flex flex-col gap-6">
                 
-                <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm flex flex-col justify-center items-center text-center">
-                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 w-full text-left">Expected Climate</h3>
-                   <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 w-full flex flex-col items-center">
+                <div className="bg-card rounded-3xl border border-border p-8 shadow-apple-sm flex flex-col justify-center items-center text-center">
+                   <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4 w-full text-left">Expected Climate</h3>
+                   <div className="bg-muted p-6 rounded-2xl border border-border w-full flex flex-col items-center">
                      {selectedTrip.weather && getWeatherIcon(selectedTrip.weather.weathercode[0])}
-                     <div className="text-5xl font-black text-slate-800 mt-3 tracking-tighter">
-                       {selectedTrip.weather ? Math.round(selectedTrip.weather.temperature_2m_max[0]) : '--'}°<span className="text-slate-400 font-bold text-3xl">C</span>
+                     <div className="text-5xl font-black text-foreground mt-3 tracking-tighter">
+                       {selectedTrip.weather ? Math.round(selectedTrip.weather.temperature_2m_max[0]) : '--'}°<span className="text-muted-foreground font-bold text-3xl">C</span>
                      </div>
-                     <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-widest">Average High</p>
+                     <p className="text-xs text-muted-foreground font-bold mt-2 uppercase tracking-widest">Average High</p>
                    </div>
                 </div>
 
@@ -571,7 +573,7 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
                   <a 
                     href={`https://www.google.com/travel/flights?q=Flights%20to%20${encodeURIComponent(selectedTrip.name)}%20from%20${encodeURIComponent(origin)}`}
                     target="_blank" rel="noreferrer"
-                    className="flex-1 bg-slate-900 text-white hover:bg-blue-600 transition-colors rounded-2xl p-5 flex flex-col items-center justify-center gap-3 group shadow-md"
+                    className="flex-1 bg-foreground text-background hover:bg-primary transition-colors rounded-2xl p-5 flex flex-col items-center justify-center gap-3 group shadow-md"
                   >
                     <Plane size={24} className="group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform" />
                     <span className="text-xs font-bold uppercase tracking-widest">Find Flights</span>
@@ -579,7 +581,7 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
                   <a 
                     href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(selectedTrip.name)}`}
                     target="_blank" rel="noreferrer"
-                    className="flex-1 bg-slate-900 text-white hover:bg-indigo-600 transition-colors rounded-2xl p-5 flex flex-col items-center justify-center gap-3 group shadow-md"
+                    className="flex-1 bg-foreground text-background hover:bg-primary transition-colors rounded-2xl p-5 flex flex-col items-center justify-center gap-3 group shadow-md"
                   >
                     <BedDouble size={24} className="group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-bold uppercase tracking-widest">Find Hotels</span>

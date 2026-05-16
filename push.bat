@@ -1,0 +1,9 @@
+@echo off
+echo Staging changes...
+git add .
+echo Committing changes...
+git commit -m "UI/UX refinements and calendar revert"
+echo Pushing to origin main...
+git push origin main
+echo Done!
+pause

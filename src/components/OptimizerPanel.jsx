@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X } from 'lucide-react';
+import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, ChevronDown } from 'lucide-react';
 import { findOptimalWindows } from '../utils/leaveOptimizer';
 import { parseNaturalLanguage } from '../utils/nlpParser';
 
-const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], viewMode, setFocusedMonth }) => {
+const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], viewMode, setFocusedMonth, inlineOnMobile = false }) => {
   const [targetLeaves, setTargetLeaves] = useState(2);
   const [targetDuration, setTargetDuration] = useState(null);
   const [targetMonth, setTargetMonth] = useState('all');
   const [suggestions, setSuggestions] = useState([]);
   const [agenticText, setAgenticText] = useState('');
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
+
+  const monthOptions = [
+    { value: 'all', label: 'Any Month' },
+    { value: '0', label: 'January' },
+    { value: '1', label: 'February' },
+    { value: '2', label: 'March' },
+    { value: '3', label: 'April' },
+    { value: '4', label: 'May' },
+    { value: '5', label: 'June' },
+    { value: '6', label: 'July' },
+    { value: '7', label: 'August' },
+    { value: '8', label: 'September' },
+    { value: '9', label: 'October' },
+    { value: '10', label: 'November' },
+    { value: '11', label: 'December' }
+  ];
 
   useEffect(() => {
     handleOptimize();
@@ -65,133 +82,156 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
   };
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className={`flex flex-col bg-card relative ${inlineOnMobile ? 'h-auto md:h-full' : 'h-full'}`}>
       
       {/* Agentic Input */}
-      <form onSubmit={handleAgenticSubmit} className="p-4 border-b border-slate-100 bg-gradient-to-r from-purple-50 to-blue-50">
+      <form onSubmit={handleAgenticSubmit} className="p-3 md:p-4 border-b border-border bg-card">
         <div className="relative flex items-center">
-          <Sparkles className="absolute left-3 text-purple-500" size={16} />
+          <Sparkles className="absolute left-3 text-purple-400" size={16} />
           <input 
             type="text" 
             value={agenticText}
             onChange={(e) => setAgenticText(e.target.value)}
             placeholder="e.g. 4 day trip in October..."
-            className="w-full pl-9 pr-16 py-2.5 bg-white border border-purple-200/60 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all placeholder:text-slate-400 text-slate-700 font-medium"
+            className="w-full pl-9 pr-16 py-2 bg-muted border border-border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all placeholder:text-muted-foreground text-foreground font-medium"
           />
-          <div className="absolute right-2 flex items-center gap-1">
+          <div className="absolute right-1.5 flex items-center gap-1">
             {agenticText && (
-              <button type="button" onClick={handleAgenticClear} className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
+              <button type="button" onClick={handleAgenticClear} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
                 <X size={14} />
               </button>
             )}
-            <button type="submit" className="p-1.5 bg-purple-100 text-purple-600 rounded-md hover:bg-purple-200 transition-colors">
-              <Search size={14} />
+            <button type="submit" className="p-1.5 bg-purple-500 text-white rounded-full hover:bg-purple-600 transition-colors shadow-apple-sm">
+              <Search size={12} strokeWidth={3} />
             </button>
           </div>
         </div>
       </form>
 
-      <div className="p-4 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/50">
-        <div className="flex justify-between items-center">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Target Leaves</span>
-          <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-md p-1">
-            <button 
-              onClick={() => { setTargetLeaves(Math.max(1, targetLeaves - 1)); setTargetDuration(null); }}
-              className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:bg-slate-100 transition-colors"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="text-sm font-bold text-slate-700 w-4 text-center">{targetLeaves}</span>
-            <button 
-              onClick={() => { setTargetLeaves(Math.min(15, targetLeaves + 1)); setTargetDuration(null); }}
-              className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:bg-slate-100 transition-colors"
-            >
-              <Plus size={14} />
-            </button>
+      <div className="px-4 py-4 border-b border-border flex justify-between items-center bg-muted/50">
+        <div className="flex flex-col gap-2">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Leaves</span>
+          <div className="flex items-center bg-card border border-border rounded-full p-1 shadow-apple-sm w-fit">
+            <button onClick={() => { setTargetLeaves(Math.max(1, targetLeaves - 1)); setTargetDuration(null); }} className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors active:bg-muted/80"><Minus size={20} strokeWidth={2.5} /></button>
+            <span className="text-lg font-black text-foreground w-10 text-center">{targetLeaves}</span>
+            <button onClick={() => { setTargetLeaves(Math.min(15, targetLeaves + 1)); setTargetDuration(null); }} className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors active:bg-muted/80"><Plus size={20} strokeWidth={2.5} /></button>
           </div>
         </div>
         
-        <div className="flex justify-between items-center">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Month</span>
-          <select 
-            className="text-sm font-medium bg-white border border-slate-200 rounded-md px-3 py-1.5 outline-none text-slate-700 focus:border-slate-400 transition-colors"
-            value={targetMonth}
-            onChange={(e) => setTargetMonth(e.target.value)}
+        <div className="flex flex-col gap-2 items-end relative">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pr-1">Target Month</span>
+          <button 
+            type="button"
+            onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
+            className="flex items-center justify-between gap-2 text-sm font-bold bg-card border border-border rounded-full pl-4 pr-3 py-2.5 outline-none text-foreground shadow-apple-sm min-w-[130px] hover:bg-muted transition-colors"
           >
-            <option value="all">Entire Year</option>
-            <option value="0">January</option>
-            <option value="1">February</option>
-            <option value="2">March</option>
-            <option value="3">April</option>
-            <option value="4">May</option>
-            <option value="5">June</option>
-            <option value="6">July</option>
-            <option value="7">August</option>
-            <option value="8">September</option>
-            <option value="9">October</option>
-            <option value="10">November</option>
-            <option value="11">December</option>
-          </select>
+            <span>{monthOptions.find(m => m.value === targetMonth)?.label || 'Any Month'}</span>
+            <ChevronDown size={16} className={`text-muted-foreground transition-transform duration-200 ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isMonthDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsMonthDropdownOpen(false)}></div>
+              <div className="absolute right-0 top-full mt-2 w-40 bg-card rounded-2xl shadow-apple border border-border z-50 flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto hide-scrollbar">
+                {monthOptions.map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => { setTargetMonth(m.value); setIsMonthDropdownOpen(false); }}
+                    className={`px-4 py-2.5 text-sm font-bold text-left transition-colors ${targetMonth === m.value ? 'bg-purple-50 text-purple-700' : 'text-muted-foreground hover:bg-muted'}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className={`p-4 flex flex-col gap-4 ${inlineOnMobile ? 'h-auto md:flex-1 md:overflow-y-auto' : 'flex-1 overflow-y-auto'}`}>
         <div className="flex justify-between items-center mb-1">
-          <h2 className="font-semibold flex items-center gap-2 text-slate-800 text-sm">
+          <h2 className="font-semibold flex items-center gap-2 text-foreground text-sm">
             <Lightbulb className="text-yellow-500" size={16} fill="currentColor" />
             {targetDuration ? `${targetDuration}-Day Trips` : `Max Trips for ${targetLeaves}L`}
           </h2>
-          <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">
+          <span className="bg-muted text-foreground px-2 py-0.5 rounded-full text-xs font-bold">
             {suggestions.length}
           </span>
         </div>
 
         {suggestions.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-32 text-slate-400 text-sm gap-2">
+          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm gap-2">
             <Settings2 size={24} className="opacity-50" />
             No optimal bridges found.
           </div>
         )}
         
-        {suggestions.slice(0, 8).map((s, idx) => (
+        {suggestions.slice(0, 8).map((s, idx) => {
+          const isHero = idx === 0;
+          return (
           <div 
             key={idx} 
-            className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm hover:border-slate-300 hover:shadow transition-all cursor-default"
+            className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center ${
+              isHero
+                ? 'bg-foreground text-background shadow-apple border border-foreground/10 hover:opacity-90'
+                : 'bg-card border border-border shadow-apple-sm hover:shadow-apple hover:border-foreground/20'
+            }`}
+            onClick={() => handlePreviewClick(s)}
             onMouseEnter={() => handleHover(s)}
             onMouseLeave={() => handleHover(null)}
           >
-            <div className="flex justify-between items-start mb-3">
+            {/* Left accent strip */}
+            {!isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-purple-500 rounded-r-full opacity-50"></div>}
+            {isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-background/40 rounded-r-full"></div>}
+            
+            <div className="flex flex-col gap-1 pl-2">
               <div className="flex items-center gap-2">
-                <span className="bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-bold">
+                <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-bold ${
+                  isHero ? 'bg-background/20 text-background/80' : 'bg-muted text-foreground'
+                }`}>
                   {new Date(s.startDate).toLocaleString('default', { month: 'short' })}
                 </span>
-                <span className="bg-orange-50 text-orange-600 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-bold border border-orange-100">
-                  {s.totalDaysOff}d stretch
+                <span className={`text-[10px] uppercase tracking-wider font-bold ${
+                  isHero ? 'text-orange-300' : 'text-orange-500'
+                }`}>
+                  {s.totalDaysOff} Days Off
                 </span>
+                {isHero && <span className="text-[8px] font-bold uppercase tracking-widest bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">Top Pick</span>}
               </div>
-              <div className="flex flex-col items-end">
-                <span className="text-lg font-bold text-slate-800 leading-none">{s.leavesRequired}L</span>
-                <span className="text-[9px] text-slate-400 uppercase font-bold mt-0.5 tracking-wider">needed</span>
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <h4 className="font-semibold text-sm text-slate-800 mb-1 leading-tight">
-                {s.holidayName ? s.holidayName : `${s.startDate.toLocaleString('default', { month: 'short' })} ${s.startDate.getDate()} - ${s.endDate.toLocaleString('default', { month: 'short' })} ${s.endDate.getDate()}`}
+              <h4 className={`font-bold text-sm leading-tight ${
+                isHero ? 'text-background' : 'text-foreground'
+              }`}>
+                {s.holidayName ? s.holidayName : `${s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} - ${s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}`}
               </h4>
-              <p className="text-xs text-slate-500 font-medium">
-                {s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} – {s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
-              </p>
+              {s.holidayName && (
+                <p className={`text-[10px] font-medium uppercase tracking-widest ${
+                  isHero ? 'text-background/50' : 'text-muted-foreground'
+                }`}>
+                  {s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} – {s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
+                </p>
+              )}
             </div>
 
-            <button 
-              onClick={() => handlePreviewClick(s)}
-              className="w-full flex items-center justify-center gap-1 bg-slate-900 text-white hover:bg-black text-xs font-semibold py-2 rounded transition-colors shadow-sm"
-            >
-              Preview Range <ChevronRight size={14} />
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end">
+                <span className={`text-lg font-black leading-none font-mono ${
+                  isHero ? 'text-background' : 'text-foreground'
+                }`}>{s.leavesRequired}<span className={`text-[10px] ml-0.5 ${
+                  isHero ? 'text-background/50' : 'text-muted-foreground'
+                }`}>L</span></span>
+                <span className={`text-[8px] uppercase font-bold tracking-widest mt-0.5 ${
+                  isHero ? 'text-background/40' : 'text-muted-foreground'
+                }`}>Cost</span>
+              </div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600'
+              }`}>
+                <ChevronRight size={16} />
+              </div>
+            </div>
           </div>
-        ))}
+        );})}
       </div>
     </div>
   );
