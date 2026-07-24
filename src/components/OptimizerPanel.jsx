@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, ChevronDown } from 'lucide-react';
+import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { findOptimalWindows } from '../utils/leaveOptimizer';
 import { parseNaturalLanguage } from '../utils/nlpParser';
 
-const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], viewMode, setFocusedMonth, inlineOnMobile = false }) => {
-  const [targetLeaves, setTargetLeaves] = useState(2);
+const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], viewMode, setFocusedMonth, inlineOnMobile = false, leaves }) => {
+  const plRem = leaves?.pl ? (leaves.pl.total - leaves.pl.used) : 15;
+  const elRem = leaves?.el ? (leaves.el.total - leaves.el.used) : 10;
+  const rhRem = leaves?.rh ? (leaves.rh.total - leaves.rh.used) : 1;
+  const maxUsableLeaves = Math.max(1, Math.floor(plRem + Math.min(elRem, 2) + Math.min(rhRem, 1)));
+
+  const [optimizerMode, setOptimizerMode] = useState('best'); // 'best' (default) or 'manual'
+  const [targetLeaves, setTargetLeaves] = useState(Math.min(2, maxUsableLeaves));
   const [targetDuration, setTargetDuration] = useState(null);
   const [targetMonth, setTargetMonth] = useState('all');
   const [suggestions, setSuggestions] = useState([]);
@@ -29,10 +35,16 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
 
   useEffect(() => {
     handleOptimize();
-  }, [targetLeaves, targetMonth, targetDuration, bookedDates]);
+  }, [optimizerMode, targetLeaves, targetMonth, targetDuration, bookedDates, maxUsableLeaves]);
 
   const handleOptimize = () => {
-    const results = findOptimalWindows({ targetLeaves, targetDuration, targetMonth, bookedDates });
+    const results = findOptimalWindows({
+      targetLeaves: optimizerMode === 'best' ? maxUsableLeaves : targetLeaves,
+      targetDuration,
+      targetMonth,
+      bookedDates,
+      mode: optimizerMode
+    });
     setSuggestions(results);
   };
 
@@ -42,7 +54,10 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
     
     const parsed = parseNaturalLanguage(agenticText);
     
-    if (parsed.targetLeaves !== null) setTargetLeaves(parsed.targetLeaves);
+    if (parsed.targetLeaves !== null) {
+      setOptimizerMode('manual');
+      setTargetLeaves(Math.min(parsed.targetLeaves, maxUsableLeaves));
+    }
     if (parsed.targetDuration !== null) setTargetDuration(parsed.targetDuration);
     else setTargetDuration(null);
     
@@ -84,7 +99,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
   return (
     <div className={`flex flex-col bg-card relative ${inlineOnMobile ? 'h-auto md:h-full' : 'h-full'}`}>
       
-      {/* Agentic Input */}
+      {/* Agentic Natural Language Input */}
       <form onSubmit={handleAgenticSubmit} className="p-3 md:p-4 border-b border-border bg-card">
         <div className="relative flex items-center">
           <Sparkles className="absolute left-3 text-purple-400" size={16} />
@@ -93,7 +108,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
             value={agenticText}
             onChange={(e) => setAgenticText(e.target.value)}
             placeholder="e.g. 4 day trip in October..."
-            className="w-full pl-9 pr-16 py-2 bg-muted border border-border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all placeholder:text-muted-foreground text-foreground font-medium"
+            className="w-full pl-9 pr-16 py-2 bg-muted border border-border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all placeholder:text-muted-foreground text-foreground font-medium select-text"
           />
           <div className="absolute right-1.5 flex items-center gap-1">
             {agenticText && (
@@ -108,25 +123,78 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
         </div>
       </form>
 
-      <div className="px-4 py-4 border-b border-border flex justify-between items-center bg-muted/50">
-        <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Leaves</span>
-          <div className="flex items-center bg-card border border-border rounded-full p-1 shadow-apple-sm w-fit">
-            <button onClick={() => { setTargetLeaves(Math.max(1, targetLeaves - 1)); setTargetDuration(null); }} className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors active:bg-muted/80"><Minus size={20} strokeWidth={2.5} /></button>
-            <span className="text-lg font-black text-foreground w-10 text-center">{targetLeaves}</span>
-            <button onClick={() => { setTargetLeaves(Math.min(15, targetLeaves + 1)); setTargetDuration(null); }} className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors active:bg-muted/80"><Plus size={20} strokeWidth={2.5} /></button>
-          </div>
+      {/* Mode Selector Tabs (Best Ratio vs Manual) */}
+      <div className="px-4 pt-3 pb-2 border-b border-border bg-muted/30 flex items-center justify-between gap-2">
+        <div className="flex bg-muted p-1 rounded-xl border border-border/40 w-full">
+          <button 
+            type="button"
+            onClick={() => setOptimizerMode('best')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              optimizerMode === 'best' 
+                ? 'bg-background text-foreground shadow-apple-sm border border-border/50 font-black' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Sparkles size={13} className="text-amber-500" /> Best Ratio
+          </button>
+          <button 
+            type="button"
+            onClick={() => setOptimizerMode('manual')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              optimizerMode === 'manual' 
+                ? 'bg-background text-foreground shadow-apple-sm border border-border/50 font-black' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <SlidersHorizontal size={13} /> Manual Count
+          </button>
         </div>
+      </div>
+
+      {/* Controls Bar */}
+      <div className="px-4 py-3 border-b border-border flex justify-between items-center bg-muted/50">
+        {optimizerMode === 'manual' ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">Target Leaves</span>
+              <span className="text-[9px] font-bold text-muted-foreground/60">Max Usable: {maxUsableLeaves}</span>
+            </div>
+            <div className="flex items-center bg-card border border-border rounded-full p-1 shadow-apple-sm w-fit">
+              <button 
+                onClick={() => { setTargetLeaves(Math.max(1, targetLeaves - 1)); setTargetDuration(null); }} 
+                className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+              >
+                <Minus size={16} strokeWidth={2.5} />
+              </button>
+              <span className="text-base font-black text-foreground w-8 text-center">{targetLeaves}</span>
+              <button 
+                onClick={() => { setTargetLeaves(Math.min(maxUsableLeaves, targetLeaves + 1)); setTargetDuration(null); }} 
+                disabled={targetLeaves >= maxUsableLeaves}
+                className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                title={targetLeaves >= maxUsableLeaves ? `Maximum usable leaves is ${maxUsableLeaves} (without medical cert)` : ''}
+              >
+                <Plus size={16} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider pl-1 flex items-center gap-1">
+              <Sparkles size={11} /> Smart Ratio Search
+            </span>
+            <span className="text-xs font-bold text-foreground pl-1">Max Usable: {maxUsableLeaves} Leaves</span>
+          </div>
+        )}
         
-        <div className="flex flex-col gap-2 items-end relative">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pr-1">Target Month</span>
+        <div className="flex flex-col gap-1 items-end relative">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pr-1">Target Month</span>
           <button 
             type="button"
             onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
-            className="flex items-center justify-between gap-2 text-sm font-bold bg-card border border-border rounded-full pl-4 pr-3 py-2.5 outline-none text-foreground shadow-apple-sm min-w-[130px] hover:bg-muted transition-colors"
+            className="flex items-center justify-between gap-2 text-xs font-bold bg-card border border-border rounded-full pl-3 pr-2.5 py-1.5 outline-none text-foreground shadow-apple-sm min-w-[120px] hover:bg-muted transition-colors"
           >
             <span>{monthOptions.find(m => m.value === targetMonth)?.label || 'Any Month'}</span>
-            <ChevronDown size={16} className={`text-muted-foreground transition-transform duration-200 ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isMonthDropdownOpen && (
@@ -138,7 +206,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
                     key={m.value}
                     type="button"
                     onClick={() => { setTargetMonth(m.value); setIsMonthDropdownOpen(false); }}
-                    className={`px-4 py-2.5 text-sm font-bold text-left transition-colors ${targetMonth === m.value ? 'bg-purple-50 text-purple-700' : 'text-muted-foreground hover:bg-muted'}`}
+                    className={`px-4 py-2.5 text-xs font-bold text-left transition-colors ${targetMonth === m.value ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'text-muted-foreground hover:bg-muted'}`}
                   >
                     {m.label}
                   </button>
@@ -149,11 +217,16 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
         </div>
       </div>
 
-      <div className={`p-4 flex flex-col gap-4 ${inlineOnMobile ? 'h-auto md:flex-1 md:overflow-y-auto' : 'flex-1 overflow-y-auto'}`}>
+      {/* Suggestions List */}
+      <div className={`p-4 flex flex-col gap-3.5 ${inlineOnMobile ? 'h-auto md:flex-1 md:overflow-y-auto' : 'flex-1 overflow-y-auto'}`}>
         <div className="flex justify-between items-center mb-1">
           <h2 className="font-semibold flex items-center gap-2 text-foreground text-sm">
             <Lightbulb className="text-yellow-500" size={16} fill="currentColor" />
-            {targetDuration ? `${targetDuration}-Day Trips` : `Max Trips for ${targetLeaves}L`}
+            {targetDuration 
+              ? `${targetDuration}-Day Trips` 
+              : optimizerMode === 'best' 
+              ? `Best Picks` 
+              : `Bridges for ${targetLeaves} Leave${targetLeaves > 1 ? 's' : ''}`}
           </h2>
           <span className="bg-muted text-foreground px-2 py-0.5 rounded-full text-xs font-bold">
             {suggestions.length}
@@ -163,7 +236,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
         {suggestions.length === 0 && (
           <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm gap-2">
             <Settings2 size={24} className="opacity-50" />
-            No optimal bridges found.
+            No optimal leave bridges found.
           </div>
         )}
         
@@ -172,7 +245,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
           return (
           <div 
             key={idx} 
-            className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center ${
+            className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center select-none ${
               isHero
                 ? 'bg-foreground text-background shadow-apple border border-foreground/10 hover:opacity-90'
                 : 'bg-card border border-border shadow-apple-sm hover:shadow-apple hover:border-foreground/20'
@@ -186,7 +259,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
             {isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-background/40 rounded-r-full"></div>}
             
             <div className="flex flex-col gap-1 pl-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-bold ${
                   isHero ? 'bg-background/20 text-background/80' : 'bg-muted text-foreground'
                 }`}>
@@ -197,7 +270,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
                 }`}>
                   {s.totalDaysOff} Days Off
                 </span>
-                {isHero && <span className="text-[8px] font-bold uppercase tracking-widest bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">Top Pick</span>}
+                {isHero && <span className="text-[8px] font-bold uppercase tracking-wider bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">Top Pick</span>}
               </div>
               <h4 className={`font-bold text-sm leading-tight ${
                 isHero ? 'text-background' : 'text-foreground'
@@ -205,7 +278,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
                 {s.holidayName ? s.holidayName : `${s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} - ${s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}`}
               </h4>
               {s.holidayName && (
-                <p className={`text-[10px] font-medium uppercase tracking-widest ${
+                <p className={`text-[10px] font-medium uppercase tracking-wider ${
                   isHero ? 'text-background/50' : 'text-muted-foreground'
                 }`}>
                   {s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} – {s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
@@ -220,12 +293,12 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
                 }`}>{s.leavesRequired}<span className={`text-[10px] ml-0.5 ${
                   isHero ? 'text-background/50' : 'text-muted-foreground'
                 }`}>L</span></span>
-                <span className={`text-[8px] uppercase font-bold tracking-widest mt-0.5 ${
+                <span className={`text-[8px] uppercase font-bold tracking-wider mt-0.5 ${
                   isHero ? 'text-background/40' : 'text-muted-foreground'
                 }`}>Cost</span>
               </div>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600'
+                isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600 dark:group-hover:bg-purple-900/40 dark:group-hover:text-purple-300'
               }`}>
                 <ChevronRight size={16} />
               </div>

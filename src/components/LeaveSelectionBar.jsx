@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, AlertTriangle, ArrowRight } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
+import { checkSequentialELWarning } from '../utils/leaveOptimizer';
 import { TimePicker } from './TimePicker';
 
 const LeaveSelectionBar = ({ 
@@ -8,7 +9,8 @@ const LeaveSelectionBar = ({
   previewDates, 
   onCancel, 
   onApply, 
-  balances 
+  balances,
+  bookedDates = []
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedType, setSelectedType] = useState('pl');
@@ -34,6 +36,12 @@ const LeaveSelectionBar = ({
       bg: 'bg-green-50 dark:bg-green-500/10', 
       text: 'text-green-700 dark:text-green-400',
       badge: 'bg-green-100/50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+    },
+    wfh: { 
+      border: 'border-cyan-500', 
+      bg: 'bg-cyan-50 dark:bg-cyan-500/10', 
+      text: 'text-cyan-700 dark:text-cyan-400',
+      badge: 'bg-cyan-100/50 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-800 text-cyan-800 dark:text-cyan-300'
     }
   };
 
@@ -51,7 +59,7 @@ const LeaveSelectionBar = ({
   const durationPerDay = isHalfDay ? 0.5 : 1;
   const leavesNeeded = isHalfDay ? 0.5 : baseLeavesNeeded;
 
-  const showElWarning = selectedType === 'el' && baseLeavesNeeded > 2;
+  const showElWarning = selectedType === 'el' && checkSequentialELWarning(actualLeaves, bookedDates);
 
   // Auto-generate plan name
   const first = dates.length > 0 ? new Date(dates[0]) : new Date();
@@ -98,15 +106,15 @@ const LeaveSelectionBar = ({
 
   // Desktop only — mobile uses the unified bottom bar in App.jsx
   const containerClasses = isExpanded
-    ? "hidden md:flex fixed md:top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-card text-foreground md:w-[480px] flex-col max-h-[88vh] md:rounded-[32px] shadow-2xl border border-border overflow-hidden z-[100]"
-    : "hidden md:flex fixed md:bottom-8 left-1/2 transform -translate-x-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-2 md:rounded-full shadow-2xl border border-border/20 z-[60] overflow-hidden items-center transition-all duration-300 ease-out hover:shadow-[0_12px_40px_-8px_hsl(var(--foreground)/0.3)]";
+    ? "hidden md:flex fixed md:top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-card text-foreground md:w-[480px] flex-col max-h-[88vh] md:rounded-[32px] shadow-2xl shadow-black/80 border border-border overflow-hidden z-[100]"
+    : "hidden md:flex fixed md:bottom-8 left-1/2 transform -translate-x-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-2 md:rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[60] overflow-hidden items-center transition-all duration-300 ease-out";
 
   return (
     <>
       {/* Backdrop for expanded modal */}
       {isExpanded && (
         <div 
-          className="hidden md:block fixed inset-0 bg-foreground/30 backdrop-blur-md z-[95]"
+          className="hidden md:block fixed inset-0 bg-black/60 backdrop-blur-md z-[95]"
           onClick={() => setIsExpanded(false)}
         />
       )}
@@ -117,8 +125,15 @@ const LeaveSelectionBar = ({
           <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3 flex-1">
             {selectionStart && previewDates.length === 0 ? (
               <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
-                 <span className="text-sm font-semibold text-background leading-none whitespace-nowrap">Select end date</span>
+                 <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+                 <div className="flex flex-col">
+                   <span className="text-xs font-bold text-background leading-none">
+                     Selected {new Date(selectionStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                   </span>
+                   <span className="text-[10px] text-background/70 leading-none mt-1">
+                     Select an end date for a trip range, or apply 1 day directly.
+                   </span>
+                 </div>
               </div>
             ) : (
               <>
@@ -137,12 +152,20 @@ const LeaveSelectionBar = ({
             >
               Cancel
             </button>
+            {selectionStart && previewDates.length === 0 && (
+              <button 
+                onClick={() => setIsExpanded(true)}
+                className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap"
+              >
+                Apply Single Day <Check size={14} strokeWidth={3} />
+              </button>
+            )}
             {previewDates.length > 0 && (
               <button 
                 onClick={() => setIsExpanded(true)}
                 className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap"
               >
-                Confirm <Check size={14} strokeWidth={3} />
+                Confirm Plan <Check size={14} strokeWidth={3} />
               </button>
             )}
           </div>
@@ -236,15 +259,23 @@ const LeaveSelectionBar = ({
                   <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'rh' ? 'bg-green-100/50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' : 'bg-background border-border text-muted-foreground'}`}>{balances.rh} left</span>
                 </label>
 
+                <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'wfh' ? `${colors.wfh.border} ${colors.wfh.bg}` : 'border-border hover:border-foreground/30'}`}>
+                  <div className="flex items-center gap-3">
+                    <input type="radio" name="leaveType" value="wfh" checked={selectedType === 'wfh'} onChange={() => {}} onClick={() => setSelectedType('wfh')} className="w-4 h-4 text-cyan-500 focus:ring-cyan-400" />
+                    <span className={`font-medium ${selectedType === 'wfh' ? colors.wfh.text : 'text-foreground'}`}>WFH — Work From Home</span>
+                  </div>
+                  <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'wfh' ? colors.wfh.badge : 'bg-background border-border text-muted-foreground'}`}>Max 10/mo</span>
+                </label>
+
               </div>
             </div>
 
             {showElWarning && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-red-500/10 dark:bg-red-950/40 border border-red-500/30 text-red-700 dark:text-red-300 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                 <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-                <div className="text-xs text-red-800">
+                <div className="text-xs">
                   <span className="font-black block mb-1 uppercase tracking-wider text-[10px]">Medical Certificate Required</span>
-                  You are applying for more than 2 consecutive Emergency Leaves. Please ensure you have a valid medical certificate to provide to HR.
+                  You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
                 </div>
               </div>
             )}

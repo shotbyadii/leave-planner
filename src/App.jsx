@@ -2,17 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Check, AlertTriangle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend } from './data/holidays';
-import { fetchBookedLeaves, fetchLeavePlans, resetAllLeaves, removeLeave, deleteLeavePlan, addLeave, createLeavePlan } from './services/leaveService';
+import { checkSequentialELWarning } from './utils/leaveOptimizer';
+import { fetchBookedLeaves, fetchLeavePlans, resetAllLeaves, removeLeave, deleteLeavePlan, updateLeavePlan, addLeave, createLeavePlan } from './services/leaveService';
 import Calendar from './components/Calendar';
 import OptimizerPanel from './components/OptimizerPanel';
 import LeaveTracker from './components/LeaveTracker';
 import TripPlanner from './components/TripPlanner';
 import { TimePicker } from './components/TimePicker';
 import LeaveSelectionBar from './components/LeaveSelectionBar';
+import WfhCheckinModal from './components/WfhCheckinModal';
+import NotificationPromptModal from './components/NotificationPromptModal';
 import './index.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('calendar');
+  const [wfhModalOpen, setWfhModalOpen] = useState(false);
+  const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
+  const [notifModalOpen, setNotifModalOpen] = useState(false);
   const [leaves, setLeaves] = useState({
     pl: { total: 15, used: 0, label: 'Privileged', color: 'blue', bg: 'bg-blue-400', badge: 'bg-blue-50 text-blue-600' },
     el: { total: 10, used: 0, label: 'Emergency', color: 'orange', bg: 'bg-orange-400', badge: 'bg-orange-50 text-orange-600' },
@@ -38,10 +44,79 @@ function App() {
   const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [isLeavesLoaded, setIsLeavesLoaded] = useState(false);
+  const [devDateStr, setDevDateStr] = useState(import.meta.env.DEV ? (localStorage.getItem('dev_date_override') || '') : '');
+
+  const getTodayStr = () => {
+    if (import.meta.env.DEV && devDateStr) return devDateStr;
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     loadLeaves();
   }, []);
+
+  // Persistent Notification Permission Prompt (Until "Not Needed" is clicked)
+  useEffect(() => {
+    if (!isLeavesLoaded) return;
+    const isDismissed = localStorage.getItem('notif_prompt_dismissed') === 'true';
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission !== 'granted' && !isDismissed) {
+        setNotifModalOpen(true);
+      }
+    }
+  }, [isLeavesLoaded]);
+
+  const handleEnableNotif = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        setNotifModalOpen(false);
+        new Notification('Attendance Reminders Enabled', {
+          body: 'You will receive daily 12 PM check-in reminders on working days.',
+          icon: '/favicon.ico'
+        });
+      }
+    }
+  };
+
+  // 12 PM Working Day Attendance Check-in Prompt
+  useEffect(() => {
+    if (!isLeavesLoaded) return;
+    const todayStr = getTodayStr();
+    
+    const isWorkday = !isWeekend(todayStr) && !isHoliday(todayStr);
+    const hasStatusRecorded = bookedDates.some(b => b.date === todayStr);
+    const now = new Date();
+    const isAfterNoon = devDateStr ? true : now.getHours() >= 12;
+
+    if (isWorkday && !hasStatusRecorded && isAfterNoon && !hasPromptedWfh) {
+      setWfhModalOpen(true);
+      setHasPromptedWfh(true);
+
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('Daily Attendance Check-in', {
+          body: `It is past 12 PM. Please confirm if ${todayStr} is WFH or In-Office.`,
+          icon: '/favicon.ico'
+        });
+      }
+    }
+  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr]);
+
+  const handleWfhStatusSelect = async (statusType) => {
+    const todayStr = getTodayStr();
+    await addLeave(todayStr, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office');
+    await loadLeaves();
+    setWfhModalOpen(false);
+  };
+
+  const handleWfhMarkLeave = () => {
+    const todayStr = getTodayStr();
+    setWfhModalOpen(false);
+    setActiveTab('calendar');
+    setSelectionStart(todayStr);
+  };
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -58,6 +133,7 @@ function App() {
     setBookedDates(dbLeaves);
     setLeavePlans(dbPlans);
     updateLeaveCounts(dbLeaves);
+    setIsLeavesLoaded(true);
   };
 
   const updateLeaveCounts = (datesArray) => {
@@ -92,6 +168,11 @@ function App() {
   const handleDeletePlan = async (planId) => {
     await deleteLeavePlan(planId);
     await loadLeaves(); // Reload everything since CASCADE deletes leaves too
+  };
+
+  const handleUpdatePlan = async (planId, newName) => {
+    await updateLeavePlan(planId, { name: newName });
+    await loadLeaves();
   };
 
   const handlePreviewRange = (datesArray) => {
@@ -178,7 +259,51 @@ function App() {
                 </div>
               );
             })}
+            {(() => {
+              const curMonthKey = new Date().toISOString().substring(0, 7);
+              const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
+              const remainingWfh = Math.max(0, 10 - wfhUsedThisMonth);
+              const pctWfh = (wfhUsedThisMonth / 10) * 100;
+              return (
+                <div className="flex flex-col w-28 border-l border-border/60 pl-5">
+                  <div className="flex justify-between items-end mb-0.5">
+                    <span className="text-[10px] font-bold font-mono text-cyan-500 uppercase">WFH <span className="ml-1 text-[8px] font-sans lowercase px-1 rounded bg-cyan-500/10 text-cyan-400">max 10/mo</span></span>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-0.5">
+                    <span className="text-xl font-bold font-mono text-cyan-400">{wfhUsedThisMonth}</span>
+                    <span className="text-xs font-mono text-muted-foreground">/ 10</span>
+                  </div>
+                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-300 bg-cyan-400" style={{ width: `${pctWfh}%` }} />
+                  </div>
+                  <span className="text-[9px] font-mono text-muted-foreground mt-0.5">{remainingWfh} left this mo</span>
+                </div>
+              );
+            })()}
             <div className="flex items-center gap-2 border-l border-border pl-6 ml-2">
+              {import.meta.env.DEV && (
+                <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-2.5 py-1 text-xs text-amber-600 dark:text-amber-400">
+                  <span className="font-mono text-[10px] font-bold uppercase">🧪 Dev Date:</span>
+                  <input 
+                    type="date" 
+                    value={getTodayStr()} 
+                    onChange={(e) => {
+                      setDevDateStr(e.target.value);
+                      localStorage.setItem('dev_date_override', e.target.value);
+                      setHasPromptedWfh(false);
+                    }} 
+                    className="bg-card text-foreground border border-border rounded px-1.5 py-0.5 text-xs font-mono outline-none"
+                  />
+                  {devDateStr && (
+                    <button 
+                      onClick={() => { setDevDateStr(''); localStorage.removeItem('dev_date_override'); setHasPromptedWfh(false); }}
+                      className="text-[10px] font-bold underline hover:text-foreground ml-1"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              )}
               <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle Theme" className="p-1.5 border border-border rounded-md hover:bg-muted transition-colors">
                 {theme === 'dark' ? <Sun size={16} className="text-muted-foreground" /> : <Moon size={16} className="text-muted-foreground" />}
               </button>
@@ -221,6 +346,7 @@ function App() {
               bookedDates={bookedDates.map(d=>d.date)}
               viewMode={calendarViewMode}
               setFocusedMonth={setCalendarFocusedMonth}
+              leaves={leaves}
             />
           </div>
         )}
@@ -234,6 +360,7 @@ function App() {
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-blue-300"></div> PL</div>
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-orange-300"></div> EL</div>
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-green-300"></div> RH</div>
+              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-4 h-1.5 rounded-full bg-cyan-400"></div> WFH</div>
             </div>
           )}
           
@@ -266,6 +393,7 @@ function App() {
                     selectionStart={selectionStart}
                     setSelectionStart={setSelectionStart}
                     onMobileConfirm={() => setMobileConfirmOpen(true)}
+                    leavePlans={leavePlans}
                   />
                   <div className="md:hidden bg-card border border-border rounded-2xl shadow-apple-sm overflow-hidden flex-shrink-0">
                     <OptimizerPanel 
@@ -275,6 +403,7 @@ function App() {
                       viewMode={calendarViewMode}
                       setFocusedMonth={setCalendarFocusedMonth}
                       inlineOnMobile={true}
+                      leaves={leaves}
                     />
                   </div>
                 </motion.div>
@@ -291,6 +420,7 @@ function App() {
                     bookedDates={bookedDates} 
                     onDelete={handleDeleteLeave} 
                     onDeletePlan={handleDeletePlan}
+                    onUpdatePlan={handleUpdatePlan}
                     leaves={leaves} 
                     leavePlans={leavePlans}
                   />
@@ -477,12 +607,12 @@ function App() {
                 </div>
 
                 {/* EL Warning synced with desktop */}
-                {mobileLeaveType === 'el' && previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length > 2 && (
+                {mobileLeaveType === 'el' && checkSequentialELWarning(previewDates.filter(d => !isHoliday(d) && !isWeekend(d)), bookedDates) && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                     <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
                     <div className="text-xs text-red-800">
                       <span className="font-black block mb-1 uppercase tracking-wider text-[10px]">Medical Certificate Required</span>
-                      You are applying for more than 2 consecutive Emergency Leaves. Please ensure you have a valid medical certificate to provide to HR.
+                      You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
                     </div>
                   </div>
                 )}
@@ -534,10 +664,13 @@ function App() {
               <div className="flex-1">
                 {selectionStart && previewDates.length === 0 ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-                    <span className="text-sm font-semibold text-background">Select end date</span>
+                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-background leading-none">Selected {new Date(selectionStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      <span className="text-[9px] text-background/70 leading-none mt-0.5">Pick end date or apply 1 day</span>
+                    </div>
                   </div>
-                                ) : (
+                ) : (
                   <div className="flex items-center gap-2">
                     <div className="bg-background/20 text-background text-[10px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-full border border-background/20 flex items-center gap-1.5 shadow-sm">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -546,11 +679,16 @@ function App() {
                   </div>
                 )}
               </div>
-              <button onClick={() => { setSelectionStart(null); setPreviewDates([]); }} className="text-xs font-bold text-background/70 hover:text-background px-3 py-2 rounded-full hover:bg-background/20">
+              <button onClick={() => { setSelectionStart(null); setPreviewDates([]); }} className="text-xs font-bold text-background/70 hover:text-background px-2.5 py-2 rounded-full hover:bg-background/20">
                 Cancel
               </button>
+              {selectionStart && previewDates.length === 0 && (
+                <button onClick={() => { setPreviewDates([selectionStart]); setMobileConfirmOpen(true); }} className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background px-3 py-2 rounded-full shadow-md whitespace-nowrap">
+                  Apply 1 Day <Check size={13} strokeWidth={3}/>
+                </button>
+              )}
               {previewDates.length > 0 && (
-                <button onClick={() => setMobileConfirmOpen(true)} className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background px-4 py-2 rounded-full shadow-md">
+                <button onClick={() => setMobileConfirmOpen(true)} className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background px-4 py-2 rounded-full shadow-md whitespace-nowrap">
                   Confirm <Check size={13} strokeWidth={3}/>
                 </button>
               )}
@@ -646,6 +784,7 @@ function App() {
           <LeaveSelectionBar 
             selectionStart={selectionStart}
             previewDates={previewDates}
+            bookedDates={bookedDates}
             onCancel={() => { setSelectionStart(null); setPreviewDates([]); }}
             onApply={async (dates, type, note, planName, duration) => {
               // Reuse logic or call a common handler
@@ -671,6 +810,32 @@ function App() {
           />
         )}
       </div>
+
+      {/* 12 PM Daily Attendance Check-in Modal */}
+      {(() => {
+        const curMonthKey = new Date().toISOString().substring(0, 7);
+        const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        return (
+          <WfhCheckinModal
+            isOpen={wfhModalOpen}
+            onClose={() => setWfhModalOpen(false)}
+            onSelectStatus={handleWfhStatusSelect}
+            onMarkLeave={handleWfhMarkLeave}
+            wfhUsedThisMonth={wfhUsedThisMonth}
+            maxWfh={10}
+            todayStr={todayStr}
+          />
+        );
+      })()}
+
+      {/* Notification Permission Modal */}
+      <NotificationPromptModal
+        isOpen={notifModalOpen}
+        onClose={() => setNotifModalOpen(false)}
+        onEnable={handleEnableNotif}
+      />
     </div>
   );
 }

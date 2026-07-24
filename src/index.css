@@ -67,7 +67,15 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10;
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 select-none;
+  }
+  input, textarea {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    cursor: text !important;
+  }
+  button, a, [role="button"] {
+    cursor: pointer;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-mono tracking-tight;

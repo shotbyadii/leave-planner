@@ -34,62 +34,62 @@ const ExistingLeaveModal = ({ leaveObj, onClose, onCancelLeave }) => {
   }
 
   const actualLeaves = tripDates.filter(d => !isHoliday(d) && !isWeekend(d));
-  const leavesNeeded = actualLeaves.length;
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col justify-end items-center pointer-events-none">
-      <div className="absolute inset-0 bg-foreground/20 backdrop-blur-sm pointer-events-auto" onClick={onClose} />
-      <div className="relative bg-background w-[92%] max-w-md mx-auto mb-6 rounded-[32px] border border-border shadow-[0_8px_32px_-4px_hsl(var(--foreground)/0.18)] overflow-hidden pointer-events-auto animate-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">
+    <div className="fixed inset-0 z-[90] flex flex-col justify-end sm:justify-end items-center pointer-events-none p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" onClick={onClose} />
+      <div className="relative bg-card w-full max-w-md mx-auto mb-36 sm:mb-6 rounded-[32px] border border-border shadow-[0_16px_48px_-8px_rgba(0,0,0,0.85)] shadow-black/80 overflow-hidden pointer-events-auto animate-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">
         
-        <div className="p-4 sm:p-6 border-b border-border bg-muted/50 flex justify-between items-start">
+        <div className="p-4 sm:p-6 border-b border-border bg-muted/60 flex justify-between items-start">
           <div>{displayDate}</div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground bg-card p-1 rounded-md shadow-sm border border-border">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground bg-card p-1.5 rounded-xl shadow-sm border border-border">
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-4 sm:px-6 py-4 bg-orange-50/50 border-b border-orange-100 flex items-center gap-3">
-          <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
+        {/* Clean dark mode contrast box */}
+        <div className="px-4 sm:px-6 py-4 bg-orange-500/15 dark:bg-orange-500/25 border-b border-orange-500/30 flex items-center gap-3">
+          <div className="p-2.5 bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-xl">
             <CalendarX2 size={20} />
           </div>
           <div>
             <div className="text-sm font-bold text-foreground">
-              Selected Leave: <span className="text-orange-600">{targetDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric'})}</span>
+              Selected Leave: <span className="text-orange-600 dark:text-orange-400 font-black">{targetDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric'})}</span>
             </div>
             {isMultiple && (
-              <div className="text-xs text-muted-foreground font-medium">Part of a {tripDates.length}-day trip.</div>
+              <div className="text-xs text-muted-foreground font-medium mt-0.5">Part of a {tripDates.length}-day trip range.</div>
             )}
           </div>
         </div>
 
         <div className="p-4 sm:p-6 flex flex-col gap-4">
           <div>
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Leave Type</span>
-            <span className="px-2.5 py-1 bg-muted border border-border text-foreground rounded text-sm font-bold uppercase tracking-wider">{targetLeave.type}</span>
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Leave Type</span>
+            <span className="px-3 py-1 bg-muted border border-border text-foreground rounded-xl text-xs font-black uppercase tracking-wider">{targetLeave.type}</span>
           </div>
           {targetLeave.note && (
             <div>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Note</span>
-              <p className="text-sm text-muted-foreground font-medium">{targetLeave.note}</p>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Note</span>
+              <p className="text-sm text-foreground/80 font-medium bg-muted/30 p-3 rounded-xl border border-border/10 italic">"{targetLeave.note}"</p>
             </div>
           )}
         </div>
 
-        <div className="p-5 border-t border-border bg-muted/30 flex flex-row gap-3">
+        <div className="p-4 sm:p-5 border-t border-border bg-muted/30 flex flex-row gap-3">
           {isMultiple && (
             <button 
               onClick={() => onCancelLeave(tripDates)} 
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-white dark:bg-zinc-800 border border-red-200 text-red-600 rounded-xl text-xs font-bold shadow-sm transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-card border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-xs font-bold shadow-sm transition-colors"
             >
-              <Trash2 size={15} /> Trip
+              <Trash2 size={15} /> Delete Trip
             </button>
           )}
           
           <button 
             onClick={() => onCancelLeave(targetLeave.date)} 
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-white dark:bg-zinc-800 border border-red-200 text-red-600 rounded-xl text-xs font-bold transition-colors shadow-sm"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-card border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-xs font-bold transition-colors shadow-sm"
           >
-            <Trash2 size={15} /> Single
+            <Trash2 size={15} /> Delete Day
           </button>
         </div>
 

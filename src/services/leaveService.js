@@ -32,6 +32,21 @@ export const createLeavePlan = async (name, startDate, endDate) => {
   return data;
 };
 
+export const updateLeavePlan = async (planId, updates) => {
+  if (!isConfigured) return null;
+  const { data, error } = await supabase
+    .from('leave_plans')
+    .update(updates)
+    .eq('id', planId)
+    .select()
+    .single();
+  if (error) {
+    console.error('Supabase update leave_plan error:', error);
+    return null;
+  }
+  return data;
+};
+
 export const deleteLeavePlan = async (planId) => {
   if (!isConfigured) return;
   // CASCADE will delete associated leaves

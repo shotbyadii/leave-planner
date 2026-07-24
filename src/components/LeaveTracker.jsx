@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Trash2, CalendarDays } from 'lucide-react';
+import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
 
-const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans }) => {
+const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leaves, leavePlans }) => {
   const plUsed = leaves.pl.used;
   const elUsed = leaves.el.used;
   const rhUsed = leaves.rh.used;
@@ -12,6 +12,12 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
   const totalUsed = plUsed + elUsed + rhUsed;
 
   const [deletingPlan, setDeletingPlan] = useState(null);
+  const [editingPlanId, setEditingPlanId] = useState(null);
+  const [editingPlanName, setEditingPlanName] = useState('');
+
+  // Table Sorting State
+  const [sortField, setSortField] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -33,7 +39,6 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
       });
     }
 
-    // Pad start to align with day-of-week
     const startDow = allDates[0]?.dayOfWeek || 0;
     const padBefore = [];
     for (let i = 0; i < startDow; i++) {
@@ -43,25 +48,25 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
     const cells = [...padBefore, ...allDates];
 
     return (
-      <div className="mt-4 bg-muted/20 rounded-xl p-3.5 border border-border/5 shadow-inner">
-        <div className="grid grid-cols-7 gap-1.5 mb-2.5">
+      <div className="w-full bg-muted/20 dark:bg-muted/10 rounded-2xl p-3 border border-border/10 shadow-inner">
+        <div className="grid grid-cols-7 gap-1 mb-2">
           {dayLabels.map((d, i) => (
-            <div key={i} className="text-[9px] font-black text-muted-foreground/30 text-center w-6 uppercase tracking-tighter">{d}</div>
+            <div key={i} className="text-[9px] font-black text-muted-foreground/40 text-center uppercase tracking-wider">{d}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="grid grid-cols-7 gap-1">
           {cells.map((cell, idx) => {
-            if (!cell) return <div key={idx} className="w-6 h-6"></div>;
+            if (!cell) return <div key={idx} className="w-full aspect-square"></div>;
             
-            let classes = "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ";
+            let classes = "w-full aspect-square rounded-full flex items-center justify-center text-[10px] font-bold transition-all ";
             if (cell.isLeave) {
-              classes += "bg-slate-900 text-white shadow-md z-10 ring-2 ring-white/10";
+              classes += "bg-blue-600 text-white shadow-md z-10 ring-2 ring-blue-400/40";
             } else if (cell.isHoliday) {
-              classes += "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300";
+              classes += "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 font-bold";
             } else if (cell.isWeekend) {
-              classes += "text-muted-foreground/20 bg-muted/10";
+              classes += "text-muted-foreground/30 bg-muted/20";
             } else {
-              classes += "text-muted-foreground/20 hover:bg-muted/40 cursor-default";
+              classes += "text-muted-foreground/40 hover:bg-muted/40 cursor-default";
             }
             
             return (
@@ -84,6 +89,51 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
     setDeletingPlan(null);
   };
 
+  const handleSavePlanName = async (planId) => {
+    if (editingPlanName.trim() && onUpdatePlan) {
+      await onUpdatePlan(planId, editingPlanName.trim());
+    }
+    setEditingPlanId(null);
+  };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const sortedBookedDates = [...bookedDates].sort((a, b) => {
+    let valA, valB;
+    if (sortField === 'date') {
+      valA = new Date(a.date).getTime();
+      valB = new Date(b.date).getTime();
+    } else if (sortField === 'type') {
+      valA = a.type || '';
+      valB = b.type || '';
+    } else if (sortField === 'duration') {
+      valA = a.duration || 1;
+      valB = b.duration || 1;
+    } else if (sortField === 'plan') {
+      valA = (a.plan_name || '').toLowerCase();
+      valB = (b.plan_name || '').toLowerCase();
+    } else {
+      valA = a.date;
+      valB = b.date;
+    }
+
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const renderSortIcon = (field) => {
+    if (sortField !== field) return <ArrowUpDown size={12} className="opacity-40 ml-1" />;
+    return sortOrder === 'asc' ? <ChevronUp size={14} className="ml-1 text-primary" /> : <ChevronDown size={14} className="ml-1 text-primary" />;
+  };
+
   return (
     <div className="flex flex-col xl:flex-row gap-6">
       {/* Left Dashboard (Sticky) */}
@@ -93,10 +143,8 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
           
           <div className="relative w-40 h-40 mx-auto mb-6">
             <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-              {/* Background track */}
               <path className="text-white/10" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
               
-              {/* PL Segment */}
               <path 
                 className="text-blue-400 transition-all duration-1000 ease-out" 
                 strokeDasharray={`${(plUsed/totalLeaves)*100}, 100`} 
@@ -104,7 +152,6 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
               />
               
-              {/* EL Segment */}
               <path 
                 className="text-orange-400 transition-all duration-1000 ease-out" 
                 strokeDasharray={`${(elUsed/totalLeaves)*100}, 100`} 
@@ -113,7 +160,6 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
               />
 
-              {/* RH Segment */}
               <path 
                 className="text-green-400 transition-all duration-1000 ease-out" 
                 strokeDasharray={`${(rhUsed/totalLeaves)*100}, 100`} 
@@ -152,6 +198,64 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
              </div>
           </div>
         </div>
+
+        {/* WFH Monthly Utilization Card */}
+        {(() => {
+          const curMonthKey = new Date().toISOString().substring(0, 7);
+          const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
+          const wfhRemaining = Math.max(0, 10 - wfhUsedThisMonth);
+          const isWfhWarning = wfhRemaining <= 2;
+
+          return (
+            <div className={`rounded-2xl border shadow-apple-sm p-5 transition-all ${
+              isWfhWarning 
+                ? 'bg-gradient-to-br from-amber-950/80 to-amber-900/40 border-amber-500/30' 
+                : 'bg-card border-border'
+            }`}>
+              <div className="flex justify-between items-center mb-3">
+                <span className="font-semibold text-xs uppercase tracking-widest text-cyan-500 font-mono flex items-center gap-1.5">
+                  <Home size={14} /> WFH Monthly Quota
+                </span>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  isWfhWarning 
+                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' 
+                    : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30'
+                }`}>
+                  {isWfhWarning ? 'Low Balance' : 'Normal'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col">
+                  <span className="text-3xl font-black font-mono text-foreground">
+                    {wfhUsedThisMonth}<span className="text-sm font-bold text-muted-foreground">/10</span>
+                  </span>
+                  <span className="text-xs font-semibold text-muted-foreground mt-0.5">
+                    {wfhRemaining} WFH day{wfhRemaining === 1 ? '' : 's'} remaining this month
+                  </span>
+                </div>
+                
+                <div className="w-14 h-14 relative flex items-center justify-center flex-shrink-0">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="28" cy="28" r="20" className="stroke-muted" strokeWidth="4" fill="transparent" />
+                    <circle 
+                      cx="28" cy="28" r="20" 
+                      className={`transition-all duration-1000 ease-out ${isWfhWarning ? 'stroke-amber-500' : 'stroke-cyan-400'}`}
+                      strokeWidth="4" 
+                      strokeDasharray={125.6}
+                      strokeDashoffset={125.6 - (wfhUsedThisMonth / 10) * 125.6}
+                      strokeLinecap="round"
+                      fill="transparent" 
+                    />
+                  </svg>
+                  <span className="absolute text-[10px] font-black font-mono text-foreground">
+                    {Math.round((wfhUsedThisMonth / 10) * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Right Content */}
@@ -177,7 +281,6 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                 const start = new Date(plan.start_date);
                 const end = new Date(plan.end_date);
 
-                // Breakdown
                 const allDatesInRange = [];
                 for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                   const ds = `${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -187,52 +290,96 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                 const holidaysCount = allDatesInRange.filter(d => isHoliday(d) && !isWeekend(d)).length;
                 const leavesCount = planLeaves.reduce((sum, l) => sum + (l.duration || 1), 0);
                 
+                const isEditing = editingPlanId === plan.id;
+
                 return (
-                  <div key={plan.id} className="bg-card rounded-[32px] border border-border shadow-apple-sm p-6 sm:p-8 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-8 relative overflow-hidden">
-                    {/* Background decoration */}
+                  <div key={plan.id} className="bg-card rounded-[32px] border border-border shadow-apple-sm p-6 sm:p-7 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-6 relative overflow-hidden">
                     <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     
-                    <div className="flex-1 relative z-10">
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="space-y-1">
-                          <h4 className="font-black text-foreground text-2xl tracking-tight leading-none mb-2">{plan.name}</h4>
-                          <div className="inline-flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-xl text-xs font-black text-foreground uppercase tracking-widest border border-border/30">
-                            <CalendarDays size={14} className="text-primary" />
-                            {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            <span className="text-muted-foreground/30">→</span>
-                            {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <div className="flex-1 relative z-10 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="space-y-1.5 flex-1 pr-3">
+                            {isEditing ? (
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="text" 
+                                  value={editingPlanName}
+                                  onChange={(e) => setEditingPlanName(e.target.value)}
+                                  className="bg-muted border border-border rounded-xl px-3 py-1.5 text-base font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 w-full"
+                                  autoFocus
+                                />
+                                <button 
+                                  onClick={() => handleSavePlanName(plan.id)}
+                                  className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-sm"
+                                  title="Save Name"
+                                >
+                                  <Check size={16} />
+                                </button>
+                                <button 
+                                  onClick={() => setEditingPlanId(null)}
+                                  className="p-2 bg-muted text-muted-foreground rounded-xl hover:bg-muted/80 transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <h4 className="font-black text-foreground text-xl sm:text-2xl tracking-tight leading-snug">
+                                {plan.name}
+                              </h4>
+                            )}
+                            <div className="inline-flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-xl text-xs font-black text-foreground uppercase tracking-wider border border-border/30">
+                              <CalendarDays size={14} className="text-primary" />
+                              {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              <span className="text-muted-foreground/30">→</span>
+                              {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </div>
                           </div>
-                        </div>
-                        <button 
-                          onClick={() => setDeletingPlan(plan)}
-                          className="p-2.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all xl:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
-                          title="Delete plan"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-4 py-3 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm transition-transform hover:scale-[1.02]">
-                          <span className="text-[10px] font-black text-blue-600/60 uppercase tracking-widest leading-none mb-2">Leaves</span>
-                          <span className="text-2xl font-black text-blue-600 leading-none">{leavesCount}</span>
+                          {!isEditing && (
+                            <div className="flex items-center gap-1">
+                              <button 
+                                onClick={() => { setEditingPlanId(plan.id); setEditingPlanName(plan.name); }}
+                                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all xl:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
+                                title="Edit plan name"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button 
+                                onClick={() => setDeletingPlan(plan)}
+                                className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all xl:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
+                                title="Delete plan"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm transition-transform hover:scale-[1.02]">
-                          <span className="text-[10px] font-black text-slate-500/60 uppercase tracking-widest leading-none mb-2">Weekends</span>
-                          <span className="text-2xl font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
-                        </div>
-                        <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-4 py-3 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm transition-transform hover:scale-[1.02]">
-                          <span className="text-[10px] font-black text-purple-600/60 uppercase tracking-widest leading-none mb-2">Holidays</span>
-                          <span className="text-2xl font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
-                        </div>
-                        <div className="flex flex-col bg-foreground text-background px-4 py-3 rounded-2xl shadow-xl shadow-foreground/10 transition-transform hover:scale-[1.02]">
-                          <span className="text-[10px] font-black opacity-50 uppercase tracking-widest leading-none mb-2">Total Days</span>
-                          <span className="text-2xl font-black leading-none">{allDatesInRange.length}d</span>
+
+                        {/* Stat Cards - Clean typography without text bleeding */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-2">
+                          <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-3.5 py-2.5 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
+                            <span className="text-[9px] font-bold text-blue-600/70 dark:text-blue-400 uppercase tracking-wider leading-none mb-1.5 truncate">Leaves</span>
+                            <span className="text-xl font-black text-blue-600 leading-none">{leavesCount}</span>
+                          </div>
+                          <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
+                            <span className="text-[9px] font-bold text-slate-500/70 dark:text-slate-400 uppercase tracking-wider leading-none mb-1.5 truncate">Weekends</span>
+                            <span className="text-xl font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
+                          </div>
+                          <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-3.5 py-2.5 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
+                            <span className="text-[9px] font-bold text-purple-600/70 dark:text-purple-400 uppercase tracking-wider leading-none mb-1.5 truncate">Holidays</span>
+                            <span className="text-xl font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
+                          </div>
+                          <div className="flex flex-col bg-foreground text-background px-3.5 py-2.5 rounded-2xl shadow-md overflow-hidden">
+                            <span className="text-[9px] font-bold opacity-60 uppercase tracking-wider leading-none mb-1.5 truncate">Total</span>
+                            <span className="text-xl font-black leading-none">{allDatesInRange.length}d</span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="xl:w-48 flex-shrink-0 flex items-center justify-center bg-muted/20 dark:bg-muted/5 rounded-3xl p-3 border border-border/10 shadow-inner relative z-10">
+                    <div className="xl:w-44 flex-shrink-0 flex items-center justify-center bg-muted/20 dark:bg-muted/5 rounded-3xl p-3 border border-border/10 shadow-inner relative z-10">
                       {renderMiniCalendar(plan)}
                     </div>
                   </div>
@@ -242,13 +389,22 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
           )}
         </div>
 
+        {/* All Records Table */}
         <div className="bg-card rounded-[32px] border border-border shadow-apple-sm overflow-hidden">
-          <div className="p-6 border-b border-border flex items-center justify-between">
+          <div className="p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="font-bold text-foreground text-xl tracking-tight">All Records</h2>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">Individual leave log</p>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Individual leave log</p>
             </div>
-            <div className="bg-muted px-3 py-1.5 rounded-xl text-xs font-black text-muted-foreground">{bookedDates.length} entries</div>
+            <div className="flex items-center gap-3">
+              {/* Mobile Sort Controls */}
+              <div className="sm:hidden flex items-center gap-2 bg-muted px-3 py-1.5 rounded-xl border border-border">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Sort:</span>
+                <button onClick={() => handleSort('date')} className={`text-xs font-bold ${sortField === 'date' ? 'text-primary' : 'text-muted-foreground'}`}>Date</button>
+                <button onClick={() => handleSort('type')} className={`text-xs font-bold ${sortField === 'type' ? 'text-primary' : 'text-muted-foreground'}`}>Type</button>
+              </div>
+              <div className="bg-muted px-3 py-1.5 rounded-xl text-xs font-black text-muted-foreground">{bookedDates.length} entries</div>
+            </div>
           </div>
           
           <div className="w-full">
@@ -259,60 +415,93 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
               </div>
             ) : (
               <>
-                {/* Desktop View (Table) */}
+                {/* Desktop View (Table with sorting) */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-muted/40 border-b border-border text-[10px] uppercase text-muted-foreground font-black tracking-widest">
+                    <thead className="bg-muted/40 border-b border-border text-[10px] uppercase text-muted-foreground font-black tracking-widest select-none">
                       <tr>
-                        <th className="px-6 py-5">Date</th>
-                        <th className="px-6 py-5">Type</th>
-                        <th className="px-6 py-5">Status</th>
-                        <th className="px-6 py-5">Associated Plan</th>
-                        <th className="px-6 py-5">Note</th>
-                        <th className="px-6 py-5 w-16 text-right"></th>
+                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('date')}>
+                          <div className="flex items-center">
+                            <span>Date</span>
+                            {renderSortIcon('date')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('type')}>
+                          <div className="flex items-center">
+                            <span>Type</span>
+                            {renderSortIcon('type')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('duration')}>
+                          <div className="flex items-center">
+                            <span>Status</span>
+                            {renderSortIcon('duration')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('plan')}>
+                          <div className="flex items-center">
+                            <span>Associated Plan</span>
+                            {renderSortIcon('plan')}
+                          </div>
+                        </th>
+                        <th className="px-6 py-4">Note</th>
+                        <th className="px-6 py-4 w-16 text-right"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/30">
-                      {[...bookedDates].sort((a,b) => new Date(b.date) - new Date(a.date)).map((leave, idx) => {
+                      {sortedBookedDates.map((leave, idx) => {
                         const dateObj = new Date(leave.date);
                         const isHalfDay = leave.duration === 0.5;
-                        const colors = leave.type === 'pl' ? { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-600', border: 'border-blue-100 dark:border-blue-500/20' }
-                                     : leave.type === 'el' ? (isHalfDay ? { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-600', border: 'border-amber-100 dark:border-amber-500/20' } : { bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-600', border: 'border-orange-100 dark:border-orange-500/20' })
-                                     : { bg: 'bg-green-50 dark:bg-green-500/10', text: 'text-green-600', border: 'border-green-100 dark:border-green-500/20' };
+                        const colors = leave.type === 'pl' ? { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20' }
+                                     : leave.type === 'el' ? (isHalfDay ? { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-100 dark:border-amber-500/20' } : { bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20' })
+                                     : { bg: 'bg-green-50 dark:bg-green-500/10', text: 'text-green-600 dark:text-green-400', border: 'border-green-100 dark:border-green-500/20' };
 
                         return (
-                          <tr key={idx} className="hover:bg-muted/20 transition-colors group">
-                            <td className="px-6 py-5">
+                          <tr key={idx} className="hover:bg-muted/20 transition-colors group select-none">
+                            <td className="px-6 py-4">
                               <div className="flex flex-col">
                                 <span className="font-black text-foreground text-sm tracking-tight">{dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                                 <span className="text-[10px] font-bold text-muted-foreground/50 uppercase">{dateObj.getFullYear()}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-5">
-                              <span className={`px-2.5 py-1 rounded-xl border text-[10px] font-black uppercase tracking-tight ${colors.bg} ${colors.text} ${colors.border}`}>
-                                {leave.type}{isHalfDay && ' · ½'}
-                              </span>
+                            <td className="px-6 py-4">
+                              {(() => {
+                                const typeColors = {
+                                  pl: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+                                  el: 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+                                  rh: 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
+                                  wfh: 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+                                  office: 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
+                                };
+                                const cls = typeColors[leave.type] || 'bg-muted border-border text-foreground';
+                                return (
+                                  <span className={`px-2.5 py-1 rounded-xl border text-[10px] font-black uppercase tracking-tight ${cls}`}>
+                                    {leave.type}{isHalfDay && ' · ½'}
+                                  </span>
+                                );
+                              })()}
                             </td>
-                            <td className="px-6 py-5">
+                            <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
                                 <div className={`w-1.5 h-1.5 rounded-full ${isHalfDay ? 'bg-amber-400' : 'bg-primary'}`} />
                                 <span className="text-xs font-bold text-foreground/70">{isHalfDay ? 'Half Day' : 'Full Day'}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-5">
-                              <span className="text-xs font-black text-foreground/50 uppercase tracking-tighter truncate max-w-[140px] block">
+                            <td className="px-6 py-4">
+                              <span className="text-xs font-black text-foreground/60 uppercase tracking-tight truncate max-w-[160px] block">
                                 {leave.plan_name || '—'}
                               </span>
                             </td>
-                            <td className="px-6 py-5">
-                              <span className="text-xs text-muted-foreground/60 font-medium italic line-clamp-1 max-w-[200px]">
+                            <td className="px-6 py-4">
+                              <span className="text-xs text-muted-foreground/70 font-medium italic line-clamp-1 max-w-[200px]">
                                 {leave.note || '—'}
                               </span>
                             </td>
-                            <td className="px-6 py-5 text-right">
+                            <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => onDelete(leave.date)}
                                 className="text-muted-foreground hover:text-red-500 transition-all p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl opacity-0 group-hover:opacity-100"
+                                title="Delete record"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -324,16 +513,16 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                   </table>
                 </div>
 
-                {/* Mobile View (Optimized Cards) */}
+                {/* Mobile View (Optimized Cards with Sorting) */}
                 <div className="md:hidden flex flex-col divide-y divide-border/50">
-                  {[...bookedDates].sort((a,b) => new Date(b.date) - new Date(a.date)).map((leave, idx) => {
+                  {sortedBookedDates.map((leave, idx) => {
                     const dateObj = new Date(leave.date);
                     const isHalfDay = leave.duration === 0.5;
                     const color = leave.type === 'pl' ? 'text-blue-500' : leave.type === 'el' ? 'text-orange-500' : 'text-green-500';
                     const bgColor = leave.type === 'pl' ? 'bg-blue-500/10' : leave.type === 'el' ? 'bg-orange-500/10' : 'bg-green-500/10';
 
                     return (
-                      <div key={idx} className="p-5 active:bg-muted/50 transition-colors space-y-4">
+                      <div key={idx} className="p-5 active:bg-muted/50 transition-colors space-y-4 select-none">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className={`w-12 h-12 rounded-2xl ${bgColor} flex flex-col items-center justify-center border border-current opacity-20 ${color}`} />
@@ -343,7 +532,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                             </div>
                             <div className="flex flex-col">
                               <span className="font-black text-foreground text-base tracking-tight">{dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{dateObj.getFullYear()}</span>
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{dateObj.getFullYear()}</span>
                             </div>
                           </div>
                           <button
@@ -359,7 +548,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                             {leave.plan_name && (
                               <div className="flex items-center gap-2">
                                 <div className="w-1 h-1 rounded-full bg-primary" />
-                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter">Plan:</span>
+                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Plan:</span>
                                 <span className="text-xs font-bold text-foreground truncate">{leave.plan_name}</span>
                               </div>
                             )}
@@ -367,7 +556,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, leaves, leavePlans 
                               <div className="flex items-start gap-2">
                                 <div className="w-1 h-1 rounded-full bg-muted-foreground/30 mt-1.5" />
                                 <div className="flex flex-col">
-                                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter">Note:</span>
+                                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Note:</span>
                                   <span className="text-xs font-medium text-muted-foreground italic leading-snug">"{leave.note}"</span>
                                 </div>
                               </div>
