@@ -6,7 +6,7 @@ import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [] }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -31,6 +31,31 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
   const isMonthPast = (monthIndex) => {
     const lastDay = new Date(year, monthIndex + 1, 0);
     return lastDay < today;
+  };
+
+  const getPlanRangeStatus = (dateStr, dayOfWeek) => {
+    if (!leavePlans || leavePlans.length === 0) return null;
+    for (const plan of leavePlans) {
+      if (plan.start_date && plan.end_date) {
+        const startStr = String(plan.start_date).split('T')[0];
+        const endStr = String(plan.end_date).split('T')[0];
+        if (startStr === endStr) continue;
+
+        if (dateStr >= startStr && dateStr <= endStr) {
+          const isStart = dateStr === startStr;
+          const isEnd = dateStr === endStr;
+          return {
+            plan,
+            isStart,
+            isEnd,
+            isMiddle: !isStart && !isEnd,
+            isRowStart: dayOfWeek === 0,
+            isRowEnd: dayOfWeek === 6
+          };
+        }
+      }
+    }
+    return null;
   };
 
   const getAllDatesInRange = (startStr, endStr) => {
@@ -160,7 +185,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
       if (holidayInfo) monthHolidays.push({ day: i, name: holidayInfo.name });
 
-      let baseClasses = `${cellClass} rounded-full flex items-center justify-center transition-all relative `;
+      let baseClasses = `${cellClass} rounded-full flex items-center justify-center transition-all relative select-none `;
 
       if (isSelected) {
         if (holidayInfo || weekend) {
@@ -190,6 +215,8 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         if (bookedLeave.type === 'pl') baseClasses += "bg-blue-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-blue-400";
         else if (bookedLeave.type === 'el') baseClasses += "bg-orange-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-orange-400";
         else if (bookedLeave.type === 'rh') baseClasses += "bg-green-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-green-400";
+        else if (bookedLeave.type === 'wfh') baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
+        else if (bookedLeave.type === 'office') baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
       } else if (holidayInfo) {
         baseClasses += useNavy ? "bg-purple-500 text-white font-medium" : "bg-purple-200 text-purple-900 font-medium";
       } else if (weekend) {
@@ -200,8 +227,13 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
       }
 
+      const isWfh = bookedLeave?.type === 'wfh';
+
       days.push(
-        <div key={`d-${i}`} className={baseClasses} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isPast ? 'Past date — click to log retroactive leave' : '')}>
+        <div key={`d-${i}`} className={baseClasses} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
+          {isWfh && (
+            <span className="absolute top-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/80 z-20 pointer-events-none" />
+          )}
           <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
         </div>
       );
@@ -266,7 +298,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     <>
       <div className="flex flex-col gap-6 relative z-10 h-full">
         <div className="flex justify-between items-center w-full">
-          <h2 className="text-lg font-bold text-foreground md:hidden">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
+          <h2 className="text-lg font-bold text-foreground">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
           <div className="flex bg-muted p-1 rounded-xl w-fit ml-auto shadow-inner">
             <button onClick={() => setViewMode('monthly')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'monthly' ? 'bg-background shadow-apple-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} title="Focused View">
               <CalendarIcon size={18} />
