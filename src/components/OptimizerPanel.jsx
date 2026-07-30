@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, ChevronDown, SlidersHorizontal, Compass } from 'lucide-react';
 import { findOptimalWindows } from '../utils/leaveOptimizer';
 import { parseNaturalLanguage } from '../utils/nlpParser';
 
@@ -10,6 +10,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
   const maxUsableLeaves = Math.max(1, Math.floor(plRem + Math.min(elRem, 2) + Math.min(rhRem, 1)));
 
   const [optimizerMode, setOptimizerMode] = useState('best'); // 'best' (default) or 'manual'
+  const [leaveFilterTier, setLeaveFilterTier] = useState('all'); // 'all' | '1-2' | '3-4' | '5+'
   const [targetLeaves, setTargetLeaves] = useState(Math.min(2, maxUsableLeaves));
   const [targetDuration, setTargetDuration] = useState(null);
   const [targetMonth, setTargetMonth] = useState('all');
@@ -35,7 +36,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
 
   useEffect(() => {
     handleOptimize();
-  }, [optimizerMode, targetLeaves, targetMonth, targetDuration, bookedDates, maxUsableLeaves]);
+  }, [optimizerMode, leaveFilterTier, targetLeaves, targetMonth, targetDuration, bookedDates, maxUsableLeaves]);
 
   const handleOptimize = () => {
     const results = findOptimalWindows({
@@ -43,7 +44,8 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
       targetDuration,
       targetMonth,
       bookedDates,
-      mode: optimizerMode
+      mode: optimizerMode,
+      leaveFilterTier: optimizerMode === 'best' ? leaveFilterTier : 'all'
     });
     setSuggestions(results);
   };
@@ -171,7 +173,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
                 onClick={() => { setTargetLeaves(Math.min(maxUsableLeaves, targetLeaves + 1)); setTargetDuration(null); }} 
                 disabled={targetLeaves >= maxUsableLeaves}
                 className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                title={targetLeaves >= maxUsableLeaves ? `Maximum usable leaves is ${maxUsableLeaves} (without medical cert)` : ''}
+                title={targetLeaves >= maxUsableLeaves ? `Maximum usable leaves is ${maxUsableLeaves}` : ''}
               >
                 <Plus size={16} strokeWidth={2.5} />
               </button>
@@ -217,6 +219,31 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
         </div>
       </div>
 
+      {/* Leave Budget Tier Filter Chips (Best Ratio Mode) */}
+      {optimizerMode === 'best' && (
+        <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'all', label: '🌟 All Tiers' },
+            { id: '1-2', label: '⚡ 1-2 Leaves' },
+            { id: '3-4', label: '✈️ 3-4 Leaves' },
+            { id: '5+', label: '🏝️ 5+ Leaves' }
+          ].map(tier => (
+            <button
+              key={tier.id}
+              type="button"
+              onClick={() => setLeaveFilterTier(tier.id)}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-xl transition-all whitespace-nowrap ${
+                leaveFilterTier === tier.id
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tier.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Suggestions List */}
       <div className={`p-4 flex flex-col gap-3.5 ${inlineOnMobile ? 'h-auto md:flex-1 md:overflow-y-auto' : 'flex-1 overflow-y-auto'}`}>
         <div className="flex justify-between items-center mb-1">
@@ -225,7 +252,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
             {targetDuration 
               ? `${targetDuration}-Day Trips` 
               : optimizerMode === 'best' 
-              ? `Best Picks` 
+              ? `Best Picks (${leaveFilterTier.toUpperCase()})` 
               : `Bridges for ${targetLeaves} Leave${targetLeaves > 1 ? 's' : ''}`}
           </h2>
           <span className="bg-muted text-foreground px-2 py-0.5 rounded-full text-xs font-bold">
@@ -240,71 +267,92 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
           </div>
         )}
         
-        {suggestions.slice(0, 8).map((s, idx) => {
+        {suggestions.map((s, idx) => {
           const isHero = idx === 0;
-          return (
-          <div 
-            key={idx} 
-            className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center select-none ${
-              isHero
-                ? 'bg-foreground text-background shadow-apple border border-foreground/10 hover:opacity-90'
-                : 'bg-card border border-border shadow-apple-sm hover:shadow-apple hover:border-foreground/20'
-            }`}
-            onClick={() => handlePreviewClick(s)}
-            onMouseEnter={() => handleHover(s)}
-            onMouseLeave={() => handleHover(null)}
-          >
-            {/* Left accent strip */}
-            {!isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-purple-500 rounded-r-full opacity-50"></div>}
-            {isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-background/40 rounded-r-full"></div>}
-            
-            <div className="flex flex-col gap-1 pl-2">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-bold ${
-                  isHero ? 'bg-background/20 text-background/80' : 'bg-muted text-foreground'
-                }`}>
-                  {new Date(s.startDate).toLocaleString('default', { month: 'short' })}
-                </span>
-                <span className={`text-[10px] uppercase tracking-wider font-bold ${
-                  isHero ? 'text-orange-300' : 'text-orange-500'
-                }`}>
-                  {s.totalDaysOff} Days Off
-                </span>
-                {isHero && <span className="text-[8px] font-bold uppercase tracking-wider bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">Top Pick</span>}
-              </div>
-              <h4 className={`font-bold text-sm leading-tight ${
-                isHero ? 'text-background' : 'text-foreground'
-              }`}>
-                {s.holidayName ? s.holidayName : `${s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} - ${s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}`}
-              </h4>
-              {s.holidayName && (
-                <p className={`text-[10px] font-medium uppercase tracking-wider ${
-                  isHero ? 'text-background/50' : 'text-muted-foreground'
-                }`}>
-                  {s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} – {s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
-                </p>
-              )}
-            </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end">
-                <span className={`text-lg font-black leading-none font-mono ${
+          // Category Badge Color
+          let badgeBg = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+          if (s.leavesRequired >= 5) badgeBg = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+          else if (s.leavesRequired >= 3) badgeBg = 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+
+          return (
+            <div 
+              key={idx} 
+              className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center select-none ${
+                isHero
+                  ? 'bg-foreground text-background shadow-apple border border-foreground/10 hover:opacity-90'
+                  : 'bg-card border border-border shadow-apple-sm hover:shadow-apple hover:border-foreground/20'
+              }`}
+              onClick={() => handlePreviewClick(s)}
+              onMouseEnter={() => handleHover(s)}
+              onMouseLeave={() => handleHover(null)}
+            >
+              {/* Left accent strip */}
+              {!isHero && (
+                <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full ${
+                  s.leavesRequired >= 5 ? 'bg-emerald-500' : s.leavesRequired >= 3 ? 'bg-purple-500' : 'bg-blue-500'
+                }`} />
+              )}
+              {isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-background/40 rounded-r-full" />}
+              
+              <div className="flex flex-col gap-1 pl-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-bold ${
+                    isHero ? 'bg-background/20 text-background/80' : 'bg-muted text-foreground'
+                  }`}>
+                    {new Date(s.startDate).toLocaleString('default', { month: 'short' })}
+                  </span>
+
+                  <span className={`text-[10px] uppercase tracking-wider font-bold ${
+                    isHero ? 'text-orange-300' : 'text-orange-500'
+                  }`}>
+                    {s.totalDaysOff} Days Off
+                  </span>
+
+                  {!isHero && (
+                    <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${badgeBg}`}>
+                      {s.leavesRequired <= 2 ? 'Quick' : s.leavesRequired <= 4 ? 'Vacation' : 'Mega Trip'}
+                    </span>
+                  )}
+
+                  {isHero && <span className="text-[8px] font-bold uppercase tracking-wider bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">Top Pick</span>}
+                </div>
+
+                <h4 className={`font-bold text-sm leading-tight ${
                   isHero ? 'text-background' : 'text-foreground'
-                }`}>{s.leavesRequired}<span className={`text-[10px] ml-0.5 ${
-                  isHero ? 'text-background/50' : 'text-muted-foreground'
-                }`}>L</span></span>
-                <span className={`text-[8px] uppercase font-bold tracking-wider mt-0.5 ${
-                  isHero ? 'text-background/40' : 'text-muted-foreground'
-                }`}>Cost</span>
+                }`}>
+                  {s.holidayName ? s.holidayName : `${s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} - ${s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}`}
+                </h4>
+
+                {s.holidayName && (
+                  <p className={`text-[10px] font-medium uppercase tracking-wider ${
+                    isHero ? 'text-background/50' : 'text-muted-foreground'
+                  }`}>
+                    {s.startDate.toLocaleString('default', { month: 'short', day: 'numeric' })} – {s.endDate.toLocaleString('default', { month: 'short', day: 'numeric' })}
+                  </p>
+                )}
               </div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600 dark:group-hover:bg-purple-900/40 dark:group-hover:text-purple-300'
-              }`}>
-                <ChevronRight size={16} />
+
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-end">
+                  <span className={`text-lg font-black leading-none font-mono ${
+                    isHero ? 'text-background' : 'text-foreground'
+                  }`}>{s.leavesRequired}<span className={`text-[10px] ml-0.5 ${
+                    isHero ? 'text-background/50' : 'text-muted-foreground'
+                  }`}>L</span></span>
+                  <span className={`text-[8px] uppercase font-bold tracking-wider mt-0.5 ${
+                    isHero ? 'text-background/40' : 'text-muted-foreground'
+                  }`}>Cost</span>
+                </div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600 dark:group-hover:bg-purple-900/40 dark:group-hover:text-purple-300'
+                }`}>
+                  <ChevronRight size={16} />
+                </div>
               </div>
             </div>
-          </div>
-        );})}
+          );
+        })}
       </div>
     </div>
   );

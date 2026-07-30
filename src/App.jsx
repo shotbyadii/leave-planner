@@ -19,7 +19,8 @@ import AuthModal from './components/AuthModal';
 import ProfileModal from './components/ProfileModal';
 import SplashScreen from './components/SplashScreen';
 import { getLeaveColor } from './utils/colorUtils';
-import { getCurrentUser, signOutUser, fetchUserProfile, upsertUserProfile } from './services/authService';
+import { getCurrentUser, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
+import { supabase } from './lib/supabase';
 import { FileText as FileTextIcon } from 'lucide-react';
 import './index.css';
 
@@ -36,6 +37,9 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(localStorage.getItem('onboarding_completed') !== 'true');
   const [userName, setUserName] = useState(localStorage.getItem('user_name') || 'User');
+  const [companyName, setCompanyName] = useState(localStorage.getItem('company_name') || '');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState(localStorage.getItem('company_logo_url') || '');
+  const [avatarUrl, setAvatarUrl] = useState(localStorage.getItem('avatar_url') || '');
   
   const [leaveNames, setLeaveNames] = useState(() => {
     try {
@@ -92,6 +96,17 @@ function App() {
   useEffect(() => {
     loadLeaves();
     checkAuthUser();
+
+    // Listen to Supabase auth state changes (e.g. Google OAuth redirect return)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        handleAuthSuccess(session.user);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const checkAuthUser = async () => {
@@ -99,11 +114,23 @@ function App() {
     if (user) {
       setCurrentUser(user);
       setShowSplash(false);
+      const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User';
       const profile = await fetchUserProfile(user.id);
       if (profile) {
-        if (profile.name) {
-          setUserName(profile.name);
-          localStorage.setItem('user_name', profile.name);
+        const activeName = profile.name || fallbackName;
+        setUserName(activeName);
+        localStorage.setItem('user_name', activeName);
+        if (profile.company_name) {
+          setCompanyName(profile.company_name);
+          localStorage.setItem('company_name', profile.company_name);
+        }
+        if (profile.company_logo_url) {
+          setCompanyLogoUrl(profile.company_logo_url);
+          localStorage.setItem('company_logo_url', profile.company_logo_url);
+        }
+        if (profile.avatar_url) {
+          setAvatarUrl(profile.avatar_url);
+          localStorage.setItem('avatar_url', profile.avatar_url);
         }
         if (profile.leave_names) {
           setLeaveNames(profile.leave_names);
@@ -113,44 +140,70 @@ function App() {
           setLeaveColors(profile.leave_colors);
           localStorage.setItem('leave_colors', JSON.stringify(profile.leave_colors));
         }
+      } else {
+        setUserName(fallbackName);
+        localStorage.setItem('user_name', fallbackName);
       }
+      await loadLeaves(user);
     } else {
-      const isGuest = localStorage.getItem('guest_mode') === 'true';
-      setShowSplash(!isGuest);
+      setShowSplash(true);
     }
-  };
-
-  const handleGuestAccess = () => {
-    localStorage.setItem('guest_mode', 'true');
-    setShowSplash(false);
   };
 
   const handleAuthSuccess = async (user) => {
     setCurrentUser(user);
     setShowSplash(false);
-    localStorage.setItem('guest_mode', 'true');
     if (user) {
-      const nameToUse = user.user_metadata?.name || userName;
+      const nameToUse = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || userName;
       setUserName(nameToUse);
-      await upsertUserProfile(user.id, {
-        name: nameToUse,
-        email: user.email,
-        quotas: {
-          pl: leaves.pl.total,
-          el: leaves.el.total,
-          rh: leaves.rh.total,
-          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
-        },
-        names: leaveNames,
-        colors: leaveColors
-      });
+      localStorage.setItem('user_name', nameToUse);
+      
+      const profile = await fetchUserProfile(user.id);
+      if (!profile) {
+        // Fresh brand-new account: create default clean profile
+        await upsertUserProfile(user.id, {
+          name: nameToUse,
+          email: user.email,
+          companyName: companyName,
+          companyLogoUrl: companyLogoUrl,
+          avatarUrl: avatarUrl || user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+          quotas: { pl: 15, el: 10, rh: 1, wfh: 10 },
+          names: { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Extra Leave', wfh: 'Work From Home' },
+          colors: { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }
+        });
+      } else {
+        if (profile.name) {
+          setUserName(profile.name);
+          localStorage.setItem('user_name', profile.name);
+        }
+        if (profile.company_name) {
+          setCompanyName(profile.company_name);
+          localStorage.setItem('company_name', profile.company_name);
+        }
+        if (profile.company_logo_url) {
+          setCompanyLogoUrl(profile.company_logo_url);
+          localStorage.setItem('company_logo_url', profile.company_logo_url);
+        }
+        if (profile.avatar_url) {
+          setAvatarUrl(profile.avatar_url);
+          localStorage.setItem('avatar_url', profile.avatar_url);
+        }
+      }
+      await loadLeaves(user);
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (currentUser?.id) {
+      await deleteUserAccount(currentUser.id);
+    }
+    setCurrentUser(null);
+    setShowSplash(true);
   };
 
   const handleSignOut = async () => {
     await signOutUser();
     setCurrentUser(null);
-    localStorage.removeItem('guest_mode');
     setShowSplash(true);
   };
 
@@ -229,7 +282,7 @@ function App() {
 
   const handleWfhStatusSelect = async (statusType) => {
     const todayStr = getTodayStr();
-    await addLeave(todayStr, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office');
+    await addLeave(todayStr, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
     await loadLeaves();
     setWfhModalOpen(false);
   };
@@ -252,9 +305,11 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const loadLeaves = async () => {
-    const dbLeaves = await fetchBookedLeaves();
-    const dbPlans = await fetchLeavePlans();
+  const loadLeaves = async (targetUser = undefined) => {
+    const activeUser = targetUser !== undefined ? targetUser : currentUser;
+    const userId = activeUser?.id || null;
+    const dbLeaves = await fetchBookedLeaves(userId);
+    const dbPlans = await fetchLeavePlans(userId);
     setBookedDates(dbLeaves);
     setLeavePlans(dbPlans);
     updateLeaveCounts(dbLeaves);
@@ -274,10 +329,22 @@ function App() {
     }));
   };
 
-  const handleSaveSettings = ({ name, quotas, names, colors }) => {
+  const handleSaveSettings = async ({ name, companyName, companyLogoUrl, avatarUrl, quotas, names, colors }) => {
     if (name) {
       setUserName(name);
       localStorage.setItem('user_name', name);
+    }
+    if (companyName !== undefined) {
+      setCompanyName(companyName);
+      localStorage.setItem('company_name', companyName);
+    }
+    if (companyLogoUrl !== undefined) {
+      setCompanyLogoUrl(companyLogoUrl);
+      localStorage.setItem('company_logo_url', companyLogoUrl);
+    }
+    if (avatarUrl !== undefined) {
+      setAvatarUrl(avatarUrl);
+      localStorage.setItem('avatar_url', avatarUrl);
     }
     if (quotas) {
       localStorage.setItem('quota_pl', quotas.pl);
@@ -292,6 +359,19 @@ function App() {
     if (colors) {
       setLeaveColors(colors);
       localStorage.setItem('leave_colors', JSON.stringify(colors));
+    }
+
+    if (currentUser?.id) {
+      await upsertUserProfile(currentUser.id, {
+        name: name || userName,
+        email: currentUser.email,
+        companyName: companyName,
+        companyLogoUrl: companyLogoUrl,
+        avatarUrl: avatarUrl,
+        quotas: quotas,
+        names: names || leaveNames,
+        colors: colors || leaveColors
+      });
     }
 
     const updatedColors = colors || leaveColors;
@@ -332,7 +412,7 @@ function App() {
   };
 
   const handleReset = async () => {
-    await resetAllLeaves();
+    await resetAllLeaves(currentUser?.id);
     setBookedDates([]);
     setLeavePlans([]);
     updateLeaveCounts([]);
@@ -341,19 +421,19 @@ function App() {
   };
 
   const handleDeleteLeave = async (dateStr) => {
-    await removeLeave(dateStr);
+    await removeLeave(dateStr, currentUser?.id);
     const newDates = bookedDates.filter(d => d.date !== dateStr);
     setBookedDates(newDates);
     updateLeaveCounts(newDates);
   };
 
   const handleDeletePlan = async (planId) => {
-    await deleteLeavePlan(planId);
-    await loadLeaves(); // Reload everything since CASCADE deletes leaves too
+    await deleteLeavePlan(planId, currentUser?.id);
+    await loadLeaves();
   };
 
   const handleUpdatePlan = async (planId, newName) => {
-    await updateLeavePlan(planId, { name: newName });
+    await updateLeavePlan(planId, { name: newName }, currentUser?.id);
     await loadLeaves();
   };
 
@@ -383,12 +463,12 @@ function App() {
     const durationPerDay = isHalfDay ? 0.5 : 1;
     let planId = null;
     if (dates.length > 1) {
-      const plan = await createLeavePlan(mobilePlanName || 'Untitled Plan', dates[0], dates[dates.length - 1]);
+      const plan = await createLeavePlan(mobilePlanName || 'Untitled Plan', dates[0], dates[dates.length - 1], currentUser?.id);
       planId = plan?.id || null;
     }
     for (const dateStr of dates) {
       if (!isHoliday(dateStr) && !isWeekend(dateStr)) {
-        await addLeave(dateStr, mobileLeaveType, mobileNote, planId, durationPerDay);
+        await addLeave(dateStr, mobileLeaveType, mobileNote, planId, durationPerDay, currentUser?.id);
       }
     }
     await loadLeaves();
@@ -403,11 +483,24 @@ function App() {
     <div className="h-screen bg-background flex flex-col font-sans text-foreground overflow-hidden">
       <div className="sticky top-0 z-40 bg-background border-b border-border shadow-[0_1px_0_0_hsl(var(--border)),0_4px_24px_-4px_hsl(var(--foreground)/0.06)]">
         <header className="hidden md:flex px-6 py-2.5 justify-between items-center gap-6">
-          {/* Desktop Top Bar */}
+          {/* Desktop Top Bar Left Branding */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="bg-primary text-primary-foreground rounded-md p-1.5 w-7 h-7 flex items-center justify-center font-bold text-sm">LV</div>
+            {companyLogoUrl ? (
+              <img 
+                src={companyLogoUrl} 
+                alt={companyName || 'Company Logo'} 
+                className="w-7 h-7 rounded-md object-contain border border-border bg-card p-0.5" 
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="bg-primary text-primary-foreground rounded-md p-1.5 w-7 h-7 flex items-center justify-center font-bold text-sm">
+                {companyName ? companyName[0].toUpperCase() : 'LV'}
+              </div>
+            )}
             <div className="flex flex-col leading-tight">
-              <h1 className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest leading-none">Leave Vault</h1>
+              <h1 className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest leading-none truncate max-w-[160px]">
+                {companyName || 'Leave Vault'}
+              </h1>
               <span className="text-sm font-semibold font-mono text-foreground tracking-tight leading-snug">
                 {(() => {
                   const hour = new Date().getHours();
@@ -486,24 +579,34 @@ function App() {
                   )}
                 </div>
               )}
-              <button 
-                type="button"
-                onClick={() => currentUser ? setProfileModalOpen(true) : setAuthModalOpen(true)} 
-                title="Manage Profile & Account"
-                className="flex items-center gap-1.5 bg-muted/60 hover:bg-muted border border-border/80 rounded-xl px-2.5 py-1 text-xs font-bold text-foreground transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
-              >
-                <User size={13} className="text-primary" />
-                <span>{userName}</span>
-              </button>
-              <button onClick={() => setBackupModalOpen(true)} title="Backup & Restore Data (Export/Import JSON)" className="px-2.5 py-1.5 border border-border rounded-md hover:bg-muted transition-colors flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <FileTextIcon size={15} className="text-blue-500" />
-                <span className="hidden lg:inline">Backup</span>
-              </button>
+
+              {/* Profile Pill with Avatar & Direct Hub Trigger */}
+              {(() => {
+                const googleAvatar = currentUser?.user_metadata?.avatar_url || currentUser?.user_metadata?.picture || null;
+                const effectiveAvatar = avatarUrl || googleAvatar || null;
+                const initials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'LV';
+
+                return (
+                  <button 
+                    type="button"
+                    onClick={() => currentUser ? setSettingsModalOpen(true) : setAuthModalOpen(true)} 
+                    title="Settings & Profile Hub"
+                    className="flex items-center gap-2 bg-muted/60 hover:bg-muted border border-border/80 rounded-full p-1 pr-3 text-xs font-bold text-foreground transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                  >
+                    {effectiveAvatar ? (
+                      <img src={effectiveAvatar} alt={userName} className="w-6 h-6 rounded-full object-cover border border-primary/20 flex-shrink-0" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground font-black text-[10px] flex items-center justify-center flex-shrink-0 shadow-sm">
+                        {initials}
+                      </div>
+                    )}
+                    <span className="font-bold text-xs">{userName}</span>
+                  </button>
+                );
+              })()}
+
               <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle Theme" className="p-1.5 border border-border rounded-md hover:bg-muted transition-colors">
                 {theme === 'dark' ? <Sun size={16} className="text-muted-foreground" /> : <Moon size={16} className="text-muted-foreground" />}
-              </button>
-              <button onClick={() => setSettingsModalOpen(true)} title="Settings & Quotas" className="p-1.5 border border-border rounded-md hover:bg-muted transition-colors">
-                <Settings size={16} className="text-muted-foreground hover:text-foreground" />
               </button>
             </div>
           </div>
@@ -1014,12 +1117,12 @@ function App() {
               // Reuse logic or call a common handler
               let planId = null;
               if (dates.length > 1) {
-                const plan = await createLeavePlan(planName || 'Untitled Plan', dates[0], dates[dates.length - 1]);
+                const plan = await createLeavePlan(planName || 'Untitled Plan', dates[0], dates[dates.length - 1], currentUser?.id);
                 planId = plan?.id || null;
               }
               for (const dateStr of dates) {
                 if (!isHoliday(dateStr) && !isWeekend(dateStr)) {
-                  await addLeave(dateStr, type, note, planId, duration);
+                  await addLeave(dateStr, type, note, planId, duration, currentUser?.id);
                 }
               }
               await loadLeaves();
@@ -1061,35 +1164,13 @@ function App() {
         onEnable={handleEnableNotif}
       />
 
-      {/* Backup & Restore Modal (JSON Export / Import) */}
-      <BackupModal
-        isOpen={backupModalOpen}
-        onClose={() => setBackupModalOpen(false)}
-        leavesQuota={leaves}
-        onImportSuccess={async (importedQuotaSettings) => {
-          await loadLeaves();
-          if (importedQuotaSettings) {
-            setLeaves(prev => ({
-              pl: { ...prev.pl, total: importedQuotaSettings.pl || prev.pl.total },
-              el: { ...prev.el, total: importedQuotaSettings.el || prev.el.total },
-              rh: { ...prev.rh, total: importedQuotaSettings.rh || prev.rh.total }
-            }));
-          }
-        }}
-      />
-
-      {/* Onboarding Flow Modal */}
-      <OnboardingModal
-        isOpen={onboardingOpen}
-        onClose={() => setOnboardingOpen(false)}
-        onComplete={handleOnboardingComplete}
-      />
-
-      {/* Settings & Quota Modal */}
+      {/* Unified Settings & Account Hub Modal */}
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         userName={userName}
+        companyName={companyName}
+        avatarUrl={avatarUrl}
         quotas={{
           pl: leaves.pl.total,
           el: leaves.el.total,
@@ -1099,10 +1180,22 @@ function App() {
         leaveNames={leaveNames}
         leaveColors={leaveColors}
         onSaveSettings={handleSaveSettings}
-        onOpenBackupModal={() => setBackupModalOpen(true)}
         currentUser={currentUser}
         onOpenAuthModal={() => setAuthModalOpen(true)}
+        onResetData={handleReset}
+        onDeleteAccount={handleDeleteAccount}
         onSignOut={handleSignOut}
+        leavesQuota={leaves}
+        onImportSuccess={async (importedQuotaSettings) => {
+          await loadLeaves(currentUser);
+          if (importedQuotaSettings) {
+            setLeaves(prev => ({
+              pl: { ...prev.pl, total: importedQuotaSettings.pl || prev.pl.total },
+              el: { ...prev.el, total: importedQuotaSettings.el || prev.el.total },
+              rh: { ...prev.rh, total: importedQuotaSettings.rh || prev.rh.total }
+            }));
+          }
+        }}
       />
 
       {/* Supabase & OAuth Multi-User Auth Modal */}
@@ -1123,31 +1216,12 @@ function App() {
         }}
       />
 
-      {/* Logged-In User Profile Modal */}
-      <ProfileModal
-        isOpen={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-        currentUser={currentUser}
-        userName={userName}
-        quotas={{
-          pl: leaves.pl.total,
-          el: leaves.el.total,
-          rh: leaves.rh.total,
-          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
-        }}
-        leaveNames={leaveNames}
-        leaveColors={leaveColors}
-        onOpenSettings={() => setSettingsModalOpen(true)}
-        onOpenBackup={() => setBackupModalOpen(true)}
-        onSignOut={handleSignOut}
-      />
-
       {/* Initial App Load & Auth Gateway Splash Screen */}
       <AnimatePresence>
         {showSplash && (
           <SplashScreen
             isOpen={showSplash}
-            onClose={handleGuestAccess}
+            onClose={() => {}}
             onAuthSuccess={handleAuthSuccess}
             currentProfile={{
               name: userName,

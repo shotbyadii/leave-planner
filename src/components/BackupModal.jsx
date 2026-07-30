@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Download, Upload, FileText, Table, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 
-const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota }) => {
+const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota, currentUser }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -13,7 +13,7 @@ const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota }) => {
   const handleExport = async () => {
     setIsExporting(true);
     setStatusMsg(null);
-    const result = await exportUserDataToJson(leavesQuota);
+    const result = await exportUserDataToJson(leavesQuota, currentUser?.id);
     setIsExporting(false);
     if (result.success) {
       setStatusMsg({ type: 'success', text: `Successfully exported ${result.count} records (leaves + WFH/Office logs) to JSON backup!` });
@@ -25,7 +25,7 @@ const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota }) => {
   const handleExportCsv = async () => {
     setIsExportingCsv(true);
     setStatusMsg(null);
-    const result = await exportUserDataToCsv();
+    const result = await exportUserDataToCsv(currentUser?.id);
     setIsExportingCsv(false);
     if (result.success) {
       setStatusMsg({ type: 'success', text: `Successfully exported ${result.count} records to CSV spreadsheet!` });
@@ -40,11 +40,11 @@ const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota }) => {
 
     setIsImporting(true);
     setStatusMsg(null);
-    const result = await importUserDataFromJson(file);
+    const result = await importUserDataFromJson(file, currentUser?.id);
     setIsImporting(false);
 
     if (result.success) {
-      setStatusMsg({ type: 'success', text: `Successfully imported ${result.leavesCount} records and ${result.plansCount} plans!` });
+      setStatusMsg({ type: 'success', text: `Successfully imported ${result.leavesCount} records and ${result.plansCount} plans into your account!` });
       if (onImportSuccess) {
         await onImportSuccess(result.quotaSettings);
       }
