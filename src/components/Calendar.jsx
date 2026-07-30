@@ -235,11 +235,15 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             : "bg-yellow-300 text-yellow-900 font-bold ring-2 ring-yellow-400 scale-105 z-10 shadow-sm";
         }
       } else if (bookedLeave) {
-        if (bookedLeave.type === 'pl') baseClasses += "bg-blue-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-blue-400";
-        else if (bookedLeave.type === 'el') baseClasses += "bg-orange-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-orange-400";
-        else if (bookedLeave.type === 'rh') baseClasses += "bg-green-500 text-white font-medium cursor-pointer shadow-sm ring-1 ring-green-400";
-        else if (bookedLeave.type === 'wfh') baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
-        else if (bookedLeave.type === 'office') baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
+        const typeInfo = leaves ? leaves[bookedLeave.type] : null;
+        const colorBg = typeInfo?.bg || (bookedLeave.type === 'pl' ? 'bg-blue-500' : bookedLeave.type === 'el' ? 'bg-orange-500' : 'bg-green-500');
+        if (['pl', 'el', 'rh'].includes(bookedLeave.type)) {
+          baseClasses += `${colorBg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
+        } else if (bookedLeave.type === 'wfh') {
+          baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
+        } else if (bookedLeave.type === 'office') {
+          baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
+        }
       } else if (holidayInfo) {
         baseClasses += useNavy ? "bg-purple-500 text-white font-medium" : "bg-purple-200 text-purple-900 font-medium";
       } else if (weekend) {

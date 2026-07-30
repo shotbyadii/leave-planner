@@ -1,0 +1,14 @@
+export const COLOR_PALETTE = [
+  { id: 'blue', name: 'Blue', bg: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500', badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20', hex: '#3b82f6' },
+  { id: 'orange', name: 'Orange', bg: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500', badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20', hex: '#f97316' },
+  { id: 'green', name: 'Green', bg: 'bg-green-500', text: 'text-green-500', border: 'border-green-500', badge: 'bg-green-500/10 text-green-400 border-green-500/20', hex: '#22c55e' },
+  { id: 'purple', name: 'Purple', bg: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-500', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20', hex: '#a855f7' },
+  { id: 'pink', name: 'Pink', bg: 'bg-pink-500', text: 'text-pink-500', border: 'border-pink-500', badge: 'bg-pink-500/10 text-pink-400 border-pink-500/20', hex: '#ec4899' },
+  { id: 'cyan', name: 'Cyan', bg: 'bg-cyan-500', text: 'text-cyan-500', border: 'border-cyan-500', badge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20', hex: '#06b6d4' },
+  { id: 'amber', name: 'Amber', bg: 'bg-amber-500', text: 'text-amber-500', border: 'border-amber-500', badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20', hex: '#f59e0b' },
+  { id: 'indigo', name: 'Indigo', bg: 'bg-indigo-500', text: 'text-indigo-500', border: 'border-indigo-500', badge: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', hex: '#6366f1' }
+];
+
+export const getLeaveColor = (colorId = 'blue') => {
+  return COLOR_PALETTE.find(c => c.id === colorId) || COLOR_PALETTE[0];
+};
