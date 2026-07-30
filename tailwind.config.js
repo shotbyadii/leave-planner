@@ -29,9 +29,10 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        'apple': '0 4px 24px -6px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.1)',
-        'apple-sm': '0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 0 1px rgba(0, 0, 0, 0.1)',
-        'apple-lg': '0 12px 32px -8px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1)',
+        'apple': '0 4px 24px -6px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.2)',
+        'apple-sm': '0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.15)',
+        'apple-lg': '0 12px 32px -8px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.2)',
+        'modal-dark': '0 30px 60px -12px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.05)',
       }
     },
   },

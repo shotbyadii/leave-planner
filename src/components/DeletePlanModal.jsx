@@ -3,8 +3,8 @@ import { X, AlertTriangle } from 'lucide-react';
 
 const DeletePlanModal = ({ plan, leaveCount, onClose, onConfirm }) => {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-2xl shadow-apple-lg border border-border w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] shadow-black/90 border border-border w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         <div className="p-6 flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center">

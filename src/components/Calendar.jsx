@@ -73,13 +73,18 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
   };
 
   const findTripForDate = (dateStr) => {
+    const leaveObj = bookedDates.find(b => b.date === dateStr);
+    if (!leaveObj || ['wfh', 'office'].includes(leaveObj.type)) {
+      return [dateStr];
+    }
     let tripDates = [dateStr];
     let d = new Date(dateStr);
     while (true) {
       d.setDate(d.getDate() - 1);
       const prevDateStr = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const isBooked = bookedDates.some(b => b.date === prevDateStr);
-      if (isBooked || isWeekend(prevDateStr) || isHoliday(prevDateStr)) {
+      const prevLeave = bookedDates.find(b => b.date === prevDateStr);
+      const isActualLeaveBooked = prevLeave && ['pl', 'el', 'rh'].includes(prevLeave.type);
+      if (isActualLeaveBooked || isWeekend(prevDateStr) || isHoliday(prevDateStr)) {
         tripDates.unshift(prevDateStr);
       } else {
         break;
@@ -89,8 +94,9 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     while (true) {
       d.setDate(d.getDate() + 1);
       const nextDateStr = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const isBooked = bookedDates.some(b => b.date === nextDateStr);
-      if (isBooked || isWeekend(nextDateStr) || isHoliday(nextDateStr)) {
+      const nextLeave = bookedDates.find(b => b.date === nextDateStr);
+      const isActualLeaveBooked = nextLeave && ['pl', 'el', 'rh'].includes(nextLeave.type);
+      if (isActualLeaveBooked || isWeekend(nextDateStr) || isHoliday(nextDateStr)) {
         tripDates.push(nextDateStr);
       } else {
         break;
@@ -103,8 +109,17 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const existingLeave = bookedDates.find(d => d.date === dateStr);
     if (existingLeave) {
-      const tripDates = findTripForDate(dateStr);
-      setViewingLeave({ targetLeave: existingLeave, tripDates: tripDates });
+      // Find associated plan explicitly created in DB
+      const associatedPlan = leavePlans.find(p => p.id === existingLeave.plan_id);
+      let tripDates = [dateStr];
+      if (associatedPlan) {
+        const pStart = associatedPlan.start_date || associatedPlan.startDate;
+        const pEnd = associatedPlan.end_date || associatedPlan.endDate;
+        if (pStart && pEnd) {
+          tripDates = getAllDatesInRange(pStart, pEnd);
+        }
+      }
+      setViewingLeave({ targetLeave: existingLeave, tripDates, associatedPlan });
       return;
     }
     if (_selectionStart) {
@@ -139,6 +154,14 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       }
     } else {
       await removeLeave(dateStrOrArray);
+    }
+    await loadLeaves();
+    setViewingLeave(null);
+  };
+
+  const handleCancelPlan = async (planId) => {
+    if (onDeletePlan) {
+      await onDeletePlan(planId);
     }
     await loadLeaves();
     setViewingLeave(null);
@@ -232,7 +255,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       days.push(
         <div key={`d-${i}`} className={baseClasses} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
           {isWfh && (
-            <span className="absolute top-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/80 z-20 pointer-events-none" />
+            <span className={isMini ? "absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none ring-1 ring-background/40" : "absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none"} />
           )}
           <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
         </div>
@@ -271,11 +294,11 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           ))}
         </div>
 
-        <div className={`grid grid-cols-7 ${isLarge ? 'gap-1 md:gap-2' : 'gap-px md:gap-1'}`}>
+        <div className={`grid grid-cols-7 ${isLarge ? 'gap-1 md:gap-2 mb-3' : 'gap-px md:gap-1 mb-2.5'}`}>
           {days}
         </div>
 
-        <div className={`mt-auto pt-2 border-t ${useNavy ? 'border-white/20' : 'border-border'} ${isMini ? 'hidden md:block' : ''}`}>
+        <div className={`mt-auto pt-3.5 border-t ${useNavy ? 'border-white/20' : 'border-border'} ${isMini ? 'hidden md:block' : ''}`}>
           {monthHolidays.length > 0 ? (
             <div className={`grid ${isLarge ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-x-3 gap-y-1'} ${isMini ? 'hidden md:grid' : ''}`}>
               {monthHolidays.map((h, idx) => (
@@ -326,7 +349,12 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       </div>
 
       {viewingLeave && (
-        <ExistingLeaveModal leaveObj={viewingLeave} onClose={() => setViewingLeave(null)} onCancelLeave={handleCancelLeave} />
+        <ExistingLeaveModal 
+          leaveObj={viewingLeave} 
+          onClose={() => setViewingLeave(null)} 
+          onCancelLeave={handleCancelLeave}
+          onCancelPlan={handleCancelPlan}
+        />
       )}
     </>
   );

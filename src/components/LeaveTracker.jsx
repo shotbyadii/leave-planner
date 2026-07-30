@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown, Home } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
 
@@ -58,15 +58,15 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
           {cells.map((cell, idx) => {
             if (!cell) return <div key={idx} className="w-full aspect-square"></div>;
             
-            let classes = "w-full aspect-square rounded-full flex items-center justify-center text-[10px] font-bold transition-all ";
+            let classes = "w-full aspect-square rounded-lg flex items-center justify-center text-[11px] font-mono transition-all ";
             if (cell.isLeave) {
-              classes += "bg-blue-600 text-white shadow-md z-10 ring-2 ring-blue-400/40";
+              classes += "text-blue-500 font-black scale-110";
             } else if (cell.isHoliday) {
-              classes += "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 font-bold";
+              classes += "text-purple-400 font-black";
             } else if (cell.isWeekend) {
-              classes += "text-muted-foreground/30 bg-muted/20";
+              classes += "text-muted-foreground/30 font-medium";
             } else {
-              classes += "text-muted-foreground/40 hover:bg-muted/40 cursor-default";
+              classes += "text-muted-foreground/50 font-medium";
             }
             
             return (
@@ -203,25 +203,39 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
         {(() => {
           const curMonthKey = new Date().toISOString().substring(0, 7);
           const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
+          const isWfhOverQuota = wfhUsedThisMonth >= 10;
+          const wfhOverAmount = wfhUsedThisMonth - 10;
           const wfhRemaining = Math.max(0, 10 - wfhUsedThisMonth);
-          const isWfhWarning = wfhRemaining <= 2;
+          const isWfhWarning = !isWfhOverQuota && wfhRemaining <= 2;
+
+          const cardStyle = isWfhOverQuota
+            ? 'bg-gradient-to-br from-red-950/80 to-red-900/40 border-red-500/30'
+            : isWfhWarning 
+            ? 'bg-gradient-to-br from-amber-950/80 to-amber-900/40 border-amber-500/30' 
+            : 'bg-card border-border';
+
+          const badgeStyle = isWfhOverQuota
+            ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
+            : isWfhWarning 
+            ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' 
+            : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30';
+
+          const badgeText = isWfhOverQuota ? 'Over Quota' : (isWfhWarning ? 'Low Balance' : 'Normal');
+
+          const subtitleText = isWfhOverQuota
+            ? `+${wfhOverAmount} day${wfhOverAmount === 1 ? '' : 's'} over monthly quota`
+            : `${wfhRemaining} WFH day${wfhRemaining === 1 ? '' : 's'} remaining this month`;
+
+          const strokeColor = isWfhOverQuota ? 'stroke-red-500' : (isWfhWarning ? 'stroke-amber-500' : 'stroke-cyan-400');
 
           return (
-            <div className={`rounded-2xl border shadow-apple-sm p-5 transition-all ${
-              isWfhWarning 
-                ? 'bg-gradient-to-br from-amber-950/80 to-amber-900/40 border-amber-500/30' 
-                : 'bg-card border-border'
-            }`}>
+            <div className={`rounded-2xl border shadow-apple-sm p-5 transition-all ${cardStyle}`}>
               <div className="flex justify-between items-center mb-3">
                 <span className="font-semibold text-xs uppercase tracking-widest text-cyan-500 font-mono flex items-center gap-1.5">
                   <Home size={14} /> WFH Monthly Quota
                 </span>
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                  isWfhWarning 
-                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' 
-                    : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30'
-                }`}>
-                  {isWfhWarning ? 'Low Balance' : 'Normal'}
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${badgeStyle}`}>
+                  {badgeText}
                 </span>
               </div>
 
@@ -231,7 +245,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                     {wfhUsedThisMonth}<span className="text-sm font-bold text-muted-foreground">/10</span>
                   </span>
                   <span className="text-xs font-semibold text-muted-foreground mt-0.5">
-                    {wfhRemaining} WFH day{wfhRemaining === 1 ? '' : 's'} remaining this month
+                    {subtitleText}
                   </span>
                 </div>
                 
@@ -240,10 +254,10 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                     <circle cx="28" cy="28" r="20" className="stroke-muted" strokeWidth="4" fill="transparent" />
                     <circle 
                       cx="28" cy="28" r="20" 
-                      className={`transition-all duration-1000 ease-out ${isWfhWarning ? 'stroke-amber-500' : 'stroke-cyan-400'}`}
+                      className={`transition-all duration-1000 ease-out ${strokeColor}`}
                       strokeWidth="4" 
                       strokeDasharray={125.6}
-                      strokeDashoffset={125.6 - (wfhUsedThisMonth / 10) * 125.6}
+                      strokeDashoffset={125.6 - Math.min(1, wfhUsedThisMonth / 10) * 125.6}
                       strokeLinecap="round"
                       fill="transparent" 
                     />
@@ -358,22 +372,22 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                         </div>
 
                         {/* Stat Cards - Clean typography without text bleeding */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-2">
-                          <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-3.5 py-2.5 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
-                            <span className="text-[9px] font-bold text-blue-600/70 dark:text-blue-400 uppercase tracking-wider leading-none mb-1.5 truncate">Leaves</span>
-                            <span className="text-xl font-black text-blue-600 leading-none">{leavesCount}</span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                          <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
+                            <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Leaves</span>
+                            <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
                           </div>
-                          <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
-                            <span className="text-[9px] font-bold text-slate-500/70 dark:text-slate-400 uppercase tracking-wider leading-none mb-1.5 truncate">Weekends</span>
-                            <span className="text-xl font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
+                          <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
+                            <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Weekends</span>
+                            <span className="text-lg font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
                           </div>
-                          <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-3.5 py-2.5 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
-                            <span className="text-[9px] font-bold text-purple-600/70 dark:text-purple-400 uppercase tracking-wider leading-none mb-1.5 truncate">Holidays</span>
-                            <span className="text-xl font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
+                          <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
+                            <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Holidays</span>
+                            <span className="text-lg font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
                           </div>
-                          <div className="flex flex-col bg-foreground text-background px-3.5 py-2.5 rounded-2xl shadow-md overflow-hidden">
-                            <span className="text-[9px] font-bold opacity-60 uppercase tracking-wider leading-none mb-1.5 truncate">Total</span>
-                            <span className="text-xl font-black leading-none">{allDatesInRange.length}d</span>
+                          <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl shadow-md overflow-hidden">
+                            <span className="text-[9px] font-extrabold opacity-60 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Total</span>
+                            <span className="text-lg font-black leading-none">{allDatesInRange.length}d</span>
                           </div>
                         </div>
                       </div>
