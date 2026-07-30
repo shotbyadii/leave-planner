@@ -12,22 +12,38 @@ const WfhCheckinModal = ({
 }) => {
   const [notifPermission, setNotifPermission] = useState('default');
 
+  const isNotificationSupported = typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification);
+
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setNotifPermission(Notification.permission);
+    if (isNotificationSupported) {
+      try {
+        setNotifPermission(Notification.permission);
+      } catch (e) {
+        console.warn('Notification permission check error:', e);
+      }
     }
-  }, []);
+  }, [isNotificationSupported]);
 
   const handleRequestNotif = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const res = await Notification.requestPermission();
-      setNotifPermission(res);
-      if (res === 'granted') {
-        new Notification('WFH & Attendance Check-in', {
-          body: 'Notifications enabled! You will be reminded daily after 12 PM.',
-          icon: '/favicon.ico'
-        });
+    if (!isNotificationSupported) return;
+    try {
+      let res;
+      if (typeof Notification.requestPermission === 'function') {
+        res = await Notification.requestPermission();
       }
+      if (res) setNotifPermission(res);
+      if (res === 'granted') {
+        try {
+          new Notification('WFH & Attendance Check-in', {
+            body: 'Notifications enabled! You will be reminded daily after 12 PM.',
+            icon: '/favicon.ico'
+          });
+        } catch (e) {
+          console.warn('Notification constructor error:', e);
+        }
+      }
+    } catch (err) {
+      console.warn('Notification requestPermission error:', err);
     }
   };
 
@@ -154,7 +170,7 @@ const WfhCheckinModal = ({
           </button>
 
           {/* Notification Permission Prompt */}
-          {notifPermission !== 'granted' && (
+          {isNotificationSupported && notifPermission !== 'granted' && (
             <button
               onClick={handleRequestNotif}
               className="mt-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1.5"
