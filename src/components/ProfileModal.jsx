@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Mail, ShieldCheck, Settings, LogOut, FileText, X, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Mail, ShieldCheck, Settings, LogOut, FileText, X, Sparkles, CheckCircle2, RotateCw, Trash2, AlertTriangle } from 'lucide-react';
 import { getLeaveColor } from '../utils/colorUtils';
 
 const ProfileModal = ({ 
@@ -12,8 +12,14 @@ const ProfileModal = ({
   leaveColors = {},
   onOpenSettings,
   onOpenBackup,
+  onResetData,
+  onDeleteAccount,
   onSignOut
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteInputText, setDeleteInputText] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   if (!isOpen) return null;
 
   const initials = userName
@@ -31,7 +37,7 @@ const ProfileModal = ({
       <div className="absolute inset-0 bg-black/80 backdrop-blur-lg animate-in fade-in duration-200" onClick={onClose} />
 
       {/* Profile Card */}
-      <div className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col">
+      <div className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar">
         
         {/* Header Banner */}
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b border-border relative">
@@ -112,6 +118,95 @@ const ProfileModal = ({
               </div>
               <span className="text-muted-foreground">→</span>
             </button>
+
+            {/* Reset All Data Button */}
+            {!showResetConfirm ? (
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                className="w-full py-3 px-4 bg-muted/60 hover:bg-muted border border-border text-foreground rounded-2xl text-xs font-bold transition-all flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <RotateCw size={15} className="text-amber-500" />
+                  <span>Reset All Booked Leaves</span>
+                </div>
+                <span className="text-muted-foreground">→</span>
+              </button>
+            ) : (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col gap-2 animate-in fade-in duration-200">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle size={14} /> Reset all booked leave dates & plans?
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowResetConfirm(false);
+                      onClose();
+                      if (onResetData) onResetData();
+                    }}
+                    className="flex-1 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-xl"
+                  >
+                    Confirm Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowResetConfirm(false)}
+                    className="px-3 py-1.5 bg-muted text-muted-foreground text-xs font-bold rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Delete Account Button */}
+            {showDeleteConfirm ? (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <Trash2 size={14} /> Delete Account & Data
+                  </span>
+                  <button type="button" onClick={() => setShowDeleteConfirm(false)} className="text-muted-foreground hover:text-foreground">
+                    <X size={14} />
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  This will permanently wipe your account and all booked leave dates. Type <strong className="text-foreground font-mono">DELETE</strong> below to confirm.
+                </p>
+                <input
+                  type="text"
+                  value={deleteInputText}
+                  onChange={(e) => setDeleteInputText(e.target.value)}
+                  placeholder="Type DELETE"
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                />
+                <button
+                  type="button"
+                  disabled={deleteInputText.trim() !== 'DELETE'}
+                  onClick={() => {
+                    onClose();
+                    if (onDeleteAccount) onDeleteAccount();
+                  }}
+                  className="w-full py-2.5 bg-red-600 text-white font-black text-xs rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
+                >
+                  Permanently Delete Account
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full py-3 px-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold transition-all flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Trash2 size={15} />
+                  <span>Delete Account & Data</span>
+                </div>
+                <span>→</span>
+              </button>
+            )}
+
           </div>
         </div>
 

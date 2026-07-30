@@ -3,10 +3,10 @@ import { fetchBookedLeaves, fetchLeavePlans, addLeave, createLeavePlan } from '.
 /**
  * Export all user leaves (PL, EL, RH, WFH, Office), plans, and settings into a JSON backup file.
  */
-export const exportUserDataToJson = async (leavesQuota = { pl: 15, el: 10, rh: 1 }) => {
+export const exportUserDataToJson = async (leavesQuota = { pl: 15, el: 10, rh: 1 }, userId = null) => {
   try {
-    const bookedLeaves = await fetchBookedLeaves();
-    const leavePlans = await fetchLeavePlans();
+    const bookedLeaves = await fetchBookedLeaves(userId);
+    const leavePlans = await fetchLeavePlans(userId);
 
     const backupData = {
       version: '1.0',
@@ -54,9 +54,9 @@ export const exportUserDataToJson = async (leavesQuota = { pl: 15, el: 10, rh: 1
 };
 
 /**
- * Import user leaves (including WFH/Office) and plans from a JSON backup file.
+ * Import user leaves (including WFH/Office) and plans from a JSON backup file directly into Supabase.
  */
-export const importUserDataFromJson = async (jsonFile) => {
+export const importUserDataFromJson = async (jsonFile, userId = null) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -72,11 +72,11 @@ export const importUserDataFromJson = async (jsonFile) => {
         let importedLeavesCount = 0;
         let importedPlansCount = 0;
 
-        // Import plans first if available
+        // Import plans first if available (scoped to userId)
         const planIdMap = {};
         if (Array.isArray(backupData.plans)) {
           for (const plan of backupData.plans) {
-            const created = await createLeavePlan(plan.name, plan.startDate, plan.endDate);
+            const created = await createLeavePlan(plan.name, plan.startDate, plan.endDate, userId);
             if (created && created.id) {
               planIdMap[plan.id] = created.id;
               importedPlansCount++;
@@ -84,11 +84,11 @@ export const importUserDataFromJson = async (jsonFile) => {
           }
         }
 
-        // Import leaves (including WFH and Office records)
+        // Import leaves (including WFH and Office records, scoped to userId)
         for (const leaf of backupData.leaves) {
           if (!leaf.date || !leaf.type) continue;
           const mappedPlanId = leaf.plan_id ? (planIdMap[leaf.plan_id] || null) : null;
-          await addLeave(leaf.date, leaf.type, leaf.note || '', mappedPlanId, leaf.duration || 1);
+          await addLeave(leaf.date, leaf.type, leaf.note || '', mappedPlanId, leaf.duration || 1, userId);
           importedLeavesCount++;
         }
 
@@ -115,10 +115,10 @@ export const importUserDataFromJson = async (jsonFile) => {
 /**
  * Export all user leave & WFH records to a formatted CSV spreadsheet file.
  */
-export const exportUserDataToCsv = async () => {
+export const exportUserDataToCsv = async (userId = null) => {
   try {
-    const bookedLeaves = await fetchBookedLeaves();
-    const leavePlans = await fetchLeavePlans();
+    const bookedLeaves = await fetchBookedLeaves(userId);
+    const leavePlans = await fetchLeavePlans(userId);
 
     const planNameMap = {};
     (leavePlans || []).forEach(p => {

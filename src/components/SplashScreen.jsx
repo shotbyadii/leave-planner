@@ -12,6 +12,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState(currentProfile.name || '');
@@ -55,7 +56,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
     setLoading(true);
     try {
       if (mode === 'login') {
-        const { data, error } = await signInWithEmail(email, password);
+        const { data, error } = await signInWithEmail(email, password, rememberMe);
         if (error) throw error;
         if (onAuthSuccess) onAuthSuccess(data?.user || null);
         onClose();
@@ -65,7 +66,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
           quotas: currentProfile.quotas,
           names: currentProfile.names,
           colors: currentProfile.colors
-        });
+        }, rememberMe);
         if (error) throw error;
         if (isSupabaseConfigured) {
           setVerifyEmailSent(true);
@@ -87,9 +88,6 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
     try {
       const { data, error } = await signInWithGoogle();
       if (error) throw error;
-      if (!isSupabaseConfigured && onAuthSuccess) {
-        onAuthSuccess({ id: 'google-user', email: 'google.user@gmail.com', user_metadata: { name: 'Google User' } });
-      }
       onClose();
     } catch (err) {
       setErrorMsg(err.message || 'Google OAuth failed.');
@@ -223,7 +221,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                 {!isSupabaseConfigured && (
                   <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-start gap-2">
                     <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" />
-                    <span>Offline Guest Mode active. Submitting will simulate profile authentication.</span>
+                    <span>Supabase credentials missing. Add keys to `.env` to activate live authentication.</span>
                   </div>
                 )}
 
@@ -346,6 +344,17 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                     </div>
                   )}
 
+                  {/* Remember Me Checkbox */}
+                  <label className="flex items-center gap-2 cursor-pointer my-1 text-xs text-muted-foreground hover:text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 accent-primary"
+                    />
+                    <span className="font-medium">Remember login on this device</span>
+                  </label>
+
                   <button
                     type="submit"
                     disabled={loading}
@@ -364,18 +373,6 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
 
               </div>
             )}
-
-            {/* Footer Offline Guest Mode */}
-            <div className="p-4 border-t border-border bg-muted/30 flex justify-center items-center">
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              >
-                <span>Continue Offline as Guest</span>
-                <ChevronRight size={14} />
-              </button>
-            </div>
 
           </div>
         </div>

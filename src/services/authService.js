@@ -7,13 +7,12 @@ export const isSupabaseConfigured = _url !== '' && _url !== 'https://placeholder
 
 // ─── AUTHENTICATION ────────────────────────────────────────
 
-export const signUpWithEmail = async (email, password, metadata = {}) => {
+export const signUpWithEmail = async (email, password, metadata = {}, rememberMe = true) => {
   if (!isSupabaseConfigured) {
-    // Offline / Guest Fallback
-    const mockUser = { id: 'guest-' + Date.now(), email, user_metadata: { name: metadata.name || 'User' } };
-    localStorage.setItem('auth_user', JSON.stringify(mockUser));
-    return { data: { user: mockUser }, error: null };
+    return { data: null, error: new Error('Supabase credentials not configured in .env file.') };
   }
+
+  localStorage.setItem('remember_me', rememberMe ? 'true' : 'false');
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -40,45 +39,42 @@ export const signUpWithEmail = async (email, password, metadata = {}) => {
   return { data, error: null };
 };
 
-export const signInWithEmail = async (email, password) => {
+export const signInWithEmail = async (email, password, rememberMe = true) => {
   if (!isSupabaseConfigured) {
-    const mockUser = { id: 'guest-user', email, user_metadata: { name: 'User' } };
-    localStorage.setItem('auth_user', JSON.stringify(mockUser));
-    return { data: { user: mockUser }, error: null };
+    return { data: null, error: new Error('Supabase credentials not configured in .env file.') };
   }
 
+  localStorage.setItem('remember_me', rememberMe ? 'true' : 'false');
   return await supabase.auth.signInWithPassword({ email, password });
 };
 
 export const signInWithGoogle = async () => {
   if (!isSupabaseConfigured) {
-    const mockUser = { id: 'google-user', email: 'google.user@gmail.com', user_metadata: { name: 'Google User' } };
-    localStorage.setItem('auth_user', JSON.stringify(mockUser));
-    return { data: { user: mockUser }, error: null };
+    return { data: null, error: new Error('Supabase credentials not configured in .env file.') };
   }
 
+  localStorage.setItem('remember_me', 'true');
+  const redirectTo = window.location.origin;
   return await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin
+      redirectTo,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent'
+      }
     }
   });
 };
 
 export const signOutUser = async () => {
-  if (!isSupabaseConfigured) {
-    localStorage.removeItem('auth_user');
-    return { error: null };
-  }
-
+  localStorage.removeItem('remember_me');
+  if (!isSupabaseConfigured) return { error: null };
   return await supabase.auth.signOut();
 };
 
 export const getCurrentUser = async () => {
-  if (!isSupabaseConfigured) {
-    const local = localStorage.getItem('auth_user');
-    return local ? JSON.parse(local) : null;
-  }
+  if (!isSupabaseConfigured) return null;
 
   const { data } = await supabase.auth.getUser();
   return data?.user || null;
@@ -99,6 +95,9 @@ export const upsertUserProfile = async (userId, profileData) => {
     quota_wfh: profileData.quotas?.wfh,
     leave_names: profileData.names,
     leave_colors: profileData.colors,
+    avatar_url: profileData.avatarUrl || profileData.avatar_url || null,
+    company_name: profileData.companyName || profileData.company_name || null,
+    company_logo_url: profileData.companyLogoUrl || profileData.company_logo_url || null,
     updated_at: new Date().toISOString()
   };
 
@@ -123,4 +122,25 @@ export const fetchUserProfile = async (userId) => {
 
   if (error) console.error('Supabase profile fetch error:', error);
   return data;
+};
+
+export const deleteUserAccount = async (userId) => {
+  if (!isSupabaseConfigured || !userId) {
+    localStorage.clear();
+    return { error: null };
+  }
+
+  // Delete user's profile and data from DB
+  const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+  if (profileError) console.error('Error deleting profile:', profileError);
+
+  const { error: leavesError } = await supabase.from('leaves').delete().eq('user_id', userId);
+  if (leavesError) console.error('Error deleting user leaves:', leavesError);
+
+  const { error: plansError } = await supabase.from('leave_plans').delete().eq('user_id', userId);
+  if (plansError) console.error('Error deleting user plans:', plansError);
+
+  await signOutUser();
+  localStorage.clear();
+  return { error: null };
 };

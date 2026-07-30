@@ -3,14 +3,17 @@ import { supabase } from '../lib/supabase';
 // Helper to prevent crashes if user hasn't added real keys yet
 const _url = import.meta.env.VITE_SUPABASE_URL || '';
 const _key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const isConfigured = _url !== '' && _url !== 'https://placeholder.supabase.co'
+export const isConfigured = _url !== '' && _url !== 'https://placeholder.supabase.co'
                   && _key !== '' && _key !== 'placeholder-key';
 
 // ─── Leave Plans ───────────────────────────────────────────
 
-export const fetchLeavePlans = async () => {
+export const fetchLeavePlans = async (userId = null) => {
   if (!isConfigured) return [];
-  const { data, error } = await supabase.from('leave_plans').select('*').order('start_date', { ascending: true });
+  let query = supabase.from('leave_plans').select('*').order('start_date', { ascending: true });
+  if (userId) query = query.eq('user_id', userId);
+  
+  const { data, error } = await query;
   if (error) {
     console.error('Supabase fetch leave_plans error:', error);
     return [];
@@ -18,11 +21,14 @@ export const fetchLeavePlans = async () => {
   return data;
 };
 
-export const createLeavePlan = async (name, startDate, endDate) => {
+export const createLeavePlan = async (name, startDate, endDate, userId = null) => {
   if (!isConfigured) return null;
+  const payload = { name, start_date: startDate, end_date: endDate };
+  if (userId) payload.user_id = userId;
+
   const { data, error } = await supabase
     .from('leave_plans')
-    .insert([{ name, start_date: startDate, end_date: endDate }])
+    .insert([payload])
     .select()
     .single();
   if (error) {
@@ -32,14 +38,12 @@ export const createLeavePlan = async (name, startDate, endDate) => {
   return data;
 };
 
-export const updateLeavePlan = async (planId, updates) => {
+export const updateLeavePlan = async (planId, updates, userId = null) => {
   if (!isConfigured) return null;
-  const { data, error } = await supabase
-    .from('leave_plans')
-    .update(updates)
-    .eq('id', planId)
-    .select()
-    .single();
+  let query = supabase.from('leave_plans').update(updates).eq('id', planId);
+  if (userId) query = query.eq('user_id', userId);
+
+  const { data, error } = await query.select().single();
   if (error) {
     console.error('Supabase update leave_plan error:', error);
     return null;
@@ -47,18 +51,23 @@ export const updateLeavePlan = async (planId, updates) => {
   return data;
 };
 
-export const deleteLeavePlan = async (planId) => {
+export const deleteLeavePlan = async (planId, userId = null) => {
   if (!isConfigured) return;
-  // CASCADE will delete associated leaves
-  const { error } = await supabase.from('leave_plans').delete().eq('id', planId);
+  let query = supabase.from('leave_plans').delete().eq('id', planId);
+  if (userId) query = query.eq('user_id', userId);
+
+  const { error } = await query;
   if (error) console.error('Supabase delete leave_plan error:', error);
 };
 
 // ─── Individual Leaves ─────────────────────────────────────
 
-export const fetchBookedLeaves = async () => {
+export const fetchBookedLeaves = async (userId = null) => {
   if (!isConfigured) return [];
-  const { data, error } = await supabase.from('leaves').select('*, leave_plans(name)');
+  let query = supabase.from('leaves').select('*, leave_plans(name)');
+  if (userId) query = query.eq('user_id', userId);
+
+  const { data, error } = await query;
   if (error) {
     console.error('Supabase fetch error:', error);
     return [];
@@ -73,30 +82,45 @@ export const fetchBookedLeaves = async () => {
   }));
 };
 
-export const addLeave = async (dateStr, type = 'pl', note = '', planId = null, duration = 1) => {
+export const addLeave = async (dateStr, type = 'pl', note = '', planId = null, duration = 1, userId = null) => {
   if (!isConfigured) return;
   const payload = { date: dateStr, leave_type: type, status: 'planned', duration };
   if (note) payload.note = note;
   if (planId) payload.plan_id = planId;
-  
-  const { error } = await supabase.from('leaves').upsert([payload], { onConflict: 'date' });
+  if (userId) payload.user_id = userId;
+
+  const onConflictConstraint = userId ? 'user_id,date' : 'date';
+  const { error } = await supabase.from('leaves').upsert([payload], { onConflict: onConflictConstraint });
   if (error) {
     console.error('Supabase insert error:', error);
   }
 };
 
-export const removeLeave = async (dateStr) => {
+export const removeLeave = async (dateStr, userId = null) => {
   if (!isConfigured) return;
-  const { error } = await supabase.from('leaves').delete().eq('date', dateStr);
+  let query = supabase.from('leaves').delete().eq('date', dateStr);
+  if (userId) query = query.eq('user_id', userId);
+
+  const { error } = await query;
   if (error) console.error('Supabase delete error:', error);
 };
 
-export const resetAllLeaves = async () => {
+export const resetAllLeaves = async (userId = null) => {
   if (!isConfigured) return;
-  // Delete all plans (cascade deletes leaves too)
-  const { error: planError } = await supabase.from('leave_plans').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  if (planError) console.error('Supabase reset plans error:', planError);
-  // Also delete any orphan leaves
-  const { error } = await supabase.from('leaves').delete().neq('date', '1900-01-01');
-  if (error) console.error('Supabase reset error:', error);
+
+  if (userId) {
+    // Delete ONLY current user's plans and leaves
+    const { error: planError } = await supabase.from('leave_plans').delete().eq('user_id', userId);
+    if (planError) console.error('Supabase reset user plans error:', planError);
+
+    const { error: leaveError } = await supabase.from('leaves').delete().eq('user_id', userId);
+    if (leaveError) console.error('Supabase reset user leaves error:', leaveError);
+  } else {
+    // Guest fallback reset
+    const { error: planError } = await supabase.from('leave_plans').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (planError) console.error('Supabase reset plans error:', planError);
+
+    const { error } = await supabase.from('leaves').delete().neq('date', '1900-01-01');
+    if (error) console.error('Supabase reset error:', error);
+  }
 };

@@ -3,7 +3,7 @@ import { publicHolidays, isHoliday, isWeekend } from '../data/holidays';
 export const isActualLeave = (type) => ['pl', 'el', 'rh'].includes(type);
 export const isAttendanceLog = (type) => ['wfh', 'office'].includes(type);
 
-export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth = 'all', bookedDates = [], mode = 'best' }) => {
+export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth = 'all', bookedDates = [], mode = 'best', leaveFilterTier = 'all' }) => {
   const year = 2026;
   const maxL = targetLeaves ? parseInt(targetLeaves, 10) : 5;
   
@@ -82,6 +82,7 @@ export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth =
     }
   }
 
+  // Deduplicate overlapping date ranges and near-identical holiday windows
   const uniqueSuggestions = [];
   const seen = new Set();
   
@@ -101,8 +102,17 @@ export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth =
     }
   });
 
-  let filtered = uniqueSuggestions;
-  
+  let filtered = uniqueSuggestions.filter(s => s.leavesRequired <= maxL);
+
+  // Apply explicit leave tier filter if selected (e.g. '1-2', '3-4', '5+')
+  if (leaveFilterTier === '1-2') {
+    filtered = filtered.filter(s => s.leavesRequired <= 2);
+  } else if (leaveFilterTier === '3-4') {
+    filtered = filtered.filter(s => s.leavesRequired === 3 || s.leavesRequired === 4);
+  } else if (leaveFilterTier === '5+') {
+    filtered = filtered.filter(s => s.leavesRequired >= 5);
+  }
+
   if (targetDuration) {
     filtered = filtered.filter(s => s.totalDaysOff >= targetDuration);
     filtered.sort((a, b) => {
@@ -111,20 +121,10 @@ export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth =
       }
       return a.leavesRequired - b.leavesRequired;
     });
-  } else if (mode === 'best') {
-    // Sort by highest days-per-leaves ratio first
-    filtered = filtered.filter(s => s.leavesRequired <= maxL);
-    filtered.sort((a, b) => {
-      if (b.ratio !== a.ratio) {
-        return b.ratio - a.ratio;
-      }
-      if (b.totalDaysOff !== a.totalDaysOff) {
-        return b.totalDaysOff - a.totalDaysOff;
-      }
-      return a.startDate.getTime() - b.startDate.getTime();
-    });
-  } else {
-    // Manual exact or capped leave mode
+    return filtered.slice(0, 18);
+  }
+
+  if (mode === 'manual') {
     filtered = filtered.filter(s => s.leavesRequired === maxL);
     if (filtered.length === 0) {
       filtered = uniqueSuggestions.filter(s => s.leavesRequired <= maxL);
@@ -135,9 +135,46 @@ export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth =
       }
       return b.totalDaysOff - a.totalDaysOff;
     });
+    return filtered.slice(0, 18);
   }
 
-  return filtered.slice(0, 15);
+  // BEST RATIO MODE: Interleave diverse tiers (1-2L, 3L, 4-5L, 6L+) so results are rich and varied!
+  if (leaveFilterTier !== 'all') {
+    filtered.sort((a, b) => {
+      if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+      if (b.totalDaysOff !== a.totalDaysOff) return b.totalDaysOff - a.totalDaysOff;
+      return a.startDate.getTime() - b.startDate.getTime();
+    });
+    return filtered.slice(0, 18);
+  }
+
+  const tier1 = filtered.filter(s => s.leavesRequired <= 2).sort((a, b) => b.ratio - a.ratio || b.totalDaysOff - a.totalDaysOff);
+  const tier2 = filtered.filter(s => s.leavesRequired === 3).sort((a, b) => b.ratio - a.ratio || b.totalDaysOff - a.totalDaysOff);
+  const tier3 = filtered.filter(s => s.leavesRequired === 4 || s.leavesRequired === 5).sort((a, b) => b.ratio - a.ratio || b.totalDaysOff - a.totalDaysOff);
+  const tier4 = filtered.filter(s => s.leavesRequired >= 6).sort((a, b) => b.ratio - a.ratio || b.totalDaysOff - a.totalDaysOff);
+
+  const interleaved = [];
+  const maxTierLength = Math.max(tier1.length, tier2.length, tier3.length, tier4.length);
+
+  for (let idx = 0; idx < maxTierLength; idx++) {
+    if (tier1[idx]) interleaved.push(tier1[idx]);
+    if (tier2[idx]) interleaved.push(tier2[idx]);
+    if (tier3[idx]) interleaved.push(tier3[idx]);
+    if (tier4[idx]) interleaved.push(tier4[idx]);
+  }
+
+  // Deduplicate interleaved list by date range key
+  const finalResults = [];
+  const finalSeen = new Set();
+  interleaved.forEach(item => {
+    const key = `${item.startDateStr}-${item.endDateStr}`;
+    if (!finalSeen.has(key)) {
+      finalSeen.add(key);
+      finalResults.push(item);
+    }
+  });
+
+  return finalResults.length > 0 ? finalResults.slice(0, 18) : filtered.slice(0, 18);
 };
 
 export const formatShortDate = (date) => {
