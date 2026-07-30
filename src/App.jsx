@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Check, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Check, AlertTriangle, Settings, User } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
@@ -13,19 +13,52 @@ import LeaveSelectionBar from './components/LeaveSelectionBar';
 import WfhCheckinModal from './components/WfhCheckinModal';
 import NotificationPromptModal from './components/NotificationPromptModal';
 import BackupModal from './components/BackupModal';
+import OnboardingModal from './components/OnboardingModal';
+import SettingsModal from './components/SettingsModal';
+import AuthModal from './components/AuthModal';
+import ProfileModal from './components/ProfileModal';
+import SplashScreen from './components/SplashScreen';
+import { getLeaveColor } from './utils/colorUtils';
+import { getCurrentUser, signOutUser, fetchUserProfile, upsertUserProfile } from './services/authService';
 import { FileText as FileTextIcon } from 'lucide-react';
 import './index.css';
 
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('calendar');
   const [wfhModalOpen, setWfhModalOpen] = useState(false);
   const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
   const [notifModalOpen, setNotifModalOpen] = useState(false);
   const [backupModalOpen, setBackupModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(localStorage.getItem('onboarding_completed') !== 'true');
+  const [userName, setUserName] = useState(localStorage.getItem('user_name') || 'User');
+  
+  const [leaveNames, setLeaveNames] = useState(() => {
+    try {
+      const saved = localStorage.getItem('leave_names');
+      return saved ? JSON.parse(saved) : { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Extra Leave', wfh: 'Work From Home' };
+    } catch (e) {
+      return { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Extra Leave', wfh: 'Work From Home' };
+    }
+  });
+
+  const [leaveColors, setLeaveColors] = useState(() => {
+    try {
+      const saved = localStorage.getItem('leave_colors');
+      return saved ? JSON.parse(saved) : { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' };
+    } catch (e) {
+      return { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' };
+    }
+  });
+
   const [leaves, setLeaves] = useState({
-    pl: { total: 15, used: 0, label: 'Privileged', color: 'blue', bg: 'bg-blue-400', badge: 'bg-blue-50 text-blue-600' },
-    el: { total: 10, used: 0, label: 'Emergency', color: 'orange', bg: 'bg-orange-400', badge: 'bg-orange-50 text-orange-600' },
-    rh: { total: 1, used: 0, label: 'Restricted', color: 'green', bg: 'bg-green-400', badge: 'bg-green-50 text-green-600' }
+    pl: { total: parseInt(localStorage.getItem('quota_pl') || '15', 10), used: 0, label: leaveNames.pl || 'Planned Leave', color: leaveColors.pl || 'blue', bg: getLeaveColor(leaveColors.pl).bg, badge: getLeaveColor(leaveColors.pl).badge },
+    el: { total: parseInt(localStorage.getItem('quota_el') || '10', 10), used: 0, label: leaveNames.el || 'Emergency Leave', color: leaveColors.el || 'orange', bg: getLeaveColor(leaveColors.el).bg, badge: getLeaveColor(leaveColors.el).badge },
+    rh: { total: parseInt(localStorage.getItem('quota_rh') || '1', 10), used: 0, label: leaveNames.rh || 'Extra Leave', color: leaveColors.rh || 'green', bg: getLeaveColor(leaveColors.rh).bg, badge: getLeaveColor(leaveColors.rh).badge }
   });
   const [bookedDates, setBookedDates] = useState([]);
   const [leavePlans, setLeavePlans] = useState([]);
@@ -58,7 +91,68 @@ function App() {
 
   useEffect(() => {
     loadLeaves();
+    checkAuthUser();
   }, []);
+
+  const checkAuthUser = async () => {
+    const user = await getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+      setShowSplash(false);
+      const profile = await fetchUserProfile(user.id);
+      if (profile) {
+        if (profile.name) {
+          setUserName(profile.name);
+          localStorage.setItem('user_name', profile.name);
+        }
+        if (profile.leave_names) {
+          setLeaveNames(profile.leave_names);
+          localStorage.setItem('leave_names', JSON.stringify(profile.leave_names));
+        }
+        if (profile.leave_colors) {
+          setLeaveColors(profile.leave_colors);
+          localStorage.setItem('leave_colors', JSON.stringify(profile.leave_colors));
+        }
+      }
+    } else {
+      const isGuest = localStorage.getItem('guest_mode') === 'true';
+      setShowSplash(!isGuest);
+    }
+  };
+
+  const handleGuestAccess = () => {
+    localStorage.setItem('guest_mode', 'true');
+    setShowSplash(false);
+  };
+
+  const handleAuthSuccess = async (user) => {
+    setCurrentUser(user);
+    setShowSplash(false);
+    localStorage.setItem('guest_mode', 'true');
+    if (user) {
+      const nameToUse = user.user_metadata?.name || userName;
+      setUserName(nameToUse);
+      await upsertUserProfile(user.id, {
+        name: nameToUse,
+        email: user.email,
+        quotas: {
+          pl: leaves.pl.total,
+          el: leaves.el.total,
+          rh: leaves.rh.total,
+          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+        },
+        names: leaveNames,
+        colors: leaveColors
+      });
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOutUser();
+    setCurrentUser(null);
+    localStorage.removeItem('guest_mode');
+    setShowSplash(true);
+  };
 
   // Persistent Notification Permission Prompt (Until "Not Needed" is clicked)
   useEffect(() => {
@@ -178,6 +272,63 @@ function App() {
       el: { ...prev.el, used: elUsed },
       rh: { ...prev.rh, used: rhUsed }
     }));
+  };
+
+  const handleSaveSettings = ({ name, quotas, names, colors }) => {
+    if (name) {
+      setUserName(name);
+      localStorage.setItem('user_name', name);
+    }
+    if (quotas) {
+      localStorage.setItem('quota_pl', quotas.pl);
+      localStorage.setItem('quota_el', quotas.el);
+      localStorage.setItem('quota_rh', quotas.rh);
+      localStorage.setItem('quota_wfh', quotas.wfh);
+    }
+    if (names) {
+      setLeaveNames(names);
+      localStorage.setItem('leave_names', JSON.stringify(names));
+    }
+    if (colors) {
+      setLeaveColors(colors);
+      localStorage.setItem('leave_colors', JSON.stringify(colors));
+    }
+
+    const updatedColors = colors || leaveColors;
+    const updatedNames = names || leaveNames;
+
+    setLeaves(prev => ({
+      pl: { 
+        ...prev.pl, 
+        total: quotas ? quotas.pl : prev.pl.total, 
+        label: updatedNames.pl, 
+        color: updatedColors.pl,
+        bg: getLeaveColor(updatedColors.pl).bg,
+        badge: getLeaveColor(updatedColors.pl).badge
+      },
+      el: { 
+        ...prev.el, 
+        total: quotas ? quotas.el : prev.el.total, 
+        label: updatedNames.el, 
+        color: updatedColors.el,
+        bg: getLeaveColor(updatedColors.el).bg,
+        badge: getLeaveColor(updatedColors.el).badge
+      },
+      rh: { 
+        ...prev.rh, 
+        total: quotas ? quotas.rh : prev.rh.total, 
+        label: updatedNames.rh, 
+        color: updatedColors.rh,
+        bg: getLeaveColor(updatedColors.rh).bg,
+        badge: getLeaveColor(updatedColors.rh).badge
+      }
+    }));
+  };
+
+  const handleOnboardingComplete = (data) => {
+    handleSaveSettings(data);
+    localStorage.setItem('onboarding_completed', 'true');
+    setOnboardingOpen(false);
   };
 
   const handleReset = async () => {
@@ -335,6 +486,15 @@ function App() {
                   )}
                 </div>
               )}
+              <button 
+                type="button"
+                onClick={() => currentUser ? setProfileModalOpen(true) : setAuthModalOpen(true)} 
+                title="Manage Profile & Account"
+                className="flex items-center gap-1.5 bg-muted/60 hover:bg-muted border border-border/80 rounded-xl px-2.5 py-1 text-xs font-bold text-foreground transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+              >
+                <User size={13} className="text-primary" />
+                <span>{userName}</span>
+              </button>
               <button onClick={() => setBackupModalOpen(true)} title="Backup & Restore Data (Export/Import JSON)" className="px-2.5 py-1.5 border border-border rounded-md hover:bg-muted transition-colors flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <FileTextIcon size={15} className="text-blue-500" />
                 <span className="hidden lg:inline">Backup</span>
@@ -342,8 +502,8 @@ function App() {
               <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle Theme" className="p-1.5 border border-border rounded-md hover:bg-muted transition-colors">
                 {theme === 'dark' ? <Sun size={16} className="text-muted-foreground" /> : <Moon size={16} className="text-muted-foreground" />}
               </button>
-              <button onClick={() => setShowResetConfirm(true)} title="Reset all leaves" className="p-1.5 border border-border rounded-md hover:bg-red-50 hover:text-red-600 transition-colors">
-                <RotateCw size={16} className="text-muted-foreground hover:text-red-600" />
+              <button onClick={() => setSettingsModalOpen(true)} title="Settings & Quotas" className="p-1.5 border border-border rounded-md hover:bg-muted transition-colors">
+                <Settings size={16} className="text-muted-foreground hover:text-foreground" />
               </button>
             </div>
           </div>
@@ -527,10 +687,13 @@ function App() {
               </div>
               {/* Header row */}
               <div className="px-4 py-3 flex items-center justify-between border-b border-border">
-                <div className="flex items-center gap-2">
+                <button onClick={() => { setIsMobileMenuOpen(false); if (currentUser) setProfileModalOpen(true); else setAuthModalOpen(true); }} className="flex items-center gap-2 hover:opacity-80 transition-opacity text-left">
                   <div className="bg-primary text-primary-foreground rounded-md w-7 h-7 flex items-center justify-center font-bold text-xs">LV</div>
-                  <span className="font-bold font-mono text-sm text-foreground">Leave Vault</span>
-                </div>
+                  <div className="flex flex-col leading-none">
+                    <span className="font-bold font-mono text-sm text-foreground">{userName}</span>
+                    <span className="text-[9px] font-mono text-muted-foreground mt-0.5">{currentUser ? 'View Profile' : 'Account & Sync'}</span>
+                  </div>
+                </button>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-full">
                   <X size={16} />
                 </button>
@@ -914,6 +1077,92 @@ function App() {
           }
         }}
       />
+
+      {/* Onboarding Flow Modal */}
+      <OnboardingModal
+        isOpen={onboardingOpen}
+        onClose={() => setOnboardingOpen(false)}
+        onComplete={handleOnboardingComplete}
+      />
+
+      {/* Settings & Quota Modal */}
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        userName={userName}
+        quotas={{
+          pl: leaves.pl.total,
+          el: leaves.el.total,
+          rh: leaves.rh.total,
+          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+        }}
+        leaveNames={leaveNames}
+        leaveColors={leaveColors}
+        onSaveSettings={handleSaveSettings}
+        onOpenBackupModal={() => setBackupModalOpen(true)}
+        currentUser={currentUser}
+        onOpenAuthModal={() => setAuthModalOpen(true)}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Supabase & OAuth Multi-User Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+        currentProfile={{
+          name: userName,
+          quotas: {
+            pl: leaves.pl.total,
+            el: leaves.el.total,
+            rh: leaves.rh.total,
+            wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+          },
+          names: leaveNames,
+          colors: leaveColors
+        }}
+      />
+
+      {/* Logged-In User Profile Modal */}
+      <ProfileModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        currentUser={currentUser}
+        userName={userName}
+        quotas={{
+          pl: leaves.pl.total,
+          el: leaves.el.total,
+          rh: leaves.rh.total,
+          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+        }}
+        leaveNames={leaveNames}
+        leaveColors={leaveColors}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenBackup={() => setBackupModalOpen(true)}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Initial App Load & Auth Gateway Splash Screen */}
+      <AnimatePresence>
+        {showSplash && (
+          <SplashScreen
+            isOpen={showSplash}
+            onClose={handleGuestAccess}
+            onAuthSuccess={handleAuthSuccess}
+            currentProfile={{
+              name: userName,
+              quotas: {
+                pl: leaves.pl.total,
+                el: leaves.el.total,
+                rh: leaves.rh.total,
+                wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+              },
+              names: leaveNames,
+              colors: leaveColors
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
