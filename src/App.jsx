@@ -64,23 +64,43 @@ function App() {
   useEffect(() => {
     if (!isLeavesLoaded) return;
     const isDismissed = localStorage.getItem('notif_prompt_dismissed') === 'true';
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission !== 'granted' && !isDismissed) {
-        setNotifModalOpen(true);
+    if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
+      try {
+        if (Notification.permission !== 'granted' && !isDismissed) {
+          setNotifModalOpen(true);
+        }
+      } catch (e) {
+        console.warn('Notification permission read failed:', e);
       }
     }
   }, [isLeavesLoaded]);
 
   const handleEnableNotif = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const perm = await Notification.requestPermission();
-      if (perm === 'granted') {
+    if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
+      try {
+        let perm;
+        if (typeof Notification.requestPermission === 'function') {
+          perm = await Notification.requestPermission();
+        }
+        if (perm === 'granted') {
+          setNotifModalOpen(false);
+          try {
+            new Notification('Attendance Reminders Enabled', {
+              body: 'You will receive daily 12 PM check-in reminders on working days.',
+              icon: '/favicon.ico'
+            });
+          } catch (e) {
+            console.warn('Notification constructor error:', e);
+          }
+        } else {
+          setNotifModalOpen(false);
+        }
+      } catch (err) {
+        console.warn('Notification permission request error:', err);
         setNotifModalOpen(false);
-        new Notification('Attendance Reminders Enabled', {
-          body: 'You will receive daily 12 PM check-in reminders on working days.',
-          icon: '/favicon.ico'
-        });
       }
+    } else {
+      setNotifModalOpen(false);
     }
   };
 
@@ -98,11 +118,17 @@ function App() {
       setWfhModalOpen(true);
       setHasPromptedWfh(true);
 
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('Daily Attendance Check-in', {
-          body: `It is past 12 PM. Please confirm if ${todayStr} is WFH or In-Office.`,
-          icon: '/favicon.ico'
-        });
+      if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
+        try {
+          if (Notification.permission === 'granted') {
+            new Notification('Daily Attendance Check-in', {
+              body: `It is past 12 PM. Please confirm if ${todayStr} is WFH or In-Office.`,
+              icon: '/favicon.ico'
+            });
+          }
+        } catch (e) {
+          console.warn('Mobile notification toast error:', e);
+        }
       }
     }
   }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr]);
@@ -119,6 +145,8 @@ function App() {
     setWfhModalOpen(false);
     setActiveTab('calendar');
     setSelectionStart(todayStr);
+    setPreviewDates([todayStr]);
+    setMobileConfirmOpen(true);
   };
 
   useEffect(() => {
