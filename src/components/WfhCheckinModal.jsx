@@ -34,7 +34,8 @@ const WfhCheckinModal = ({
   if (!isOpen) return null;
 
   const remainingWfh = Math.max(0, maxWfh - wfhUsedThisMonth);
-  const isWarning = remainingWfh <= 2;
+  const isOverQuota = wfhUsedThisMonth >= maxWfh;
+  const isWarning = !isOverQuota && remainingWfh <= 2;
   const percentage = Math.min(100, Math.round((wfhUsedThisMonth / maxWfh) * 100));
 
   const todayObj = todayStr ? new Date(todayStr) : new Date();
@@ -44,6 +45,14 @@ const WfhCheckinModal = ({
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+  const gaugeStroke = isOverQuota ? 'stroke-red-500' : (isWarning ? 'stroke-amber-500' : 'stroke-cyan-500');
+  const textColor = isOverQuota ? 'text-red-500' : (isWarning ? 'text-amber-500' : 'text-cyan-400');
+  const alertStyle = isOverQuota
+    ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+    : (isWarning
+      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+      : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-300');
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -88,7 +97,7 @@ const WfhCheckinModal = ({
                 cx="56"
                 cy="56"
                 r={radius}
-                className={`transition-all duration-700 ease-out ${isWarning ? 'stroke-amber-500' : 'stroke-cyan-500'}`}
+                className={`transition-all duration-700 ease-out ${gaugeStroke}`}
                 strokeWidth="8"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
@@ -97,7 +106,7 @@ const WfhCheckinModal = ({
               />
             </svg>
             <div className="absolute flex flex-col items-center justify-center inset-0">
-              <span className={`text-2xl font-black font-mono leading-none ${isWarning ? 'text-amber-500' : 'text-cyan-400'}`}>
+              <span className={`text-2xl font-black font-mono leading-none ${textColor}`}>
                 {wfhUsedThisMonth}<span className="text-xs font-bold text-muted-foreground">/{maxWfh}</span>
               </span>
               <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">WFH Used</span>
@@ -105,15 +114,13 @@ const WfhCheckinModal = ({
           </div>
 
           {/* Status Message */}
-          <div className={`p-3 rounded-2xl border text-xs font-medium w-full flex items-center justify-center gap-2 ${
-            isWarning 
-              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
-              : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-300'
-          }`}>
-            {isWarning ? <AlertTriangle size={15} className="flex-shrink-0" /> : <Home size={15} className="flex-shrink-0" />}
+          <div className={`p-3.5 rounded-2xl border text-xs font-medium w-full flex items-start gap-2.5 text-left leading-relaxed ${alertStyle}`}>
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
             <span>
-              {isWarning 
-                ? `Low WFH Balance! Only ${remainingWfh} WFH day${remainingWfh === 1 ? '' : 's'} remaining this month.` 
+              {isOverQuota
+                ? `Monthly WFH Quota Over! (${wfhUsedThisMonth}/${maxWfh} used). Selecting WFH assumes you have manager/HR approval for exceeding your monthly quota.`
+                : isWarning
+                ? `Low WFH Balance! Only ${remainingWfh} WFH day${remainingWfh === 1 ? '' : 's'} remaining this month.`
                 : `${remainingWfh} Work-From-Home day${remainingWfh === 1 ? '' : 's'} available this month.`}
             </span>
           </div>

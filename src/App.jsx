@@ -12,6 +12,8 @@ import { TimePicker } from './components/TimePicker';
 import LeaveSelectionBar from './components/LeaveSelectionBar';
 import WfhCheckinModal from './components/WfhCheckinModal';
 import NotificationPromptModal from './components/NotificationPromptModal';
+import BackupModal from './components/BackupModal';
+import { FileText as FileTextIcon } from 'lucide-react';
 import './index.css';
 
 function App() {
@@ -19,6 +21,7 @@ function App() {
   const [wfhModalOpen, setWfhModalOpen] = useState(false);
   const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
   const [notifModalOpen, setNotifModalOpen] = useState(false);
+  const [backupModalOpen, setBackupModalOpen] = useState(false);
   const [leaves, setLeaves] = useState({
     pl: { total: 15, used: 0, label: 'Privileged', color: 'blue', bg: 'bg-blue-400', badge: 'bg-blue-50 text-blue-600' },
     el: { total: 10, used: 0, label: 'Emergency', color: 'orange', bg: 'bg-orange-400', badge: 'bg-orange-50 text-orange-600' },
@@ -304,6 +307,10 @@ function App() {
                   )}
                 </div>
               )}
+              <button onClick={() => setBackupModalOpen(true)} title="Backup & Restore Data (Export/Import JSON)" className="px-2.5 py-1.5 border border-border rounded-md hover:bg-muted transition-colors flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <FileTextIcon size={15} className="text-blue-500" />
+                <span className="hidden lg:inline">Backup</span>
+              </button>
               <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle Theme" className="p-1.5 border border-border rounded-md hover:bg-muted transition-colors">
                 {theme === 'dark' ? <Sun size={16} className="text-muted-foreground" /> : <Moon size={16} className="text-muted-foreground" />}
               </button>
@@ -360,7 +367,7 @@ function App() {
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-blue-300"></div> PL</div>
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-orange-300"></div> EL</div>
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-green-300"></div> RH</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-4 h-1.5 rounded-full bg-cyan-400"></div> WFH</div>
+              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-2 h-2 rounded-full bg-cyan-400"></div> WFH</div>
             </div>
           )}
           
@@ -470,7 +477,7 @@ function App() {
         <motion.div
           layout
           transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-          className={`pointer-events-auto overflow-hidden border border-border shadow-[0_8px_32px_-4px_hsl(var(--foreground)/0.18)] ${
+          className={`pointer-events-auto overflow-hidden border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] shadow-black/90 ${
             isMobileMenuOpen || mobileConfirmOpen
               ? 'w-full rounded-[28px] bg-background'
               : (selectionStart !== null || previewDates.length > 0)
@@ -519,6 +526,32 @@ function App() {
                     </div>
                   );
                 })}
+                {/* WFH Monthly Quota Row */}
+                {(() => {
+                  const curMonthKey = new Date().toISOString().substring(0, 7);
+                  const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
+                  const wfhRemaining = Math.max(0, 10 - wfhUsedThisMonth);
+                  const isWfhOverQuota = wfhUsedThisMonth >= 10;
+                  const wfhOverAmount = wfhUsedThisMonth - 10;
+
+                  return (
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold font-mono text-foreground">Work-From-Home <span className="text-muted-foreground">(wfh)</span></span>
+                        <span className="text-sm font-bold font-mono">{wfhRemaining}<span className="text-muted-foreground font-normal text-xs"> / 10</span></span>
+                      </div>
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${isWfhOverQuota ? 'bg-red-500' : 'bg-cyan-400'}`} 
+                          style={{ width: `${Math.min(100, (wfhRemaining / 10) * 100)}%` }} 
+                        />
+                      </div>
+                      <span className={`text-[10px] font-mono ${isWfhOverQuota ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>
+                        {isWfhOverQuota ? `+${wfhOverAmount} day${wfhOverAmount === 1 ? '' : 's'} over monthly quota` : `${wfhUsedThisMonth} used this month`}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
               {/* Actions */}
               <div className="px-4 pb-6 pt-2 border-t border-border flex gap-3">
@@ -835,6 +868,23 @@ function App() {
         isOpen={notifModalOpen}
         onClose={() => setNotifModalOpen(false)}
         onEnable={handleEnableNotif}
+      />
+
+      {/* Backup & Restore Modal (JSON Export / Import) */}
+      <BackupModal
+        isOpen={backupModalOpen}
+        onClose={() => setBackupModalOpen(false)}
+        leavesQuota={leaves}
+        onImportSuccess={async (importedQuotaSettings) => {
+          await loadLeaves();
+          if (importedQuotaSettings) {
+            setLeaves(prev => ({
+              pl: { ...prev.pl, total: importedQuotaSettings.pl || prev.pl.total },
+              el: { ...prev.el, total: importedQuotaSettings.el || prev.el.total },
+              rh: { ...prev.rh, total: importedQuotaSettings.rh || prev.rh.total }
+            }));
+          }
+        }}
       />
     </div>
   );

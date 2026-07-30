@@ -1,5 +1,8 @@
 import { publicHolidays, isHoliday, isWeekend } from '../data/holidays';
 
+export const isActualLeave = (type) => ['pl', 'el', 'rh'].includes(type);
+export const isAttendanceLog = (type) => ['wfh', 'office'].includes(type);
+
 export const findOptimalWindows = ({ targetLeaves, targetDuration, targetMonth = 'all', bookedDates = [], mode = 'best' }) => {
   const year = 2026;
   const maxL = targetLeaves ? parseInt(targetLeaves, 10) : 5;
