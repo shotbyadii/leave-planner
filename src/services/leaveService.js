@@ -10,8 +10,18 @@ export const isConfigured = _url !== '' && _url !== 'https://placeholder.supabas
 
 export const fetchLeavePlans = async (userId = null) => {
   if (!isConfigured) return [];
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    targetUserId = session?.user?.id || null;
+  }
+
   let query = supabase.from('leave_plans').select('*').order('start_date', { ascending: true });
-  if (userId) query = query.eq('user_id', userId);
+  if (targetUserId) {
+    query = query.eq('user_id', targetUserId);
+  } else {
+    query = query.is('user_id', null);
+  }
   
   const { data, error } = await query;
   if (error) {
@@ -64,8 +74,18 @@ export const deleteLeavePlan = async (planId, userId = null) => {
 
 export const fetchBookedLeaves = async (userId = null) => {
   if (!isConfigured) return [];
+  let targetUserId = userId;
+  if (!targetUserId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    targetUserId = session?.user?.id || null;
+  }
+
   let query = supabase.from('leaves').select('*, leave_plans(name)');
-  if (userId) query = query.eq('user_id', userId);
+  if (targetUserId) {
+    query = query.eq('user_id', targetUserId);
+  } else {
+    query = query.is('user_id', null);
+  }
 
   const { data, error } = await query;
   if (error) {
@@ -78,7 +98,7 @@ export const fetchBookedLeaves = async (userId = null) => {
     note: row.note || '',
     plan_id: row.plan_id || null,
     plan_name: row.leave_plans?.name || null,
-    duration: row.duration !== undefined ? row.duration : 1
+    duration: row.duration !== undefined ? Number(row.duration) : 1
   }));
 };
 
@@ -109,14 +129,12 @@ export const resetAllLeaves = async (userId = null) => {
   if (!isConfigured) return;
 
   if (userId) {
-    // Delete ONLY current user's plans and leaves
     const { error: planError } = await supabase.from('leave_plans').delete().eq('user_id', userId);
     if (planError) console.error('Supabase reset user plans error:', planError);
 
     const { error: leaveError } = await supabase.from('leaves').delete().eq('user_id', userId);
     if (leaveError) console.error('Supabase reset user leaves error:', leaveError);
   } else {
-    // Guest fallback reset
     const { error: planError } = await supabase.from('leave_plans').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (planError) console.error('Supabase reset plans error:', planError);
 

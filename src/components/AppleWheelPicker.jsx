@@ -40,13 +40,25 @@ const AppleWheelPicker = ({
 
   const currentColor = COLOR_PALETTE.find(c => c.id === color) || COLOR_PALETTE[0];
 
+  const getShortform = (name, fallbackCode) => {
+    if (!name || typeof name !== 'string') return fallbackCode;
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return fallbackCode;
+    if (words.length === 1) {
+      return words[0].substring(0, 3).toUpperCase();
+    }
+    return words.map(w => w[0]).join('').substring(0, 4).toUpperCase();
+  };
+
+  const displayShortform = getShortform(customName, code);
+
   return (
     <div className="flex flex-col gap-2 bg-card/80 border border-border/80 rounded-2xl p-3.5 shadow-apple-sm flex-1 min-w-[140px]">
       
       {/* Header Badge */}
       <div className="flex items-center justify-between">
         <span className={`text-[10px] font-black uppercase tracking-wider font-mono px-2 py-0.5 rounded-md border ${currentColor.badge}`}>
-          {code || label}
+          {displayShortform}
         </span>
       </div>
 

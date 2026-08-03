@@ -95,75 +95,106 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-lg animate-in fade-in duration-200" onClick={onClose} />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            transition={{ duration: 0.2 }} 
+            className="absolute inset-0 bg-black/80 backdrop-blur-lg" 
+            onClick={onClose} 
+          />
 
       {/* Auth Card */}
-      <div className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col">
+      <motion.div 
+        layout
+        initial={{ opacity: 0, y: 20, scale: 0.96 }} 
+        animate={{ opacity: 1, y: 0, scale: 1 }} 
+        exit={{ opacity: 0, y: 15, scale: 0.96 }} 
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }} 
+        className="relative bg-card dark:bg-[#121212] dark:text-zinc-100 dark:border-zinc-800 w-full max-w-md mx-auto rounded-[32px] border border-border shadow-2xl overflow-hidden z-10 flex flex-col"
+      >
         
         {/* Header */}
-        <div className="p-6 border-b border-border bg-muted/40 flex justify-between items-center">
+        <div className="p-6 border-b border-border dark:border-zinc-800 bg-muted/40 dark:bg-[#161616] flex justify-between items-center">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shadow-md">
               LV
             </div>
             <div>
-              <h3 className="text-base font-black text-foreground">Leave Vault Account</h3>
-              <p className="text-[11px] text-muted-foreground font-medium">Sync profiles & leave plans across devices</p>
+              <h3 className="text-base font-black text-foreground dark:text-zinc-100">Leave Vault Account</h3>
+              <p className="text-[11px] text-muted-foreground dark:text-zinc-400 font-medium">Sync profiles & leave plans across devices</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 text-muted-foreground hover:text-foreground dark:text-zinc-400 dark:hover:text-white bg-muted/60 dark:bg-zinc-800 hover:bg-muted rounded-full transition-colors">
             <X size={16} />
           </button>
         </div>
 
         {/* Verify Email Screen OR Auth Form */}
-        {verifyEmailSent ? (
-          <div className="p-8 flex flex-col items-center text-center gap-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center shadow-inner animate-pulse">
-              <Mail size={32} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-foreground tracking-tight">Verify Your Email</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">
-                We've sent a verification link to <span className="font-bold text-foreground">{email}</span>. Please check your inbox to confirm your account.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 w-full mt-3">
-              <button
-                type="button"
-                onClick={() => { setVerifyEmailSent(false); setMode('login'); }}
-                className="w-full py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl shadow-md flex items-center justify-center gap-2"
-              >
-                <span>Back to Sign In</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Tab Switcher */}
-            <div className="flex border-b border-border bg-muted/20">
-              <button
-                type="button"
-                onClick={() => { setMode('login'); setErrorMsg(''); }}
-                className={`flex-1 py-3 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 ${
-                  mode === 'login' ? 'border-b-2 border-primary text-foreground bg-card' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <LogIn size={14} /> Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode('signup'); setErrorMsg(''); }}
-                className={`flex-1 py-3 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 ${
-                  mode === 'signup' ? 'border-b-2 border-primary text-foreground bg-card' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <UserPlus size={14} /> Create Account
-              </button>
-            </div>
+        <AnimatePresence mode="wait">
+          {verifyEmailSent ? (
+            <motion.div 
+              key="verify"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="p-8 flex flex-col items-center text-center gap-4"
+            >
+              <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center shadow-inner animate-pulse">
+                <Mail size={32} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-foreground dark:text-zinc-100 tracking-tight">Verify Your Email</h3>
+                <p className="text-xs text-muted-foreground dark:text-zinc-400 leading-relaxed mt-1.5">
+                  We've sent a verification link to <span className="font-bold text-foreground dark:text-zinc-100">{email}</span>. Please check your inbox to confirm your account.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 w-full mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setVerifyEmailSent(false); setMode('login'); }}
+                  className="w-full py-3 bg-primary dark:bg-white text-primary-foreground dark:text-black font-black text-xs rounded-2xl shadow-md flex items-center justify-center gap-2"
+                >
+                  <span>Back to Sign In</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={mode}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col"
+            >
+              {/* Tab Switcher */}
+              <div className="flex border-b border-border dark:border-zinc-800 bg-muted/20 dark:bg-[#181818]">
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setErrorMsg(''); }}
+                  className={`flex-1 py-3 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 ${
+                    mode === 'login' ? 'border-b-2 border-primary dark:border-white text-foreground dark:text-white bg-card dark:bg-[#121212]' : 'text-muted-foreground dark:text-zinc-400 hover:text-foreground'
+                  }`}
+                >
+                  <LogIn size={14} /> Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('signup'); setErrorMsg(''); }}
+                  className={`flex-1 py-3 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 ${
+                    mode === 'signup' ? 'border-b-2 border-primary dark:border-white text-foreground dark:text-white bg-card dark:bg-[#121212]' : 'text-muted-foreground dark:text-zinc-400 hover:text-foreground'
+                  }`}
+                >
+                  <UserPlus size={14} /> Create Account
+                </button>
+              </div>
 
             {/* Body Form */}
             <div className="p-6 flex flex-col gap-4 max-h-[75vh] overflow-y-auto no-scrollbar">
@@ -323,7 +354,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 mt-1 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                  className="w-full py-3.5 mt-1 bg-primary dark:bg-white text-primary-foreground dark:text-black font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                 >
                   {loading ? (
                     <span>Processing...</span>
@@ -337,11 +368,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
               </form>
 
             </div>
-          </>
+          </motion.div>
         )}
+        </AnimatePresence>
 
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };
 

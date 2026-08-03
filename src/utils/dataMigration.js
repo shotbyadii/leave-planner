@@ -1,4 +1,4 @@
-import { fetchBookedLeaves, fetchLeavePlans, addLeave, createLeavePlan } from '../services/leaveService';
+import { fetchBookedLeaves, fetchLeavePlans, addLeave, createLeavePlan, resetAllLeaves } from '../services/leaveService';
 
 /**
  * Export all user leaves (PL, EL, RH, WFH, Office), plans, and settings into a JSON backup file.
@@ -55,6 +55,7 @@ export const exportUserDataToJson = async (leavesQuota = { pl: 15, el: 10, rh: 1
 
 /**
  * Import user leaves (including WFH/Office) and plans from a JSON backup file directly into Supabase.
+ * Deletes existing plans and leaves for the target profile first to prevent duplicate plans.
  */
 export const importUserDataFromJson = async (jsonFile, userId = null) => {
   return new Promise((resolve, reject) => {
@@ -68,6 +69,9 @@ export const importUserDataFromJson = async (jsonFile, userId = null) => {
         if (!backupData || !Array.isArray(backupData.leaves)) {
           throw new Error('Invalid backup file format: missing "leaves" array.');
         }
+
+        // Clean slate: Delete existing leave plans and leaves for this user profile to prevent duplicates
+        await resetAllLeaves(userId);
 
         let importedLeavesCount = 0;
         let importedPlansCount = 0;
@@ -99,13 +103,19 @@ export const importUserDataFromJson = async (jsonFile, userId = null) => {
           quotaSettings: backupData.quotaSettings || null
         });
       } catch (err) {
-        console.error('Failed to parse or import backup file:', err);
-        resolve({ success: false, error: err.message });
+        console.error('Import failed:', err);
+        resolve({
+          success: false,
+          error: err.message || 'Unknown error occurred while parsing JSON backup.'
+        });
       }
     };
 
     reader.onerror = () => {
-      resolve({ success: false, error: 'Failed to read backup file.' });
+      resolve({
+        success: false,
+        error: 'Failed to read backup file.'
+      });
     };
 
     reader.readAsText(jsonFile);
@@ -113,62 +123,39 @@ export const importUserDataFromJson = async (jsonFile, userId = null) => {
 };
 
 /**
- * Export all user leave & WFH records to a formatted CSV spreadsheet file.
+ * Export leave records to a formatted CSV file.
  */
 export const exportUserDataToCsv = async (userId = null) => {
   try {
     const bookedLeaves = await fetchBookedLeaves(userId);
-    const leavePlans = await fetchLeavePlans(userId);
+    
+    if (!bookedLeaves || bookedLeaves.length === 0) {
+      return { success: false, error: 'No leave records found to export.' };
+    }
 
-    const planNameMap = {};
-    (leavePlans || []).forEach(p => {
-      if (p.id) planNameMap[p.id] = p.name;
-    });
+    const headers = ['Date', 'Leave Type', 'Duration', 'Plan Name', 'Note'];
+    const rows = bookedLeaves.map(b => [
+      b.date,
+      (b.type || 'PL').toUpperCase(),
+      b.duration || 1,
+      `"${(b.plan_name || '').replace(/"/g, '""')}"`,
+      `"${(b.note || '').replace(/"/g, '""')}"`
+    ]);
 
-    const labels = {
-      pl: 'Privileged Leave',
-      el: 'Emergency Leave',
-      rh: 'Restricted Holiday',
-      wfh: 'Work From Home',
-      office: 'In-Office'
-    };
-
-    const headers = ['Date', 'Type Code', 'Record Type', 'Duration (Days)', 'Plan Name', 'Notes', 'Status'];
-    const rows = [headers];
-
-    (bookedLeaves || []).forEach(b => {
-      const typeCode = (b.type || '').toUpperCase();
-      const recordType = labels[b.type] || b.type || 'Leave';
-      const duration = b.duration || 1;
-      const planName = b.leave_plans?.name || (b.plan_id ? planNameMap[b.plan_id] : '') || '-';
-      const note = (b.note || '').replace(/"/g, '""');
-      const status = (b.status || 'planned').toUpperCase();
-
-      rows.push([
-        `"${b.date}"`,
-        `"${typeCode}"`,
-        `"${recordType}"`,
-        `"${duration}"`,
-        `"${planName.replace(/"/g, '""')}"`,
-        `"${note}"`,
-        `"${status}"`
-      ]);
-    });
-
-    const csvContent = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
+    
     const todayStr = new Date().toISOString().split('T')[0];
     const link = document.createElement('a');
     link.href = url;
-    link.download = `leave_planner_spreadsheet_${todayStr}.csv`;
+    link.download = `leave_records_${todayStr}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    return { success: true, count: (bookedLeaves || []).length };
+    return { success: true, count: bookedLeaves.length };
   } catch (err) {
     console.error('Failed to export CSV:', err);
     return { success: false, error: err.message };

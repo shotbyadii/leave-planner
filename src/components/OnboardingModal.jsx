@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, SlidersHorizontal } from 'lucide-react';
+import { 
+  Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, 
+  SlidersHorizontal, Building2, Clock, Bell, ShieldCheck 
+} from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
+import CompanyInput from './CompanyInput';
 
 const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
-  
+  const [companyName, setCompanyName] = useState('');
+  const [wfhPromptHour, setWfhPromptHour] = useState('12');
+  const [notifGranted, setNotifGranted] = useState(
+    typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+  );
+
   // Quotas, Names & Colors State
   const [quotas, setQuotas] = useState({
     pl: 15,
@@ -31,10 +40,32 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
 
   if (!isOpen) return null;
 
+  const handleRequestNotif = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          setNotifGranted(true);
+          try {
+            new Notification('Attendance Reminders Enabled', {
+              body: `Daily check-in reminders set for ${wfhPromptHour}:00.`,
+              icon: '/favicon.ico'
+            });
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.warn('Notification permission error:', err);
+      }
+    }
+  };
+
   const handleFinish = () => {
     if (onComplete) {
       onComplete({
         name: name.trim() || 'User',
+        companyName: companyName.trim(),
+        wfhPromptHour,
+        notifEnabled: notifGranted,
         quotas,
         names,
         colors
@@ -42,6 +73,8 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
     }
     onClose();
   };
+
+  const totalSteps = 4;
 
   const slides = [
     {
@@ -51,7 +84,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
       highlights: [
         { icon: CalendarDays, title: 'Smart Leave Optimizer', desc: 'Auto-finds long weekend bridges with minimal leave cost.' },
         { icon: MapPin, title: 'Trip Range Planner', desc: 'Group & label multi-day vacations effortlessly.' },
-        { icon: Home, title: '12 PM WFH Attendance Tracker', desc: 'Track your monthly remote days with daily check-ins.' }
+        { icon: Home, title: 'Daily WFH Attendance Tracker', desc: 'Track your monthly remote days with daily check-ins.' }
       ]
     }
   ];
@@ -69,11 +102,11 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span className="text-xs font-black uppercase tracking-widest text-muted-foreground font-mono">
-              Onboarding • Step {step} of 3
+              Onboarding • Step {step} of {totalSteps}
             </span>
           </div>
           <div className="flex gap-1.5">
-            {[1, 2, 3].map(s => (
+            {[1, 2, 3, 4].map(s => (
               <div 
                 key={s} 
                 className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -125,7 +158,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
               </motion.div>
             )}
 
-            {/* STEP 2: Name Personalization */}
+            {/* STEP 2: Name & Company Information */}
             {step === 2 && (
               <motion.div 
                 key="step2"
@@ -133,30 +166,47 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-6 items-center text-center py-8 max-w-md mx-auto"
+                className="flex flex-col gap-6 max-w-md mx-auto py-4"
               >
-                <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shadow-inner">
-                  <User size={32} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-foreground tracking-tight">What should we call you?</h2>
-                  <p className="text-xs text-muted-foreground mt-1 font-medium">Personalize your Leave Vault experience.</p>
+                <div className="text-center flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-3 shadow-inner">
+                    <User size={32} />
+                  </div>
+                  <h2 className="text-2xl font-black text-foreground tracking-tight">User & Company Profile</h2>
+                  <p className="text-xs text-muted-foreground mt-1 font-medium">Set your display name and company brand.</p>
                 </div>
 
-                <div className="w-full">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your name (e.g. Aditya)"
-                    className="w-full bg-muted/50 border border-border rounded-2xl px-5 py-4 text-base font-bold text-center text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-inner"
-                    autoFocus
-                  />
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-foreground mb-1.5 block text-left">Your Full Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Aditya Sharma"
+                      className="w-full bg-muted/50 border border-border rounded-2xl px-4 py-3 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-inner"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-foreground mb-1.5 block text-left flex items-center gap-1.5">
+                      <Building2 size={14} className="text-primary" /> Company Name & Logo
+                    </label>
+                    <CompanyInput
+                      value={companyName}
+                      onChange={(val) => setCompanyName(val)}
+                      placeholder="Search company (e.g. Google, Microsoft...)"
+                    />
+                    <p className="text-[11px] text-muted-foreground text-left mt-1">
+                      Auto-detects and displays your official company logo in the header.
+                    </p>
+                  </div>
                 </div>
               </motion.div>
             )}
 
-            {/* STEP 3: 4 Horizontally Stacked Quota, Name & Color Cards */}
+            {/* STEP 3: Quotas, Colors & Names */}
             {step === 3 && (
               <motion.div 
                 key="step3"
@@ -170,7 +220,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                   <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-2 shadow-inner">
                     <SlidersHorizontal size={24} />
                   </div>
-                  <h2 className="text-xl font-black text-foreground tracking-tight">Quotas, Colors & Custom Names</h2>
+                  <h2 className="text-xl font-black text-foreground tracking-tight">Quotas, Colors & Category Names</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">Configure your annual leave limits, category names, and UI theme colors.</p>
                 </div>
 
@@ -213,7 +263,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                     customName={names.rh}
                     onCustomNameChange={(val) => setNames(n => ({ ...n, rh: val }))}
                     color={colors.rh}
-                    onColorChange={(val) => setColors(c => ({ ...c, rh: val }))}
+                    onColorChange={(val) => setColors(c => ({ ...c, rh:val }))}
                   />
 
                   {/* WFH Tumbler */}
@@ -233,6 +283,80 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
               </motion.div>
             )}
 
+            {/* STEP 4: Prompt Time & Notifications */}
+            {step === 4 && (
+              <motion.div 
+                key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-6 max-w-md mx-auto py-2 text-center"
+              >
+                <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+                  <Bell size={32} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-foreground tracking-tight">Check-in Prompt & Notifications</h2>
+                  <p className="text-xs text-muted-foreground mt-1 font-medium">Set your preferred time for daily attendance prompts and enable browser notifications.</p>
+                </div>
+
+                {/* Prompt Hour Selector */}
+                <div className="bg-muted/40 border border-border/60 rounded-2xl p-4 text-left flex flex-col gap-2">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-2">
+                    <Clock size={16} className="text-amber-500" /> Daily Attendance Prompt Time
+                  </label>
+                  <select
+                    value={wfhPromptHour}
+                    onChange={(e) => setWfhPromptHour(e.target.value)}
+                    className="bg-card border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer"
+                  >
+                    <option value="9">9:00 AM (Morning Start)</option>
+                    <option value="10">10:00 AM</option>
+                    <option value="11">11:00 AM</option>
+                    <option value="12">12:00 PM (Midday Check-in - Default)</option>
+                    <option value="13">1:00 PM (After Lunch)</option>
+                    <option value="17">5:00 PM (End of Workday)</option>
+                    <option value="18">6:00 PM</option>
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    On unbooked workdays, Leave Vault will prompt you at this hour to check-in as WFH or In-Office.
+                  </p>
+                </div>
+
+                {/* Enable Notifications Card */}
+                <div className="bg-muted/40 border border-border/60 rounded-2xl p-4 text-left flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={18} className={notifGranted ? "text-emerald-500" : "text-primary"} />
+                      <span className="text-xs font-bold text-foreground">Browser Reminders</span>
+                    </div>
+                    {notifGranted && (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                        Enabled ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Receive desktop check-in reminders so you never miss logging your WFH workdays.
+                  </p>
+                  {!notifGranted ? (
+                    <button
+                      type="button"
+                      onClick={handleRequestNotif}
+                      className="py-2.5 px-4 bg-primary text-primary-foreground text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                    >
+                      <Bell size={14} /> Enable Desktop Notifications
+                    </button>
+                  ) : (
+                    <div className="text-xs font-bold text-emerald-500 flex items-center gap-1.5">
+                      <Check size={14} strokeWidth={3} /> Notifications active and configured!
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
           </AnimatePresence>
         </div>
 
@@ -242,7 +366,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
             <button
               type="button"
               onClick={() => setStep(s => s - 1)}
-              className="px-5 py-3 bg-muted border border-border text-foreground font-bold text-xs rounded-2xl hover:bg-muted/80 transition-all"
+              className="px-5 py-3 bg-muted border border-border text-foreground font-bold text-xs rounded-2xl hover:bg-muted/80 transition-all cursor-pointer"
             >
               Back
             </button>
@@ -250,11 +374,11 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
             <div />
           )}
 
-          {step < 3 ? (
+          {step < totalSteps ? (
             <button
               type="button"
               onClick={() => setStep(s => s + 1)}
-              className="px-6 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto"
+              className="px-6 py-3 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto cursor-pointer"
             >
               Continue <ArrowRight size={14} />
             </button>
@@ -262,7 +386,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
             <button
               type="button"
               onClick={handleFinish}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto"
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto cursor-pointer"
             >
               Complete Setup <Check size={14} strokeWidth={3} />
             </button>

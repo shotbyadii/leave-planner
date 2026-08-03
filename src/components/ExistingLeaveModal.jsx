@@ -1,8 +1,10 @@
 import React from 'react';
 import { Trash2, X, ArrowRight, CalendarX2, CalendarDays } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const ExistingLeaveModal = ({ leaveObj, onClose, onCancelLeave, onCancelPlan }) => {
+const ExistingLeaveModal = ({ leaveObj, onClose, onCancelLeave, onCancelPlan, calendarStyle = 'classic' }) => {
+  if (!leaveObj) return null;
   const { targetLeave, tripDates = [], associatedPlan = null } = leaveObj;
   
   const isAttendanceLog = ['wfh', 'office'].includes(targetLeave.type);
@@ -55,26 +57,41 @@ const ExistingLeaveModal = ({ leaveObj, onClose, onCancelLeave, onCancelPlan }) 
 
     return (
       <div>
-        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Trip Calendar</span>
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2 font-mono">Trip Calendar</span>
         <div className="w-full bg-muted/20 dark:bg-muted/10 rounded-2xl p-3 border border-border/10 shadow-inner">
           <div className="grid grid-cols-7 gap-1 mb-1.5">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} className="text-[9px] font-black text-muted-foreground/40 text-center uppercase">{d}</div>
+              <div key={i} className="text-[9px] font-black text-muted-foreground/40 text-center uppercase font-mono">{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
             {cells.map((cell, idx) => {
-              if (!cell) return <div key={idx} className="w-full aspect-square"></div>;
+              if (!cell) return <div key={idx} className="w-full h-6"></div>;
               
-              let classes = "w-full aspect-square rounded-lg flex items-center justify-center text-[11px] font-mono transition-all ";
-              if (cell.isLeave) {
-                classes += "text-blue-500 font-black scale-110";
-              } else if (cell.isHoliday) {
-                classes += "text-purple-400 font-black";
-              } else if (cell.isWeekend) {
-                classes += "text-muted-foreground/30 font-medium";
+              let classes = calendarStyle === 'capsule'
+                ? "w-full h-6 rounded-md flex items-center justify-center text-[10px] font-mono transition-all border "
+                : "w-full h-6 rounded-md flex items-center justify-center text-[10px] font-mono transition-all ";
+              
+              if (calendarStyle === 'capsule') {
+                if (cell.isLeave) {
+                  classes += "bg-blue-500/15 border-blue-500/40 text-blue-400 font-black scale-105 shadow-sm";
+                } else if (cell.isHoliday) {
+                  classes += "bg-purple-500/15 border-purple-500/40 text-purple-400 font-black";
+                } else if (cell.isWeekend) {
+                  classes += "bg-muted/10 border-transparent text-muted-foreground/30 font-medium";
+                } else {
+                  classes += "bg-card/40 border-border/30 text-muted-foreground/60 font-bold";
+                }
               } else {
-                classes += "text-muted-foreground/50 font-medium";
+                if (cell.isLeave) {
+                  classes += "text-blue-500 font-black scale-110 bg-blue-500/10 rounded-full border border-blue-500/20";
+                } else if (cell.isHoliday) {
+                  classes += "text-purple-400 font-black";
+                } else if (cell.isWeekend) {
+                  classes += "text-muted-foreground/30 font-medium";
+                } else {
+                  classes += "text-muted-foreground/50 font-medium";
+                }
               }
               
               return (
@@ -90,116 +107,109 @@ const ExistingLeaveModal = ({ leaveObj, onClose, onCancelLeave, onCancelPlan }) 
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col justify-end sm:justify-end items-center pointer-events-none p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" onClick={onClose} />
-      <div className="relative bg-card w-full max-w-md mx-auto mb-36 sm:mb-6 rounded-[32px] border border-border shadow-[0_16px_48px_-8px_rgba(0,0,0,0.85)] shadow-black/80 overflow-hidden pointer-events-auto animate-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] max-h-[85vh] overflow-y-auto no-scrollbar">
-        
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-md" 
+        onClick={onClose} 
+      />
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 15 }} 
+        animate={{ opacity: 1, scale: 1, y: 0 }} 
+        exit={{ opacity: 0, scale: 0.95, y: 15 }} 
+        transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+        className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_16px_48px_-8px_rgba(0,0,0,0.85)] shadow-black/80 overflow-hidden z-10 max-h-[85vh] flex flex-col"
+      >
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-border bg-muted/60 flex justify-between items-start sticky top-0 bg-card/95 backdrop-blur-md z-20">
           {associatedPlan ? (
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-primary block mb-1">Trip Plan</span>
-              <h3 className="text-xl font-black text-foreground tracking-tight leading-snug">{associatedPlan.name}</h3>
-              <div className="inline-flex items-center gap-1.5 mt-2 bg-muted/80 px-2.5 py-1 rounded-xl text-xs font-bold text-foreground border border-border/40">
-                <CalendarDays size={13} className="text-primary" />
-                {planStart?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                <span className="text-muted-foreground/40">→</span>
-                {planEnd?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary font-mono block mb-1">Leave Plan</span>
+              <h3 className="text-xl font-bold text-foreground leading-tight">{associatedPlan.name}</h3>
             </div>
           ) : (
-            <div className="text-lg font-bold text-foreground">
-              {targetDateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground font-mono block mb-1">
+                {isAttendanceLog ? 'Attendance Record' : 'Individual Leave'}
+              </span>
+              <h3 className="text-xl font-bold text-foreground leading-tight">
+                {targetLeave.type === 'wfh' ? 'Work From Home' : targetLeave.type === 'office' ? 'In-Office Attendance' : `${targetLeave.type.toUpperCase()} Leave`}
+              </h3>
             </div>
           )}
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground bg-card p-1.5 rounded-xl shadow-sm border border-border">
+          <button 
+            onClick={onClose} 
+            className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
+          >
             <X size={16} />
           </button>
         </div>
 
-        {/* Explicit Trip Breakdown Stats Pill Row */}
-        {associatedPlan && (
-          <div className="p-4 bg-muted/30 border-b border-border grid grid-cols-4 gap-2">
-            <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 text-center">
-              <span className="text-[8px] font-black text-blue-600/70 dark:text-blue-400 uppercase tracking-widest leading-none mb-1 whitespace-nowrap">Leaves</span>
-              <span className="text-base font-black text-blue-600 leading-none">{actualLeavesCount}</span>
-            </div>
-            <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 text-center">
-              <span className="text-[8px] font-black text-slate-500/70 dark:text-slate-400 uppercase tracking-widest leading-none mb-1 whitespace-nowrap">Weekends</span>
-              <span className="text-base font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
-            </div>
-            <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 text-center">
-              <span className="text-[8px] font-black text-purple-600/70 dark:text-purple-400 uppercase tracking-widest leading-none mb-1 whitespace-nowrap">Holidays</span>
-              <span className="text-base font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
-            </div>
-            <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl text-center shadow-sm">
-              <span className="text-[8px] font-black opacity-60 uppercase tracking-widest leading-none mb-1 whitespace-nowrap">Total</span>
-              <span className="text-base font-black leading-none">{totalDays}d</span>
-            </div>
-          </div>
-        )}
-
-        {/* Selected Date Context Banner */}
-        <div className={`px-4 sm:px-6 py-3.5 border-b flex items-center gap-3 ${bannerTheme}`}>
-          <div className="p-2 bg-black/10 dark:bg-white/10 rounded-xl">
-            <CalendarX2 size={18} />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-foreground">
-              {isAttendanceLog ? 'Work Location Log: ' : 'Selected Date: '} 
-              <span className="font-black">{targetDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric'})}</span>
-            </div>
-            {isAttendanceLog ? (
-              <div className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                {targetLeave.type === 'wfh' ? 'Work From Home • 10 days/mo quota' : 'In-Office Attendance Log'}
-              </div>
-            ) : associatedPlan ? (
-              <div className="text-[11px] text-muted-foreground font-medium mt-0.5">Linked to "{associatedPlan.name}" plan.</div>
-            ) : (
-              <div className="text-[11px] text-muted-foreground font-medium mt-0.5">Single-day leave booking.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-4 sm:p-6 flex flex-col gap-4">
-          <div>
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-              {isAttendanceLog ? 'Log Type' : 'Leave Type'}
-            </span>
-            <span className="px-3 py-1 bg-muted border border-border text-foreground rounded-xl text-xs font-black uppercase tracking-wider">
-              {targetLeave.type}
-            </span>
-          </div>
-          
-          {associatedPlan && renderMiniCalendar()}
-
-          {targetLeave.note && (
+        <div className="p-4 sm:p-6 flex flex-col gap-6 overflow-y-auto no-scrollbar">
+          {/* Target Leave Highlight Card */}
+          <div className={`p-4 rounded-2xl border flex items-center justify-between ${bannerTheme}`}>
             <div>
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Note</span>
-              <p className="text-sm text-foreground/80 font-medium bg-muted/30 p-3 rounded-xl border border-border/10 italic">"{targetLeave.note}"</p>
+              <span className="text-[10px] uppercase tracking-wider font-bold opacity-80 block mb-0.5 font-mono">Selected Date</span>
+              <span className="text-base font-bold font-mono">
+                {targetDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+            <span className="text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border bg-card/50 font-mono">
+              {targetLeave.type.toUpperCase()}
+            </span>
+          </div>
+
+          {/* Linked Plan Stats */}
+          {associatedPlan && (
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-center text-xs font-bold font-mono text-muted-foreground">
+                <span>Trip Duration</span>
+                <span>{planStart?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {planEnd?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-2.5 text-center">
+                  <span className="text-lg font-black text-blue-500 block font-mono">{actualLeavesCount}</span>
+                  <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider font-mono">Leaves</span>
+                </div>
+                <div className="bg-slate-500/10 border border-slate-500/20 rounded-xl p-2.5 text-center">
+                  <span className="text-lg font-black text-slate-400 block font-mono">{weekendsCount}</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">Weekends</span>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-2.5 text-center">
+                  <span className="text-lg font-black text-purple-400 block font-mono">{holidaysCount}</span>
+                  <span className="text-[9px] font-bold text-purple-400 uppercase tracking-wider font-mono">Holidays</span>
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Mini Calendar View */}
+          {renderMiniCalendar()}
         </div>
 
-        <div className="p-4 sm:p-5 border-t border-border bg-muted/30 flex flex-row gap-3">
+        {/* Action Footer */}
+        <div className="p-4 sm:p-6 border-t border-border bg-muted/40 flex flex-col gap-2.5 sticky bottom-0 bg-card/95 backdrop-blur-md z-20">
+          <button
+            onClick={() => onCancelLeave(targetLeave.date)}
+            className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
+          >
+            <CalendarX2 size={15} /> Cancel Leave for {targetDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </button>
+
           {associatedPlan && (
-            <button 
-              onClick={() => (onCancelPlan ? onCancelPlan(associatedPlan.id) : onCancelLeave(tripDates))} 
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-card border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl text-xs font-bold shadow-sm transition-colors"
+            <button
+              onClick={() => onCancelPlan(associatedPlan.id)}
+              className="w-full py-3 bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
             >
-              <Trash2 size={15} /> Delete Trip
+              <Trash2 size={15} /> Delete Entire "{associatedPlan.name}" Plan
             </button>
           )}
-          
-          <button 
-            onClick={() => onCancelLeave(targetLeave.date)} 
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-card border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl text-xs font-bold transition-colors shadow-sm"
-          >
-            <Trash2 size={15} /> {isAttendanceLog ? 'Delete Log' : 'Delete Day'}
-          </button>
         </div>
-
-      </div>
+      </motion.div>
     </div>
   );
 };

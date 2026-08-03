@@ -4,9 +4,9 @@ import { addLeave, removeLeave, createLeavePlan } from '../services/leaveService
 import LeaveSelectionBar from './LeaveSelectionBar';
 import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [] }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 36 }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -22,7 +22,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     }
   }, [_selectionStart, setIsSelecting]);
 
-  const today = new Date();
+  const today = todayDate ? new Date(todayDate) : new Date();
   today.setHours(0, 0, 0, 0);
 
   const getDaysInMonth = (month) => new Date(year, month + 1, 0).getDate();
@@ -176,15 +176,21 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     const days = [];
     const monthHolidays = [];
 
-    const cellClass = isLarge ? "w-10 h-10 md:w-12 md:h-12 text-sm md:text-base" : (isMini ? "w-1.5 h-1.5 md:w-6 md:h-6 text-[0px] md:text-sm" : "w-8 h-8 text-sm");
+    const isCapsule = calendarStyle === 'capsule';
+
+    const cellClass = isLarge 
+      ? (isCapsule ? "h-8 md:h-9 text-xs md:text-sm font-mono" : "w-10 h-10 md:w-12 md:h-12 text-sm md:text-base")
+      : (isMini 
+          ? (isCapsule ? "h-5 md:h-6 text-[0px] md:text-[11px] font-mono" : "w-1.5 h-1.5 md:w-6 md:h-6 text-[0px] md:text-sm")
+          : (isCapsule ? "h-7 md:h-8 text-xs md:text-sm font-mono" : "w-8 h-8 text-sm"));
+
     const headerClass = isLarge ? "w-10 md:w-12 text-[10px] md:text-xs" : (isMini ? "w-1.5 md:w-6 text-[0px] md:text-[10px]" : "w-8 text-[10px]");
 
-    const currentMonth = new Date().getMonth();
-    const isCurrentMonth = monthIndex === currentMonth;
-    const useNavy = isLarge || (isMini && isCurrentMonth && !isPastMonth);
+    const isDarkMode = typeof document !== 'undefined' && (document.documentElement.classList.contains('dark') || document.documentElement.className.includes('dark'));
+    const useNavy = isDarkMode && isLarge;
 
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`e-${i}`} className={cellClass}></div>);
+      days.push(<div key={`e-${i}`} className={cellClass} style={isLarge ? { height: `${focusedCellHeight}px` } : {}}></div>);
     }
 
     for (let i = 1; i <= daysInMonth; i++) {
@@ -208,57 +214,89 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
       if (holidayInfo) monthHolidays.push({ day: i, name: holidayInfo.name });
 
-      let baseClasses = `${cellClass} rounded-full flex items-center justify-center transition-all relative select-none `;
+      let baseClasses = `${cellClass} ${isCapsule ? (isMini ? 'rounded-sm md:rounded-md' : 'rounded-lg md:rounded-xl') : 'rounded-full'} flex items-center justify-center transition-all relative select-none `;
 
-      if (isSelected) {
-        if (holidayInfo || weekend) {
+      if (isCapsule) {
+        if (isSelected) {
           baseClasses += useNavy
-            ? "bg-white/25 text-white font-bold z-10 scale-105 border border-white/40 border-dashed"
-            : "bg-muted text-foreground font-bold z-10 scale-105 shadow-apple-sm border border-border border-dashed";
+            ? "bg-primary text-primary-foreground font-black ring-4 ring-primary/30 z-10 scale-105 shadow-lg"
+            : "bg-primary text-primary-foreground font-black ring-4 ring-primary/20 z-10 scale-105 shadow-lg";
+        } else if (isToday) {
+          baseClasses += "bg-cyan-500/10 border-2 border-cyan-500 ring-2 ring-cyan-500/30 text-cyan-500 font-black z-10 scale-105 shadow-md";
+        } else if (isHovered) {
+          baseClasses += "bg-yellow-400/30 text-yellow-500 font-black border border-yellow-300 scale-105 z-10";
+        } else if (bookedLeave) {
+          if (bookedLeave.type === 'pl') {
+            baseClasses += "bg-blue-500/15 border border-blue-500/40 text-blue-500 font-black cursor-pointer shadow-sm";
+          } else if (bookedLeave.type === 'el') {
+            baseClasses += "bg-orange-500/15 border border-orange-500/40 text-orange-500 font-black cursor-pointer shadow-sm";
+          } else if (bookedLeave.type === 'rh') {
+            baseClasses += "bg-emerald-500/15 border border-emerald-500/40 text-emerald-500 font-black cursor-pointer shadow-sm";
+          } else if (bookedLeave.type === 'wfh') {
+            baseClasses += "bg-cyan-500/15 border border-cyan-500/40 text-cyan-500 font-black cursor-pointer shadow-sm";
+          } else {
+            baseClasses += "bg-muted/40 border border-border/60 hover:bg-muted cursor-pointer text-foreground font-bold";
+          }
+        } else if (holidayInfo) {
+          baseClasses += "bg-purple-500/15 border border-purple-500/40 text-purple-500 font-black";
+        } else if (weekend) {
+          baseClasses += useNavy ? "text-white/40 bg-transparent" : "text-muted-foreground/40 bg-transparent";
+        } else if (isPast) {
+          baseClasses += "text-muted-foreground/40 bg-muted/20 border border-border/30 opacity-50 cursor-pointer";
         } else {
-          baseClasses += useNavy
-            ? "bg-white text-blue-900 font-bold ring-4 ring-white/20 z-10 scale-105 shadow-apple-sm"
-            : "bg-primary text-primary-foreground font-bold ring-4 ring-border z-10 scale-105 shadow-apple-sm";
+          baseClasses += useNavy ? "bg-white/10 border border-white/15 hover:bg-white/25 cursor-pointer text-white font-bold" : "bg-card border border-border/60 hover:bg-muted/70 cursor-pointer text-foreground font-bold shadow-2xs";
         }
-      } else if (isToday) {
-        baseClasses += useNavy
-          ? "bg-white text-blue-900 font-bold ring-2 ring-white/40 z-10 scale-105 shadow-apple-sm"
-          : "bg-blue-600 text-white font-bold ring-2 ring-blue-200 z-10 scale-105 shadow-apple-sm animate-pulse-subtle";
-      } else if (isHovered) {
-        if (holidayInfo || weekend) {
+      } else {
+        if (isSelected) {
+          if (holidayInfo || weekend) {
+            baseClasses += useNavy
+              ? "bg-white/25 text-white font-bold z-10 scale-105 border border-white/40 border-dashed"
+              : "bg-muted text-foreground font-bold z-10 scale-105 shadow-apple-sm border border-border border-dashed";
+          } else {
+            baseClasses += useNavy
+              ? "bg-white text-blue-900 font-bold ring-4 ring-white/20 z-10 scale-105 shadow-apple-sm"
+              : "bg-primary text-primary-foreground font-bold ring-4 ring-border z-10 scale-105 shadow-apple-sm";
+          }
+        } else if (isToday) {
           baseClasses += useNavy
-            ? "bg-yellow-400/30 text-white border border-yellow-300/50 border-dashed scale-105 z-10"
-            : "bg-yellow-100 text-yellow-900 border border-yellow-300 border-dashed scale-105 z-10";
+            ? "bg-white text-blue-900 font-bold ring-2 ring-white/40 z-10 scale-105 shadow-apple-sm"
+            : "bg-blue-600 text-white font-bold ring-2 ring-blue-200 z-10 scale-105 shadow-apple-sm animate-pulse-subtle";
+        } else if (isHovered) {
+          if (holidayInfo || weekend) {
+            baseClasses += useNavy
+              ? "bg-yellow-400/30 text-white border border-yellow-300/50 border-dashed scale-105 z-10"
+              : "bg-yellow-100 text-yellow-900 border border-yellow-300 border-dashed scale-105 z-10";
+          } else {
+            baseClasses += useNavy
+              ? "bg-yellow-400/50 text-white font-bold ring-2 ring-yellow-300/60 scale-105 z-10 shadow-sm"
+              : "bg-yellow-300 text-yellow-900 font-bold ring-2 ring-yellow-400 scale-105 z-10 shadow-sm";
+          }
+        } else if (bookedLeave) {
+          const typeInfo = leaves ? leaves[bookedLeave.type] : null;
+          const colorBg = typeInfo?.bg || (bookedLeave.type === 'pl' ? 'bg-blue-500' : bookedLeave.type === 'el' ? 'bg-orange-500' : 'bg-green-500');
+          if (['pl', 'el', 'rh'].includes(bookedLeave.type)) {
+            baseClasses += `${colorBg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
+          } else if (bookedLeave.type === 'wfh') {
+            baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
+          } else if (bookedLeave.type === 'office') {
+            baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
+          }
+        } else if (holidayInfo) {
+          baseClasses += useNavy ? "bg-purple-500 text-white font-medium" : "bg-purple-200 text-purple-900 font-medium";
+        } else if (weekend) {
+          baseClasses += useNavy ? "text-white/50 bg-white/10" : "text-muted-foreground bg-muted";
+        } else if (isPast) {
+          baseClasses += useNavy ? "text-white/30 bg-white/5 opacity-50 hover:opacity-70 hover:bg-white/10 cursor-pointer" : "text-muted-foreground/60 bg-muted/50 opacity-50 hover:opacity-70 hover:bg-muted cursor-pointer";
         } else {
-          baseClasses += useNavy
-            ? "bg-yellow-400/50 text-white font-bold ring-2 ring-yellow-300/60 scale-105 z-10 shadow-sm"
-            : "bg-yellow-300 text-yellow-900 font-bold ring-2 ring-yellow-400 scale-105 z-10 shadow-sm";
-        }
-      } else if (bookedLeave) {
-        const typeInfo = leaves ? leaves[bookedLeave.type] : null;
-        const colorBg = typeInfo?.bg || (bookedLeave.type === 'pl' ? 'bg-blue-500' : bookedLeave.type === 'el' ? 'bg-orange-500' : 'bg-green-500');
-        if (['pl', 'el', 'rh'].includes(bookedLeave.type)) {
-          baseClasses += `${colorBg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
-        } else if (bookedLeave.type === 'wfh') {
-          baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
-        } else if (bookedLeave.type === 'office') {
           baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
         }
-      } else if (holidayInfo) {
-        baseClasses += useNavy ? "bg-purple-500 text-white font-medium" : "bg-purple-200 text-purple-900 font-medium";
-      } else if (weekend) {
-        baseClasses += useNavy ? "text-white/50 bg-white/10" : "text-muted-foreground bg-muted";
-      } else if (isPast) {
-        baseClasses += useNavy ? "text-white/30 bg-white/5 opacity-50 hover:opacity-70 hover:bg-white/10 cursor-pointer" : "text-muted-foreground/60 bg-muted/50 opacity-50 hover:opacity-70 hover:bg-muted cursor-pointer";
-      } else {
-        baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
       }
 
       const isWfh = bookedLeave?.type === 'wfh';
 
       days.push(
-        <div key={`d-${i}`} className={baseClasses} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
-          {isWfh && (
+        <div key={`d-${i}`} className={baseClasses} style={isLarge ? { height: `${focusedCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
+          {!isCapsule && isWfh && (
             <span className={isMini ? "absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none ring-1 ring-background/40" : "absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none"} />
           )}
           <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
@@ -266,23 +304,37 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       );
     }
 
-    const cardBg = useNavy
-      ? 'bg-gradient-to-br from-[#0f172a] via-[#1e3a6e] to-[#1d4ed8] border-blue-900/30 shadow-apple-md'
-      : 'bg-card border-border shadow-apple-sm';
+    const isCurrentMonthCard = monthIndex === new Date().getMonth();
+
+    let cardBg = 'bg-card border-border shadow-apple-sm';
+    if (isLarge) {
+      cardBg = isCapsule
+        ? 'bg-gradient-to-br from-blue-50/95 via-sky-50/85 to-indigo-100/75 border-blue-200/70 shadow-xl shadow-blue-500/10 dark:from-slate-950 dark:via-[#0f172a] dark:to-slate-950 dark:border-slate-800/80 dark:shadow-2xl'
+        : 'bg-gradient-to-br from-blue-50/95 via-sky-50/85 to-indigo-100/75 border-blue-200/70 shadow-xl shadow-blue-500/10 dark:from-[#0f172a] dark:via-[#1e3a6e] dark:to-[#1d4ed8] dark:border-blue-900/30 dark:shadow-apple-md';
+    } else if (isCurrentMonthCard) {
+      cardBg = 'bg-card border-2 border-blue-500/40 dark:border-blue-400/40 ring-4 ring-blue-500/10 dark:ring-blue-400/10 shadow-lg shadow-blue-500/5 relative overflow-visible';
+    }
 
     return (
       <motion.div
         layoutId={`month-card-${monthIndex}`}
         key={monthIndex}
         onClick={onClick}
-        whileHover={onClick ? { scale: 1.02 } : {}}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className={`${cardBg} border flex flex-col transition-colors origin-center ${isLarge ? 'p-4 md:p-6 rounded-2xl' : (isMini ? 'p-2.5 rounded-xl h-full aspect-[4/3] md:aspect-auto flex flex-col justify-between' : 'p-5 rounded-2xl hover:border-foreground/20')} ${opacityClass} ${wrapperClasses}`}
+        whileHover={onClick ? { scale: 1.015 } : {}}
+        transition={{ type: "spring", stiffness: 350, damping: 25 }}
+        className={`${cardBg} border flex flex-col transition-colors transform-gpu origin-center ${isLarge ? 'p-4 md:p-6 rounded-2xl' : (isMini ? 'p-2.5 rounded-xl h-full aspect-[4/3] md:aspect-auto flex flex-col justify-between' : 'p-5 rounded-2xl hover:border-foreground/20')} ${opacityClass} ${wrapperClasses}`}
       >
         <div className={`flex justify-between items-center ${isLarge ? 'mb-4' : (isMini ? 'mb-2' : 'mb-4')}`}>
-          <h3 className={`font-semibold leading-none ${useNavy ? 'text-white' : 'text-foreground'} ${isLarge ? 'text-lg md:text-xl' : (isMini ? 'text-[11px] uppercase tracking-wider' : 'text-lg group-hover:text-muted-foreground')}`}>
-            {isMini ? monthNames[monthIndex].substring(0,3) : monthNames[monthIndex]}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className={`font-semibold leading-none ${useNavy ? 'text-white' : 'text-foreground'} ${isLarge ? 'text-lg md:text-xl' : (isMini ? 'text-[11px] uppercase tracking-wider' : 'text-lg group-hover:text-muted-foreground')}`}>
+              {isMini ? monthNames[monthIndex].substring(0,3) : monthNames[monthIndex]}
+            </h3>
+            {isCurrentMonthCard && !isLarge && (
+              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-wider font-mono">
+                Current
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className={`${isLarge ? 'text-xs md:text-sm' : (isMini ? 'text-[9px]' : 'text-xs')} font-medium leading-none ${useNavy ? 'text-white/60' : 'text-muted-foreground'}`}>
               {isMini ? "'26" : year}
@@ -337,29 +389,32 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         </div>
 
         {viewMode === 'yearly' ? (
-          <motion.div layout className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-start pb-4">
+          <motion.div layout className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-start p-2 pb-6">
             {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, null, "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
           </motion.div>
         ) : (
-          <motion.div layout className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)]">
-            <div className="flex-1 flex justify-center w-full relative z-10">
-              <div className="w-full max-w-2xl">{renderMonth(focusedMonth, true)}</div>
+          <motion.div layout className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)] p-1">
+            <div className="flex-1 flex justify-start w-full relative z-10">
+              <div className="w-full">{renderMonth(focusedMonth, true)}</div>
             </div>
-            <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto h-full pr-2 pb-20 no-scrollbar relative z-10">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full ${isMonthPast(m) ? 'opacity-40' : 'opacity-100'}`, () => setFocusedMonth(m)))}
+            <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto h-full p-2 pb-24 no-scrollbar relative z-10">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full ${isMonthPast(m) ? 'opacity-40 hover:opacity-100' : 'opacity-100'}`, () => setFocusedMonth(m)))}
             </div>
           </motion.div>
         )}
       </div>
 
-      {viewingLeave && (
-        <ExistingLeaveModal 
-          leaveObj={viewingLeave} 
-          onClose={() => setViewingLeave(null)} 
-          onCancelLeave={handleCancelLeave}
-          onCancelPlan={handleCancelPlan}
-        />
-      )}
+      <AnimatePresence>
+        {viewingLeave && (
+          <ExistingLeaveModal 
+            leaveObj={viewingLeave} 
+            onClose={() => setViewingLeave(null)} 
+            onCancelLeave={handleCancelLeave}
+            onCancelPlan={handleCancelPlan}
+            calendarStyle={calendarStyle}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 };
