@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { User, Mail, ShieldCheck, Settings, LogOut, FileText, X, Sparkles, CheckCircle2, RotateCw, Trash2, AlertTriangle } from 'lucide-react';
 import { getLeaveColor } from '../utils/colorUtils';
 
@@ -20,8 +21,6 @@ const ProfileModal = ({
   const [deleteInputText, setDeleteInputText] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  if (!isOpen) return null;
-
   const initials = userName
     .split(' ')
     .map(n => n[0])
@@ -32,12 +31,27 @@ const ProfileModal = ({
   const isGoogle = currentUser?.app_metadata?.provider === 'google' || currentUser?.email?.includes('google');
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-lg animate-in fade-in duration-200" onClick={onClose} />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          {/* Backdrop */}
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        transition={{ duration: 0.2 }} 
+        className="absolute inset-0 bg-black/80 backdrop-blur-lg" 
+        onClick={onClose} 
+      />
 
       {/* Profile Card */}
-      <div className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar">
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.96 }} 
+        animate={{ opacity: 1, y: 0, scale: 1 }} 
+        exit={{ opacity: 0, y: 15, scale: 0.96 }} 
+        transition={{ type: 'spring', damping: 26, stiffness: 340 }} 
+        className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar"
+      >
         
         {/* Header Banner */}
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b border-border relative">
@@ -221,8 +235,10 @@ const ProfileModal = ({
           </button>
         </div>
 
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };
 

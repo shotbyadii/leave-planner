@@ -12,3 +12,13 @@ export const COLOR_PALETTE = [
 export const getLeaveColor = (colorId = 'blue') => {
   return COLOR_PALETTE.find(c => c.id === colorId) || COLOR_PALETTE[0];
 };
+
+export const getShortform = (name, fallbackCode = '') => {
+  if (!name || typeof name !== 'string') return fallbackCode.toUpperCase();
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return fallbackCode.toUpperCase();
+  if (words.length === 1) {
+    return words[0].substring(0, 3).toUpperCase();
+  }
+  return words.map(w => w[0]).join('').substring(0, 4).toUpperCase();
+};

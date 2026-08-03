@@ -98,6 +98,7 @@ export const upsertUserProfile = async (userId, profileData) => {
     avatar_url: profileData.avatarUrl || profileData.avatar_url || null,
     company_name: profileData.companyName || profileData.company_name || null,
     company_logo_url: profileData.companyLogoUrl || profileData.company_logo_url || null,
+    wfh_prompt_hour: profileData.wfhPromptHour || profileData.wfh_prompt_hour || '12',
     updated_at: new Date().toISOString()
   };
 

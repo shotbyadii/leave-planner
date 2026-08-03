@@ -35,7 +35,7 @@ const generateMonthGrid = (year, month) => {
   return grid;
 };
 
-const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates }) => {
+const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates, calendarStyle = 'classic' }) => {
   const year = startDate.getFullYear();
   const month = startDate.getMonth();
   const grid = generateMonthGrid(year, month);
@@ -54,22 +54,35 @@ const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates }) => {
     else leavesUsed++;
   }
 
+  const isCapsule = calendarStyle === 'capsule';
+
   const getDayClass = (day) => {
-    if (!day) return 'bg-transparent';
+    if (!day) return 'bg-transparent border-transparent';
     const d = new Date(year, month, day);
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isWknd = d.getDay() === 0 || d.getDay() === 6;
     const isHol = holidays.some(h => h.date === dateStr);
     const inRange = d >= start && d <= end;
 
-    if (inRange) {
-      if (isHol) return 'bg-purple-200 border-purple-300 text-purple-900 font-bold shadow-inner';
-      if (isWknd) return 'bg-muted border-border text-foreground font-bold shadow-inner';
-      return 'bg-blue-300 border-blue-400 text-blue-900 font-bold shadow-inner';
+    if (isCapsule) {
+      if (inRange) {
+        if (isHol) return 'bg-purple-500/20 border border-purple-500/40 text-purple-400 font-black rounded-xl scale-105 shadow-sm';
+        if (isWknd) return 'bg-muted border border-border text-foreground font-black rounded-xl shadow-sm';
+        return 'bg-blue-500/20 border border-blue-500/40 text-blue-400 font-black rounded-xl scale-105 shadow-sm';
+      }
+      if (isHol) return 'bg-purple-500/10 border border-purple-500/20 text-purple-400/80 rounded-xl';
+      if (isWknd) return 'bg-muted/20 border-transparent text-muted-foreground/40 rounded-xl';
+      return 'bg-card border border-border/50 text-foreground hover:bg-muted rounded-xl';
     }
-    if (isHol) return 'bg-purple-50 border-purple-100 text-purple-400';
-    if (isWknd) return 'bg-muted border-border text-muted-foreground';
-    return 'bg-card border-border text-foreground hover:bg-muted';
+
+    if (inRange) {
+      if (isHol) return 'bg-purple-200 border-purple-300 text-purple-900 font-bold shadow-inner rounded-lg';
+      if (isWknd) return 'bg-muted border-border text-foreground font-bold shadow-inner rounded-lg';
+      return 'bg-blue-300 border-blue-400 text-blue-900 font-bold shadow-inner rounded-lg';
+    }
+    if (isHol) return 'bg-purple-50 border-purple-100 text-purple-400 rounded-lg';
+    if (isWknd) return 'bg-muted border-border text-muted-foreground rounded-lg';
+    return 'bg-card border-border text-foreground hover:bg-muted rounded-lg';
   };
 
   return (
@@ -88,7 +101,7 @@ const MonthlyCalendar = ({ startDate, endDate, holidays, bookedDates }) => {
           {grid.map((week, i) => (
             <div key={i} className="grid grid-cols-7 gap-1">
               {week.map((day, j) => (
-                <div key={j} className={`aspect-square flex items-center justify-center rounded-lg border text-xs transition-colors ${getDayClass(day)}`}>
+                <div key={j} className={`h-7 md:h-8 flex items-center justify-center font-mono text-xs transition-all ${getDayClass(day)}`}>
                   {day || ''}
                 </div>
               ))}
@@ -146,7 +159,7 @@ const Globe = ({ lat, lon }) => {
   return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><canvas ref={canvasRef} style={{ width: 250, height: 250 }} /></div>;
 };
 
-const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPreviewRange }) => {
+const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPreviewRange, calendarStyle = 'classic' }) => {
   const [origin, setOrigin] = useState('Bengaluru');
   const [originCoords, setOriginCoords] = useState({ lat: 12.9716, lon: 77.5946 });
   const [passport, setPassport] = useState('IN');
@@ -495,7 +508,7 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               <MonthlyCalendar startDate={currentActiveWindowData.window.startDate} endDate={currentActiveWindowData.window.endDate} holidays={holidays} bookedDates={bookedDates} />
+               <MonthlyCalendar startDate={currentActiveWindowData.window.startDate} endDate={currentActiveWindowData.window.endDate} holidays={holidays} bookedDates={bookedDates} calendarStyle={calendarStyle} />
                
                <div className="bg-card rounded-3xl border border-border shadow-apple-sm overflow-hidden relative p-4 h-full min-h-[300px]">
                   {selectedTrip.type === 'international' ? (

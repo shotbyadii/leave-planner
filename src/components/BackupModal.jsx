@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Download, Upload, FileText, Table, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 
@@ -7,8 +8,6 @@ const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota, currentUse
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
-
-  if (!isOpen) return null;
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -55,9 +54,11 @@ const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota, currentUse
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose} />
-      <div className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-6 z-10 animate-in zoom-in-95 duration-200 flex flex-col gap-5">
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 bg-black/80 backdrop-blur-lg" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 15, scale: 0.96 }} transition={{ type: 'spring', damping: 26, stiffness: 340 }} className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-6 z-10 flex flex-col gap-5">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
@@ -129,8 +130,10 @@ const BackupModal = ({ isOpen, onClose, onImportSuccess, leavesQuota, currentUse
           <ShieldCheck size={13} className="text-emerald-500" /> All WFH & Leave data preserved strictly in JSON format
         </div>
 
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };
 

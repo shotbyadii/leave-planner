@@ -1,9 +1,8 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
 
 const NotificationPromptModal = ({ isOpen, onClose, onEnable }) => {
-  if (!isOpen) return null;
-
   const handleDismiss = () => {
     localStorage.setItem('notif_prompt_dismissed', 'true');
     onClose();
@@ -14,9 +13,11 @@ const NotificationPromptModal = ({ isOpen, onClose, onEnable }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose} />
-      <div className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-6 z-10 animate-in zoom-in-95 duration-200 text-center flex flex-col items-center gap-4">
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 bg-black/80 backdrop-blur-lg" onClick={onClose} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 15, scale: 0.96 }} transition={{ type: 'spring', damping: 26, stiffness: 340 }} className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-6 z-10 text-center flex flex-col items-center gap-4">
         
         <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shadow-inner mt-1">
           <Bell size={28} />
@@ -44,8 +45,10 @@ const NotificationPromptModal = ({ isOpen, onClose, onEnable }) => {
           </button>
         </div>
 
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };
 

@@ -3,7 +3,7 @@ import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, Chevron
 import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
 
-const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leaves, leavePlans }) => {
+const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leaves, leavePlans, calendarStyle = 'classic' }) => {
   const plUsed = leaves.pl.used;
   const elUsed = leaves.el.used;
   const rhUsed = leaves.rh.used;
@@ -56,17 +56,32 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
         </div>
         <div className="grid grid-cols-7 gap-1">
           {cells.map((cell, idx) => {
-            if (!cell) return <div key={idx} className="w-full aspect-square"></div>;
+            if (!cell) return <div key={idx} className="w-full h-6"></div>;
             
-            let classes = "w-full aspect-square rounded-lg flex items-center justify-center text-[11px] font-mono transition-all ";
-            if (cell.isLeave) {
-              classes += "text-blue-500 font-black scale-110";
-            } else if (cell.isHoliday) {
-              classes += "text-purple-400 font-black";
-            } else if (cell.isWeekend) {
-              classes += "text-muted-foreground/30 font-medium";
+            let classes = calendarStyle === 'capsule' 
+              ? "w-full h-6 rounded-md flex items-center justify-center text-[10px] font-mono transition-all border "
+              : "w-full h-6 rounded-md flex items-center justify-center text-[10px] font-mono transition-all ";
+            
+            if (calendarStyle === 'capsule') {
+              if (cell.isLeave) {
+                classes += "bg-blue-500/15 border-blue-500/40 text-blue-400 font-black scale-105 shadow-sm";
+              } else if (cell.isHoliday) {
+                classes += "bg-purple-500/15 border-purple-500/40 text-purple-400 font-black";
+              } else if (cell.isWeekend) {
+                classes += "bg-muted/10 border-transparent text-muted-foreground/30 font-medium";
+              } else {
+                classes += "bg-card/40 border-border/30 text-muted-foreground/60 font-bold";
+              }
             } else {
-              classes += "text-muted-foreground/50 font-medium";
+              if (cell.isLeave) {
+                classes += "text-blue-500 font-black scale-110 bg-blue-500/10 rounded-full border border-blue-500/20";
+              } else if (cell.isHoliday) {
+                classes += "text-purple-400 font-black";
+              } else if (cell.isWeekend) {
+                classes += "text-muted-foreground/30 font-medium";
+              } else {
+                classes += "text-muted-foreground/50 font-medium";
+              }
             }
             
             return (

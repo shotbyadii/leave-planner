@@ -4,9 +4,10 @@ import {
   Settings, X, Save, FileText, CheckCircle2, User, SlidersHorizontal, 
   LogIn, LogOut, Download, Upload, Table, AlertCircle, ShieldCheck, 
   RotateCw, Trash2, AlertTriangle, ChevronRight, Camera, Building2, 
-  Globe, Image as ImageIcon
+  Globe, Image as ImageIcon, Clock
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
+import CompanyInput from './CompanyInput';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 
@@ -32,6 +33,7 @@ const SettingsModal = ({
   const [name, setName] = useState(userName);
   const [companyName, setCompanyName] = useState(propCompanyName);
   const [avatarUrl, setAvatarUrl] = useState(propAvatarUrl);
+  const [wfhPromptHour, setWfhPromptHour] = useState(localStorage.getItem('wfh_prompt_hour') || '12');
 
   const [currentQuotas, setCurrentQuotas] = useState({ ...quotas });
   const [currentNames, setCurrentNames] = useState({ ...leaveNames });
@@ -159,39 +161,55 @@ const SettingsModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 md:p-6">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-lg animate-in fade-in duration-200" onClick={onClose} />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 md:p-6">
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            transition={{ duration: 0.2 }} 
+            className="absolute inset-0 bg-black/80 backdrop-blur-lg" 
+            onClick={onClose} 
+          />
 
-      {/* iPadOS Split View Container */}
-      <div className="relative bg-card/95 w-full max-w-5xl h-[88vh] max-h-[780px] mx-auto rounded-[32px] border border-border shadow-[0_30px_80px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col md:flex-row">
+          {/* iPadOS Split View Container */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.96 }} 
+            animate={{ opacity: 1, y: 0, scale: 1 }} 
+            exit={{ opacity: 0, y: 15, scale: 0.96 }} 
+            transition={{ type: 'spring', damping: 26, stiffness: 340 }} 
+            className="relative bg-card/95 w-full max-w-5xl h-[88vh] max-h-[780px] mx-auto rounded-[32px] border border-border shadow-[0_30px_80px_rgba(0,0,0,0.95)] overflow-hidden z-10 flex flex-col md:flex-row"
+          >
         
         {/* LEFT SIDEBAR (Fixed ~280px iPadOS Column) */}
-        <div className="w-full md:w-[280px] bg-muted/40 border-b md:border-b-0 md:border-r border-border p-5 flex flex-col justify-between flex-shrink-0">
+        {/* LEFT SIDEBAR (Fixed ~280px Column, Responsive on mobile) */}
+        <div className="w-full md:w-[280px] bg-muted/40 border-b md:border-b-0 md:border-r border-border p-3.5 sm:p-5 flex flex-col justify-between flex-shrink-0">
           
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3 sm:gap-6">
             
-            {/* Top Close Button (Mobile) */}
-            <div className="flex md:hidden justify-between items-center pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono">Settings</span>
-              <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground bg-card rounded-full">
+            {/* Top Header & Close Button (Mobile) */}
+            <div className="flex md:hidden justify-between items-center pb-1">
+              <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono">App Settings</span>
+              <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground bg-card rounded-full shadow-sm">
                 <X size={16} />
               </button>
             </div>
 
             {/* Profile & Company Badge Card */}
-            <div className="flex flex-col items-center text-center p-4 bg-card/80 border border-border/80 rounded-3xl shadow-apple-sm relative group">
+            <div className="flex flex-row md:flex-col items-center text-left md:text-center p-3 md:p-4 bg-card/80 border border-border/80 rounded-2xl md:rounded-3xl shadow-sm relative group gap-3 md:gap-0">
               
               {/* Profile Avatar */}
-              <div className="relative mb-3">
+              <div className="relative mb-0 md:mb-3 flex-shrink-0">
                 {effectiveAvatar ? (
                   <img 
                     src={effectiveAvatar} 
                     alt={userName} 
-                    className="w-16 h-16 rounded-2xl object-cover shadow-md border-2 border-primary/20" 
+                    className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl object-cover shadow-md border-2 border-primary/20" 
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground font-black text-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-primary text-primary-foreground font-black text-base md:text-xl flex items-center justify-center shadow-lg shadow-primary/20">
                     {initials}
                   </div>
                 )}
@@ -201,9 +219,9 @@ const SettingsModal = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Change Profile Photo"
-                  className="absolute -bottom-1 -right-1 p-1.5 bg-primary text-primary-foreground rounded-xl shadow-md hover:scale-110 active:scale-95 transition-all"
+                  className="absolute -bottom-1 -right-1 p-1 bg-primary text-primary-foreground rounded-lg md:rounded-xl shadow-md hover:scale-110 active:scale-95 transition-all"
                 >
-                  <Camera size={12} />
+                  <Camera size={11} />
                 </button>
                 <input 
                   ref={fileInputRef} 
@@ -215,12 +233,14 @@ const SettingsModal = ({
               </div>
 
               {/* User Name */}
-              <h4 className="text-sm font-black text-foreground truncate max-w-full leading-tight">{name || userName}</h4>
-              <span className="text-[11px] text-muted-foreground font-medium truncate max-w-full">{currentUser?.email || 'User Account'}</span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <h4 className="text-xs md:text-sm font-black text-foreground truncate leading-tight">{name || userName}</h4>
+                <span className="text-[10px] md:text-[11px] text-muted-foreground font-medium truncate">{currentUser?.email || 'User Account'}</span>
+              </div>
 
               {/* Company Badge with Automagical Logo */}
               {companyName && (
-                <div className="mt-3 px-3 py-1.5 bg-muted/60 border border-border/60 rounded-xl flex items-center gap-2 max-w-full">
+                <div className="hidden md:flex mt-3 px-3 py-1.5 bg-muted/60 border border-border/60 rounded-xl items-center gap-2 max-w-full">
                   {companyLogoUrl ? (
                     <img 
                       src={companyLogoUrl} 
@@ -237,8 +257,8 @@ const SettingsModal = ({
 
             </div>
 
-            {/* iPadOS Vertical Sidebar Navigation Tabs */}
-            <nav className="flex flex-col gap-1.5">
+            {/* Sidebar Navigation Tabs (Horizontal scroll on mobile, Vertical list on desktop) */}
+            <nav className="flex flex-row md:flex-col gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
               {[
                 { id: 'profile', label: 'Account & Profile', icon: User, color: 'text-primary' },
                 { id: 'quotas', label: 'Quotas & Themes', icon: SlidersHorizontal, color: 'text-cyan-500' },
@@ -251,17 +271,17 @@ const SettingsModal = ({
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full py-3 px-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between ${
+                    className={`flex-shrink-0 md:w-full py-2 md:py-3 px-3 md:px-3.5 rounded-xl md:rounded-2xl text-xs font-bold transition-all flex items-center justify-between gap-2 ${
                       isActive 
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' 
-                        : 'text-muted-foreground hover:text-foreground hover:bg-card/60'
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.01]' 
+                        : 'bg-card md:bg-transparent text-muted-foreground hover:text-foreground hover:bg-card/60 border md:border-0 border-border/60'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <IconComp size={15} className={isActive ? 'text-primary-foreground' : tab.color} />
-                      <span>{tab.label}</span>
+                    <div className="flex items-center gap-2">
+                      <IconComp size={14} className={isActive ? 'text-primary-foreground' : tab.color} />
+                      <span className="whitespace-nowrap">{tab.label}</span>
                     </div>
-                    <ChevronRight size={14} className={isActive ? 'opacity-100' : 'opacity-30'} />
+                    <ChevronRight size={14} className={`hidden md:block ${isActive ? 'opacity-100' : 'opacity-30'}`} />
                   </button>
                 );
               })}
@@ -345,27 +365,15 @@ const SettingsModal = ({
                     />
                   </div>
 
-                  {/* Company Name & Automagical Domain Input */}
+                  {/* Company Name Autocomplete & Logo Input */}
                   <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
-                        <Building2 size={14} className="text-cyan-500" /> Company / Workspace
-                      </label>
-                      {companyLogoUrl && (
-                        <img 
-                          src={companyLogoUrl} 
-                          alt="Company Logo Preview" 
-                          className="w-4 h-4 rounded object-contain" 
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
-                      )}
-                    </div>
-                    <input
-                      type="text"
+                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                      <Building2 size={14} className="text-cyan-500" /> Company / Workspace
+                    </label>
+                    <CompanyInput
                       value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      className="w-full bg-card border border-border rounded-2xl px-4 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-cyan-500/20 shadow-inner"
-                      placeholder="e.g. Google, Microsoft, google.com"
+                      onChange={(val) => setCompanyName(val)}
+                      placeholder="e.g. Siemens, ABB, Google"
                     />
                   </div>
 
@@ -570,6 +578,37 @@ const SettingsModal = ({
                   />
 
                 </div>
+
+                {/* Daily Attendance Check-in Prompt Preference */}
+                <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                      <Clock size={14} className="text-amber-500" /> Attendance Check-in Prompt Time
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                      Time of day to prompt for unbooked workdays (WFH vs In-Office)
+                    </span>
+                  </div>
+                  <select
+                    value={wfhPromptHour}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setWfhPromptHour(val);
+                      localStorage.setItem('wfh_prompt_hour', val);
+                    }}
+                    className="bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer"
+                  >
+                    {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
+                      const period = h >= 12 ? 'PM' : 'AM';
+                      const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+                      return (
+                        <option key={h} value={h}>
+                          {displayH}:00 {period}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -654,8 +693,10 @@ const SettingsModal = ({
 
         </div>
 
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };
 
