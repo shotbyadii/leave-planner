@@ -11,9 +11,9 @@ const DevToolsModal = ({
   setHasPromptedWfh,
   onStartNewUserFlow,
   onOpenWfhCheckin,
-  calendarStyle = 'classic',
+  calendarStyle = 'capsule',
   onSetCalendarStyle,
-  focusedCellHeight = 36,
+  focusedCellHeight = 52,
   onSetFocusedCellHeight
 }) => {
   const [tempDateStr, setTempDateStr] = useState(devDateStr || getTodayStr());
