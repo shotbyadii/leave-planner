@@ -97,8 +97,8 @@ function App() {
   const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [devModalOpen, setDevModalOpen] = useState(false);
-  const [calendarStyle, setCalendarStyle] = useState(localStorage.getItem('calendar_cell_style') || 'classic');
-  const [focusedCellHeight, setFocusedCellHeight] = useState(Number(localStorage.getItem('dev_focused_cell_height') || 36));
+  const [calendarStyle, setCalendarStyle] = useState(localStorage.getItem('calendar_cell_style') || 'capsule');
+  const [focusedCellHeight, setFocusedCellHeight] = useState(Number(localStorage.getItem('dev_focused_cell_height') || 52));
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   useEffect(() => {
     localStorage.setItem('theme', theme);
