@@ -118,7 +118,7 @@ const LeaveSelectionBar = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="hidden md:block fixed inset-0 bg-black/60 backdrop-blur-md z-[95]"
+            className="hidden md:block fixed inset-0 bg-black/60 backdrop-blur-md z-[200]"
             onClick={() => setIsExpanded(false)}
           />
         )}
@@ -133,7 +133,7 @@ const LeaveSelectionBar = ({
             animate={{ opacity: 1, scale: 1, y: '-50%', x: '-50%' }}
             exit={{ opacity: 0, scale: 0.95, y: '-45%', x: '-50%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            className="hidden md:flex fixed top-1/2 left-1/2 bg-card text-foreground w-[480px] max-w-[92vw] flex-col max-h-[88vh] rounded-[32px] shadow-2xl shadow-black/80 border border-border overflow-hidden z-[100]"
+            className="hidden md:flex fixed top-1/2 left-1/2 bg-card text-foreground w-[480px] max-w-[92vw] flex-col max-h-[88vh] rounded-[32px] shadow-2xl shadow-black/80 border border-border overflow-hidden z-[201]"
           >
             <div className="p-5 sm:p-6 pt-4 md:pt-6 border-b border-border bg-muted flex justify-between items-start flex-shrink-0">
               <div>{displayDate}</div>

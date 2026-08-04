@@ -13,7 +13,7 @@ const DevToolsModal = ({
   onOpenWfhCheckin,
   calendarStyle = 'capsule',
   onSetCalendarStyle,
-  focusedCellHeight = 52,
+  focusedCellHeight = 56,
   onSetFocusedCellHeight
 }) => {
   const [tempDateStr, setTempDateStr] = useState(devDateStr || getTodayStr());

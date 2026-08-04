@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
 import { fetchBookedLeaves, fetchLeavePlans, resetAllLeaves, removeLeave, deleteLeavePlan, updateLeavePlan, addLeave, createLeavePlan } from './services/leaveService';
 import Calendar from './components/Calendar';
+import ExistingLeaveModal, { ExistingLeaveDetailContent } from './components/ExistingLeaveModal';
 import OptimizerPanel from './components/OptimizerPanel';
 import LeaveTracker from './components/LeaveTracker';
 import TripPlanner from './components/TripPlanner';
@@ -87,6 +88,7 @@ function App() {
   const [mobileToast, setMobileToast] = useState('');
   const [selectionStart, setSelectionStart] = useState(null);
   const [mobileConfirmOpen, setMobileConfirmOpen] = useState(false);
+  const [viewingLeave, setViewingLeave] = useState(null);
   const [isSelecting, setIsSelecting] = useState(false);
   // Mobile confirmation form state
   const [mobileLeaveType, setMobileLeaveType] = useState('pl');
@@ -98,7 +100,7 @@ function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [devModalOpen, setDevModalOpen] = useState(false);
   const [calendarStyle, setCalendarStyle] = useState(localStorage.getItem('calendar_cell_style') || 'capsule');
-  const [focusedCellHeight, setFocusedCellHeight] = useState(Number(localStorage.getItem('dev_focused_cell_height') || 52));
+  const [focusedCellHeight, setFocusedCellHeight] = useState(Number(localStorage.getItem('dev_focused_cell_height') || 56));
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -409,14 +411,7 @@ function App() {
     setMobileConfirmOpen(true);
   };
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+
 
   const loadLeaves = async (targetUser = undefined) => {
     const activeUser = targetUser !== undefined ? targetUser : currentUser;
@@ -881,6 +876,8 @@ function App() {
                     calendarStyle={calendarStyle}
                     focusedCellHeight={focusedCellHeight}
                     theme={theme}
+                    viewingLeave={viewingLeave}
+                    setViewingLeave={setViewingLeave}
                   />
                   <div className="md:hidden bg-card border border-border rounded-2xl shadow-apple-sm overflow-hidden flex-shrink-0">
                     <OptimizerPanel 
@@ -939,18 +936,24 @@ function App() {
 
 
 
-      {/* ── UNIFIED MOBILE BOTTOM BAR ── */}
-      {/* Gradient fade behind the bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none z-40" />
+      {/* Dynamic Linear Blur & Multi-stop Gradient fade overlay behind floating mobile navbar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-40 pointer-events-none z-40 overflow-hidden">
+        <div className="absolute inset-0 backdrop-blur-md [mask-image:linear-gradient(to_top,black_75%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_75%,transparent_100%)]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 via-background/70 to-transparent" />
+      </div>
 
-      {/* Backdrop when menu open */}
+      {/* Backdrop when mobile menu, confirmation modal, or viewing leave open */}
       <AnimatePresence>
-        {isMobileMenuOpen && (
+        {(isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null) && (
           <motion.div
-            key="menu-backdrop"
+            key="mobile-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="md:hidden fixed inset-0 bg-foreground/20 backdrop-blur-sm z-[48]"
-            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[48]"
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              setMobileConfirmOpen(false);
+              setViewingLeave(null);
+            }}
           />
         )}
       </AnimatePresence>
@@ -960,7 +963,7 @@ function App() {
           layout
           transition={{ type: 'spring', damping: 32, stiffness: 320 }}
           className={`pointer-events-auto overflow-hidden border border-border/80 backdrop-blur-2xl shadow-[0_12px_40px_-5px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] ${
-            isMobileMenuOpen || mobileConfirmOpen
+            isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null
               ? 'w-full rounded-[28px] bg-card/95 dark:bg-card/95'
               : (selectionStart !== null || previewDates.length > 0)
                 ? 'w-full rounded-[28px] bg-slate-900 dark:bg-slate-950 text-white border border-slate-800 shadow-2xl'
@@ -968,6 +971,56 @@ function App() {
           }`}
         >
         <AnimatePresence mode="popLayout">
+
+          {/* ── EXISTING LEAVE DETAIL MORPHING STATE ── */}
+          {viewingLeave && !isMobileMenuOpen && (
+            <motion.div layout key="viewing-leave"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="max-h-[82vh] overflow-y-auto no-scrollbar bg-card"
+            >
+              {/* Handle */}
+              <div className="flex justify-center pt-3 pb-1 bg-card">
+                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+              </div>
+              <ExistingLeaveDetailContent 
+                leaveObj={viewingLeave} 
+                onClose={() => setViewingLeave(null)}
+                onCancelLeave={async (date) => {
+                  await removeLeave(date);
+                  await loadLeaves();
+                  setViewingLeave(null);
+                }}
+                onCancelPlan={async (planId) => {
+                  await deleteLeavePlan(planId);
+                  await loadLeaves();
+                  setViewingLeave(null);
+                }}
+                onConvertToOffice={async (date) => {
+                  await removeLeave(date);
+                  await addLeave(date, 'office');
+                  await loadLeaves();
+                  setViewingLeave(null);
+                }}
+                onConvertToWfh={async (date) => {
+                  await removeLeave(date);
+                  await addLeave(date, 'wfh');
+                  await loadLeaves();
+                  setViewingLeave(null);
+                }}
+                onConvertToLeave={async (date) => {
+                  await removeLeave(date);
+                  await loadLeaves();
+                  setViewingLeave(null);
+                  setSelectionStart(date);
+                  setPreviewDates([date]);
+                  setMobileConfirmOpen(true);
+                }}
+                leaves={leaves}
+                calendarStyle={calendarStyle}
+              />
+            </motion.div>
+          )}
 
           {/* ── MENU STATE ── */}
           {isMobileMenuOpen && (
@@ -1447,10 +1500,7 @@ function App() {
                   </div>
                   {/* Actions */}
                   <div className="px-4 pb-5 pt-2 border-t border-border flex gap-2.5">
-                    <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-muted/60 border border-border text-foreground rounded-2xl text-xs font-bold hover:bg-muted transition-colors">
-                      {theme === 'dark' ? <Sun size={15}/> : <Moon size={15}/>}
-                      <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-                    </button>
+                    <ThemeSelector theme={theme} setTheme={setTheme} direction="up" variant="full" />
                     <button onClick={handleSignOut} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold hover:bg-red-500/20 transition-colors">
                       <LogOut size={15}/> <span>Sign Out</span>
                     </button>
@@ -1589,7 +1639,7 @@ function App() {
           )}
 
           {/* ── SELECTION STATE (date selected, not yet confirmed) ── */}
-          {!isMobileMenuOpen && !mobileConfirmOpen && (selectionStart !== null || previewDates.length > 0) && (
+          {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && (selectionStart !== null || previewDates.length > 0) && (
             <motion.div layout key="selection"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
@@ -1605,15 +1655,13 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <div className="bg-emerald-500/20 text-emerald-300 text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-full border border-emerald-500/30 flex items-center gap-2 shadow-sm font-mono">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length} leaves • {previewDates.length} days</span>
-                    </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-white leading-none">{previewDates.length} Days Selected</span>
+                    <span className="text-[9px] text-slate-300 leading-none mt-0.5">{new Date(previewDates[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {new Date(previewDates[previewDates.length-1]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                   </div>
                 )}
               </div>
-              <button onClick={() => { setSelectionStart(null); setPreviewDates([]); }} className="text-xs font-bold text-slate-300 hover:text-white px-2.5 py-2 rounded-full hover:bg-white/10">
+              <button onClick={() => { setSelectionStart(null); setPreviewDates([]); }} className="text-xs font-bold text-slate-400 hover:text-white px-2 py-1">
                 Cancel
               </button>
               {selectionStart && previewDates.length === 0 && (
@@ -1628,7 +1676,7 @@ function App() {
               )}
             </motion.div>
           )}
-          {!isMobileMenuOpen && selectionStart === null && previewDates.length === 0 && (
+          {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && selectionStart === null && previewDates.length === 0 && (
             <motion.div layout key="nav"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}

@@ -6,15 +6,50 @@ import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 36 }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
-  const [viewingLeave, setViewingLeave] = useState(null);
+  const [internalViewingLeave, setInternalViewingLeave] = useState(null);
+  const viewingLeave = propViewingLeave !== undefined ? propViewingLeave : internalViewingLeave;
+  const setViewingLeave = propSetViewingLeave || setInternalViewingLeave;
+
   const [localSelectionStart, setLocalSelectionStart] = useState(null);
   const _selectionStart = selectionStart !== undefined ? selectionStart : localSelectionStart;
   const _setSelectionStart = setSelectionStart || setLocalSelectionStart;
+
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark') || document.documentElement.className.includes('dark');
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const updateDarkMode = () => {
+      if (typeof document !== 'undefined') {
+        const isDark = document.documentElement.classList.contains('dark') || document.documentElement.className.includes('dark');
+        setIsDarkMode(isDark);
+      }
+    };
+    updateDarkMode();
+
+    if (typeof document !== 'undefined') {
+      const observer = new MutationObserver(updateDarkMode);
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      return () => observer.disconnect();
+    }
+  }, [theme]);
+
+  const effectiveCellHeight = isMobile ? 42 : (focusedCellHeight || 56);
 
   useEffect(() => {
     if (setIsSelecting) {
@@ -167,6 +202,31 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     setViewingLeave(null);
   };
 
+  const handleConvertToOffice = async (dateStr) => {
+    await removeLeave(dateStr);
+    await addLeave(dateStr, 'office');
+    await loadLeaves();
+    setViewingLeave(null);
+  };
+
+  const handleConvertToWfh = async (dateStr) => {
+    await removeLeave(dateStr);
+    await addLeave(dateStr, 'wfh');
+    await loadLeaves();
+    setViewingLeave(null);
+  };
+
+  const handleConvertToLeave = async (dateStr) => {
+    await removeLeave(dateStr);
+    await loadLeaves();
+    setViewingLeave(null);
+    _setSelectionStart(dateStr);
+    setPreviewDates([dateStr]);
+    if (onMobileConfirm && typeof window !== 'undefined' && window.innerWidth < 768) {
+      onMobileConfirm();
+    }
+  };
+
   const renderMonth = (monthIndex, isLarge = false, isInteractive = true, isPastOverride = null, wrapperClasses = '', onClick = null) => {
     const isMini = !isLarge;
     const isPastMonth = isPastOverride !== null ? isPastOverride : isMonthPast(monthIndex);
@@ -181,16 +241,15 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     const cellClass = isLarge 
       ? (isCapsule ? "h-8 md:h-9 text-xs md:text-sm font-mono" : "w-10 h-10 md:w-12 md:h-12 text-sm md:text-base")
       : (isMini 
-          ? (isCapsule ? "h-5 md:h-6 text-[0px] md:text-[11px] font-mono" : "w-1.5 h-1.5 md:w-6 md:h-6 text-[0px] md:text-sm")
+          ? (isCapsule ? "h-2.5 md:h-6 text-[0px] md:text-[11px] font-mono" : "w-1.5 h-1.5 md:w-6 md:h-6 text-[0px] md:text-sm")
           : (isCapsule ? "h-7 md:h-8 text-xs md:text-sm font-mono" : "w-8 h-8 text-sm"));
 
     const headerClass = isLarge ? "w-10 md:w-12 text-[10px] md:text-xs" : (isMini ? "w-1.5 md:w-6 text-[0px] md:text-[10px]" : "w-8 text-[10px]");
 
-    const isDarkMode = typeof document !== 'undefined' && (document.documentElement.classList.contains('dark') || document.documentElement.className.includes('dark'));
     const useNavy = isDarkMode && isLarge;
 
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`e-${i}`} className={cellClass} style={isLarge ? { height: `${focusedCellHeight}px` } : {}}></div>);
+      days.push(<div key={`e-${i}`} className={cellClass} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}}></div>);
     }
 
     for (let i = 1; i <= daysInMonth; i++) {
@@ -295,7 +354,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       const isWfh = bookedLeave?.type === 'wfh';
 
       days.push(
-        <div key={`d-${i}`} className={baseClasses} style={isLarge ? { height: `${focusedCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
+        <div key={`d-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
           {!isCapsule && isWfh && (
             <span className={isMini ? "absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none ring-1 ring-background/40" : "absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none"} />
           )}
@@ -318,11 +377,13 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     return (
       <motion.div
         layoutId={`month-card-${monthIndex}`}
-        key={monthIndex}
+        key={`${monthIndex}-${isDarkMode ? 'dark' : 'light'}`}
         onClick={onClick}
         whileHover={onClick ? { scale: 1.015 } : {}}
-        transition={{ type: "spring", stiffness: 350, damping: 25 }}
-        className={`${cardBg} border flex flex-col transition-colors transform-gpu origin-center ${isLarge ? 'p-4 md:p-6 rounded-2xl' : (isMini ? 'p-2.5 rounded-xl h-full aspect-[4/3] md:aspect-auto flex flex-col justify-between' : 'p-5 rounded-2xl hover:border-foreground/20')} ${opacityClass} ${wrapperClasses}`}
+        initial={{ opacity: 0.92, filter: 'blur(1px)' }}
+        animate={{ opacity: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className={`${cardBg} border flex flex-col transition-all duration-300 transform-gpu origin-center overflow-hidden ${isLarge ? 'p-4 md:p-6 rounded-2xl' : (isMini ? 'p-1.5 md:p-2.5 rounded-xl h-auto md:h-full aspect-square md:aspect-auto flex flex-col justify-start md:justify-between gap-0.5 md:gap-0' : 'p-5 rounded-2xl hover:border-foreground/20')} ${opacityClass} ${wrapperClasses}`}
       >
         <div className={`flex justify-between items-center ${isLarge ? 'mb-4' : (isMini ? 'mb-2' : 'mb-4')}`}>
           <div className="flex items-center gap-2">
@@ -330,7 +391,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
               {isMini ? monthNames[monthIndex].substring(0,3) : monthNames[monthIndex]}
             </h3>
             {isCurrentMonthCard && !isLarge && (
-              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-wider font-mono">
+              <span className="hidden md:inline-block px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-wider font-mono">
                 Current
               </span>
             )}
@@ -389,7 +450,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         </div>
 
         {viewMode === 'yearly' ? (
-          <motion.div layout className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-start p-2 pb-6">
+          <motion.div layout className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6">
             {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, null, "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
           </motion.div>
         ) : (
@@ -398,7 +459,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
               <div className="w-full">{renderMonth(focusedMonth, true)}</div>
             </div>
             <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto h-full p-2 pb-24 no-scrollbar relative z-10">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full ${isMonthPast(m) ? 'opacity-40 hover:opacity-100' : 'opacity-100'}`, () => setFocusedMonth(m)))}
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-40 hover:opacity-100' : 'opacity-100'}`, () => setFocusedMonth(m)))}
             </div>
           </motion.div>
         )}
@@ -411,6 +472,10 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             onClose={() => setViewingLeave(null)} 
             onCancelLeave={handleCancelLeave}
             onCancelPlan={handleCancelPlan}
+            onConvertToOffice={handleConvertToOffice}
+            onConvertToWfh={handleConvertToWfh}
+            onConvertToLeave={handleConvertToLeave}
+            leaves={leaves}
             calendarStyle={calendarStyle}
           />
         )}
