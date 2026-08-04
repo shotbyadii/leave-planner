@@ -86,6 +86,10 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
     }
     
     onPreviewRange(range);
+
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleHover = (s) => {
