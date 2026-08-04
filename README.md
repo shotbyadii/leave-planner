@@ -1,44 +1,42 @@
-# 📅 Leave Planner & Vault
+# Leave Planner & Vault
 
-A beautiful, premium web application designed to plan, track, and optimize your employee leaves (PL, EL, RH) and Work-From-Home (WFH) logs. Built with a focus on rich aesthetics, smooth animations, and dual-mode responsive layout for desktop and mobile devices.
-
----
-
-## ✨ Features
-
-### 🗓️ Smart Calendar & Selection
-- **Interactive Multi-Day Selection**: Drag or click to select date ranges directly on the calendar.
-- **Dynamic Suggestions & Warnings**: Instant visual optimizer highlights potential long weekends and flags sequential EL bookings requiring medical certificates.
-- **Custom Legends**: Real-time shortform badges (e.g. Planned Leave -> CL -> **CL**) updated dynamically across metrics and calendar legends.
-
-### ⚙️ Customizable Quotas & Themes
-- **Apple-Style Wheel Tumbler Selection**: Interactive tumbler selector (`AppleWheelPicker`) for adjusting quotas.
-- **Custom Swatch Colors & Names**: Redesign category names and associate them with vibrant, tailored HSL color palettes.
-- **Double-Mode Theme Selector**: Clean toggle between light, dark, and system theme preferences.
-
-### 📊 Leave Tracker & All Records Log
-- **Collapsible Leave Plans**: Expandable mobile cards that morph smoothly using Framer Motion spring curves, saving vertical space.
-- **Unified Sortable Log Table**: Sleek tabular list with click-to-sort headers (`DATE`, `TYPE`, `ASSOCIATED PLAN`) that adapts to mobile viewports.
-- **Delete Tracking**: Instantly cancel individual leave entries or delete plan records with real-time balance updates.
-
-### ☁️ Sync, Backup & Restore
-- **Supabase Integration**: Account sync with secure user authentication, automatic profile pictures, and cloud backup.
-- **Device-Native Uploads**: Upload profile pictures directly from your mobile or desktop device as base64 images.
-- **Flexible Data Migrations**: Export data to JSON backups or CSV spreadsheets. Import and hydrate database records instantly via a JSON restore mechanism.
+A professional web application designed to plan, track, and optimize employee leaves and Work-From-Home (WFH) logs. Built with a focus on ease of use, responsiveness, and clean interactive visualization.
 
 ---
 
-## 🛠️ Tech Stack
+## Key Features
 
-- **Core**: React 19, Vite 8, Javascript (ES6+)
-- **Animations**: Framer Motion (Morphing spring-physics transitions)
-- **Database / Auth**: Supabase JS SDK (PostgreSQL storage, authentication)
+### Visual Calendar & Selection
+- **Multi-Day Selection**: Drag or click to select date ranges directly on the calendar to plan trips or consecutive leaves.
+- **Dynamic Optimization Suggestions**: Highlight potential long weekends and holiday overlaps to maximize time off using minimal leave balance.
+- **Dynamic Metrics**: Live calculations of remaining leave balances (PL, EL, RH) and warning messages when sequential Emergency Leaves require administrative verification.
+
+### Account Sync & Settings
+- **Custom Quota & Category Naming**: Rename leave categories and adjust quotas using interactive tumbler selectors.
+- **Category Colors**: Map custom colors to leave categories to keep the calendar legend readable.
+- **Cloud Sync**: Secure sign-in to sync leave plans and WFH logs across multiple devices.
+
+### Leave Tracker & Logs
+- **Collapsible Plan Summaries**: Clean, space-saving layouts on mobile that expand to show complete breakdowns of leaves, holidays, and weekends.
+- **Sortable All-Records Table**: A single log table with sortable columns (Date, Type, Associated Plan) for desktop and mobile to audit your history.
+- **Quick Deletion**: Cancel individual leave days or delete complete trip plans with instant balance updates.
+
+### Backup & Restore
+- **Flexible Exporters**: Save your complete records as JSON backups or CSV spreadsheets.
+- **Direct Restore**: Upload a previously exported JSON backup file to hydrate your cloud database and local client state instantly.
+
+---
+
+## Tech Stack
+
+- **Frontend**: React 19, Vite 8, JavaScript
+- **Animations**: Framer Motion
+- **Database / Auth**: Supabase
 - **Icons**: Lucide React
-- **Styles**: Custom Utility-based CSS for smooth glassmorphism, responsive grids, and adaptive dark mode palettes.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js (v18+)
@@ -68,11 +66,9 @@ A beautiful, premium web application designed to plan, track, and optimize your 
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
-- `src/App.jsx` — Core application router, state management, and main mobile/desktop views.
-- `src/components/Calendar.jsx` — Rich visual calendar grid rendering leaves, holidays, and weekends.
-- `src/components/LeaveTracker.jsx` — Stat cards, collapsible leave plan grids, and sortable all-records table.
-- `src/components/AppleWheelPicker.jsx` — Smooth tumbler selection wheel component for quota adjustments.
-- `src/utils/dataMigration.js` — JSON/CSV parser, data download exporter, and Supabase database sync triggers.
-- `src/utils/colorUtils.js` — Dynamic color palette helpers and shortform calculators.
+- `src/App.jsx` — Core state management and application views.
+- `src/components/Calendar.jsx` — Visual calendar grid rendering leaves, holidays, and weekends.
+- `src/components/LeaveTracker.jsx` — Collapsible leave plans and sortable log table.
+- `src/utils/dataMigration.js` — JSON/CSV parsers for imports, exports, and backup restorations.
