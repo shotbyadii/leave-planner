@@ -177,20 +177,12 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [activeWindowIndex, setActiveWindowIndex] = useState(0);
 
-  // Auto-search on mount (Default State)
-  useEffect(() => {
-    if (!hasSearchedExplicitly && suggestions.length === 0) {
-      handleSearch(true); // isAuto = true
-    }
-  }, []);
-
   const generatePricingData = (dest) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months.map((m, idx) => {
-      let price = 50;
+      let price = 40;
       if (dest.peakMonths.includes(idx)) price = 100;
       else if (dest.shoulderMonths.includes(idx)) price = 75;
-      else price = 40;
       price = price + (Math.random() * 10 - 5);
       return { month: m, price: Math.round(price) };
     });
@@ -215,74 +207,63 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
 
       let windows = [];
       if (mode === 'optimize' || isAuto) {
-        windows = findOptimalWindows({ targetLeaves: isAuto ? 5 : targetLeaves, targetDuration: null, targetMonth: 'all', bookedDates: bookedDates.map(d=>d.date) }).slice(0, 15); // Check top 15 windows
+        windows = findOptimalWindows({ targetLeaves: isAuto ? 5 : targetLeaves, targetDuration: null, targetMonth: 'all', bookedDates: bookedDates.map(d=>d.date) }).slice(0, 15);
       } else if (mode === 'plan') {
         const plan = leavePlans.find(p => p.id === selectedPlanId);
         if (plan) {
-           const s = new Date(plan.start_date); const e = new Date(plan.end_date);
-           windows = [{ startDate: s, endDate: e, totalDaysOff: Math.round((e-s)/86400000)+1 }];
+          windows = [{ startDate: new Date(plan.start_date), endDate: new Date(plan.end_date), totalDaysOff: plan.duration, leavesRequired: plan.leaves_used }];
         }
       } else if (mode === 'custom' && customStart && customEnd) {
          const s = new Date(customStart); const e = new Date(customEnd);
          windows = [{ startDate: s, endDate: e, totalDaysOff: Math.round((e-s)/86400000)+1 }];
       }
 
-      if (windows.length === 0) {
-        if (!isAuto) alert("No valid dates found for this criteria.");
-        setLoading(false);
-        return;
-      }
-
-      // Group by destination to support Date Cycling
       const destMap = new Map();
+      const passport = userPassport;
+      const startMonth = windows[0]?.startDate ? windows[0].startDate.getMonth() : new Date().getMonth();
 
-      for (const w of windows) {
-        const startMonth = w.startDate.getMonth();
-        destinations
-          .filter(d => destType === 'all' || d.type === destType)
-          .forEach(d => {
-            const distance = calculateDistance(currentOrigin.lat, currentOrigin.lon, d.coordinates.lat, d.coordinates.lon);
-            const travelCategory = categorizeDistance(distance);
+      destinations
+        .filter(d => destType === 'all' || d.type === destType)
+        .forEach(d => {
+          const distance = calculateDistance(currentOrigin.lat, currentOrigin.lon, d.coordinates.lat, d.coordinates.lon);
+          const travelCategory = categorizeDistance(distance);
+          
+          let seasonMatch = 'Peak (Expensive)';
+          let score = 0;
+          if (d.offSeasonMonths.includes(startMonth)) { seasonMatch = 'Off-Season (Cheap)'; score += 10; }
+          else if (d.shoulderMonths.includes(startMonth)) { seasonMatch = 'Shoulder Season (Good Value)'; score += 5; }
+
+          const visa = d.visaRules[passport] || 'visa-required';
+          if (visa === 'visa-free' || visa === 'domestic') score += 5;
+
+          for (const w of windows) {
+            const wStartMonth = w.startDate.getMonth();
+            let wSeason = 'Peak (Expensive)';
+            let wScore = 0;
+            if (d.offSeasonMonths.includes(wStartMonth)) { wSeason = 'Off-Season (Cheap)'; wScore += 10; }
+            else if (d.shoulderMonths.includes(wStartMonth)) { wSeason = 'Shoulder Season (Good Value)'; wScore += 5; }
+
+            if (travelCategory === 'Long Haul Flight' && w.totalDaysOff < 7) wScore -= 15;
+
+            const windowData = { window: w, seasonMatch: wSeason, score: wScore, travelCategory };
             
-            let seasonMatch = 'Peak (Expensive)';
-            let score = 0;
-            if (d.offSeasonMonths.includes(startMonth)) { seasonMatch = 'Off-Season (Cheap)'; score += 10; }
-            else if (d.shoulderMonths.includes(startMonth)) { seasonMatch = 'Shoulder Season (Good Value)'; score += 5; }
-
-            const visa = d.visaRules[passport] || 'visa-required';
-            if (visa === 'visa-free' || visa === 'domestic') score += 5;
-
-            // Give a baseline score so trips always show
-            score += 5;
-
-            // Penalize long haul for short trips
-            if (travelCategory === 'Long Haul Flight' && w.totalDaysOff < 7) score -= 15;
-
-            if (score > -10) { // Relaxed threshold
-               const windowData = { window: w, seasonMatch, score, travelCategory };
-               if (!destMap.has(d.id)) {
-                 destMap.set(d.id, { ...d, distance, visa, allWindows: [windowData] });
-               } else {
-                 destMap.get(d.id).allWindows.push(windowData);
-               }
+            if (!destMap.has(d.id)) {
+              destMap.set(d.id, { ...d, distance, visa, allWindows: [windowData] });
+            } else {
+              destMap.get(d.id).allWindows.push(windowData);
             }
-          });
-      }
+          }
+        });
 
-      // Sort destinations by their best window score
       let bestDests = Array.from(destMap.values()).map(d => {
-         d.allWindows.sort((a, b) => b.score - a.score); // sort windows internally
-         return { ...d, bestScore: d.allWindows[0].score };
-      }).sort((a, b) => b.bestScore - a.bestScore);
+        d.allWindows.sort((a, b) => b.score - a.score);
+        return { ...d, bestScore: d.allWindows[0].score };
+      });
 
-      if (isAuto) {
-         // Auto load exactly 3 highly varied
-         bestDests = bestDests.slice(0, 3);
-      } else {
-         bestDests = bestDests.slice(0, 10); // max 10 cards
-      }
+      bestDests.sort((a, b) => b.bestScore - a.bestScore);
+      const topMatches = bestDests.slice(0, isAuto ? 6 : 9);
 
-      const enriched = await Promise.all(bestDests.map(async (s) => {
+      const enriched = await Promise.all(topMatches.map(async (s) => {
         try {
           const wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(s.name)}`);
           const wikiData = await wikiRes.json();
@@ -292,7 +273,7 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
             image: wikiData.originalimage?.source || 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=2074&auto=format&fit=crop',
             pricingData: generatePricingData(s)
           };
-        } catch(e) {
+        } catch {
           return { ...s, description: 'A beautiful destination.', image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=2074&auto=format&fit=crop', pricingData: generatePricingData(s) };
         }
       }));
@@ -300,12 +281,19 @@ const TripPlanner = ({ leavePlans, bookedDates = [], leaves, holidays = [], onPr
       if (isAuto) enriched.sort(() => Math.random() - 0.5);
       setSuggestions(enriched);
 
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Auto-search on mount (Default State)
+  useEffect(() => {
+    if (!hasSearchedExplicitly && suggestions.length === 0) {
+      handleSearch(true); // isAuto = true
+    }
+  }, []);
 
   const handleSelectTrip = async (trip) => {
     setActiveWindowIndex(0); // reset to best window

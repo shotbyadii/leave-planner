@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown, Home } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
@@ -14,6 +15,9 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
   const [deletingPlan, setDeletingPlan] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editingPlanName, setEditingPlanName] = useState('');
+
+  const [expandedPlans, setExpandedPlans] = useState({});
+  const togglePlanExpand = (id) => setExpandedPlans(prev => ({ ...prev, [id]: !prev[id] }));
 
   // Table Sorting State
   const [sortField, setSortField] = useState('date');
@@ -320,17 +324,22 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                 const leavesCount = planLeaves.reduce((sum, l) => sum + (l.duration || 1), 0);
                 
                 const isEditing = editingPlanId === plan.id;
+                const isExpanded = expandedPlans[plan.id] || false;
 
                 return (
-                  <div key={plan.id} className="bg-card rounded-[32px] border border-border shadow-apple-sm p-6 sm:p-7 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-6 relative overflow-hidden">
+                  <div key={plan.id} className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm p-4 sm:p-7 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-4 sm:gap-6 relative overflow-hidden">
                     <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     
                     <div className="flex-1 relative z-10 flex flex-col justify-between">
                       <div>
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="space-y-1.5 flex-1 pr-3">
+                        {/* Card Header (Mobile Collapsible Bar) */}
+                        <div 
+                          className="flex justify-between items-start mb-2 sm:mb-4 cursor-pointer sm:cursor-default" 
+                          onClick={() => togglePlanExpand(plan.id)}
+                        >
+                          <div className="space-y-1 flex-1 pr-2">
                             {isEditing ? (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <input 
                                   type="text" 
                                   value={editingPlanName}
@@ -354,12 +363,17 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                                 </button>
                               </div>
                             ) : (
-                              <h4 className="font-black text-foreground text-xl sm:text-2xl tracking-tight leading-snug">
-                                {plan.name}
-                              </h4>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-black text-foreground text-lg sm:text-2xl tracking-tight leading-snug">
+                                  {plan.name}
+                                </h4>
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 sm:hidden">
+                                  {leavesCount} {leavesCount === 1 ? 'Leaf' : 'Leaves'}
+                                </span>
+                              </div>
                             )}
-                            <div className="inline-flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-xl text-xs font-black text-foreground uppercase tracking-wider border border-border/30">
-                              <CalendarDays size={14} className="text-primary" />
+                            <div className="inline-flex items-center gap-1.5 bg-muted/60 px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-black text-foreground uppercase tracking-wider border border-border/30">
+                              <CalendarDays size={13} className="text-primary" />
                               {start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               <span className="text-muted-foreground/30">→</span>
                               {end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -367,49 +381,96 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                           </div>
 
                           {!isEditing && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <button 
                                 onClick={() => { setEditingPlanId(plan.id); setEditingPlanName(plan.name); }}
-                                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all xl:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
+                                className="p-1.5 sm:p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
                                 title="Edit plan name"
                               >
-                                <Pencil size={16} />
+                                <Pencil size={15} />
                               </button>
                               <button 
                                 onClick={() => setDeletingPlan(plan)}
-                                className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all xl:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
+                                className="p-1.5 sm:p-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100 bg-muted/30 border border-border/10"
                                 title="Delete plan"
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={15} />
+                              </button>
+                              <button
+                                onClick={() => togglePlanExpand(plan.id)}
+                                className="p-1.5 text-muted-foreground hover:text-foreground bg-muted/50 rounded-xl sm:hidden border border-border/20"
+                              >
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                               </button>
                             </div>
                           )}
                         </div>
 
-                        {/* Stat Cards - Clean typography without text bleeding */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                          <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
-                            <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Leaves</span>
-                            <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
+                        {/* Stat Cards & Mini Calendar - Always visible on desktop, morph animated on mobile */}
+                        <div className="hidden sm:flex flex-col xl:flex-row gap-4 sm:gap-6 pt-2">
+                          <div className="flex-1">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                              <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
+                                <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Leaves</span>
+                                <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
+                              </div>
+                              <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
+                                <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Weekends</span>
+                                <span className="text-lg font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
+                              </div>
+                              <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
+                                <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Holidays</span>
+                                <span className="text-lg font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
+                              </div>
+                              <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl shadow-md overflow-hidden">
+                                <span className="text-[9px] font-extrabold opacity-60 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Total</span>
+                                <span className="text-lg font-black leading-none">{allDatesInRange.length}d</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
-                            <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Weekends</span>
-                            <span className="text-lg font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
-                          </div>
-                          <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
-                            <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Holidays</span>
-                            <span className="text-lg font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
-                          </div>
-                          <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl shadow-md overflow-hidden">
-                            <span className="text-[9px] font-extrabold opacity-60 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Total</span>
-                            <span className="text-lg font-black leading-none">{allDatesInRange.length}d</span>
+                          <div className="xl:w-44 flex-shrink-0 flex items-center justify-center bg-muted/20 dark:bg-muted/5 rounded-3xl p-3 border border-border/10 shadow-inner relative z-10">
+                            {renderMiniCalendar(plan)}
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="xl:w-44 flex-shrink-0 flex items-center justify-center bg-muted/20 dark:bg-muted/5 rounded-3xl p-3 border border-border/10 shadow-inner relative z-10">
-                      {renderMiniCalendar(plan)}
+                        {/* Mobile Morphing Expand/Collapse Container */}
+                        <div className="sm:hidden">
+                          <AnimatePresence initial={false}>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                                className="overflow-hidden flex flex-col gap-3 pt-3 border-t border-border/40 mt-1"
+                              >
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
+                                    <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Leaves</span>
+                                    <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
+                                  </div>
+                                  <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
+                                    <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Weekends</span>
+                                    <span className="text-lg font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
+                                  </div>
+                                  <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
+                                    <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Holidays</span>
+                                    <span className="text-lg font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
+                                  </div>
+                                  <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl shadow-md overflow-hidden">
+                                    <span className="text-[9px] font-extrabold opacity-60 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Total</span>
+                                    <span className="text-lg font-black leading-none">{allDatesInRange.length}d</span>
+                                  </div>
+                                </div>
+
+                                <div className="w-full flex items-center justify-center bg-muted/20 dark:bg-muted/5 rounded-3xl p-3 border border-border/10 shadow-inner">
+                                  {renderMiniCalendar(plan)}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -418,185 +479,105 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
           )}
         </div>
 
-        {/* All Records Table */}
-        <div className="bg-card rounded-[32px] border border-border shadow-apple-sm overflow-hidden">
-          <div className="p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* All Records Table (Fits page width on mobile without horizontal scroll) */}
+        <div className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm overflow-hidden">
+          <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="font-bold text-foreground text-xl tracking-tight">All Records</h2>
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Individual leave log</p>
+              <h2 className="font-bold text-foreground text-lg sm:text-xl tracking-tight">All Records</h2>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Individual leave log</p>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Mobile Sort Controls */}
-              <div className="sm:hidden flex items-center gap-2 bg-muted px-3 py-1.5 rounded-xl border border-border">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Sort:</span>
-                <button onClick={() => handleSort('date')} className={`text-xs font-bold ${sortField === 'date' ? 'text-primary' : 'text-muted-foreground'}`}>Date</button>
-                <button onClick={() => handleSort('type')} className={`text-xs font-bold ${sortField === 'type' ? 'text-primary' : 'text-muted-foreground'}`}>Type</button>
-              </div>
-              <div className="bg-muted px-3 py-1.5 rounded-xl text-xs font-black text-muted-foreground">{bookedDates.length} entries</div>
+            <div className="flex items-center gap-2">
+              <div className="bg-muted px-2.5 py-1 rounded-xl text-xs font-black text-muted-foreground font-mono">{bookedDates.length} entries</div>
             </div>
           </div>
           
-          <div className="w-full">
+          <div className="w-full overflow-hidden">
             {bookedDates.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/50 italic">
                 <CalendarDays size={32} className="mb-2 opacity-20" />
                 <p className="text-sm">No leave records found.</p>
               </div>
             ) : (
-              <>
-                {/* Desktop View (Table with sorting) */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-muted/40 border-b border-border text-[10px] uppercase text-muted-foreground font-black tracking-widest select-none">
-                      <tr>
-                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('date')}>
-                          <div className="flex items-center">
-                            <span>Date</span>
-                            {renderSortIcon('date')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('type')}>
-                          <div className="flex items-center">
-                            <span>Type</span>
-                            {renderSortIcon('type')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('duration')}>
-                          <div className="flex items-center">
-                            <span>Status</span>
-                            {renderSortIcon('duration')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('plan')}>
-                          <div className="flex items-center">
-                            <span>Associated Plan</span>
-                            {renderSortIcon('plan')}
-                          </div>
-                        </th>
-                        <th className="px-6 py-4">Note</th>
-                        <th className="px-6 py-4 w-16 text-right"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {sortedBookedDates.map((leave, idx) => {
-                        const dateObj = new Date(leave.date);
-                        const isHalfDay = leave.duration === 0.5;
-                        const colors = leave.type === 'pl' ? { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20' }
-                                     : leave.type === 'el' ? (isHalfDay ? { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-100 dark:border-amber-500/20' } : { bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20' })
-                                     : { bg: 'bg-green-50 dark:bg-green-500/10', text: 'text-green-600 dark:text-green-400', border: 'border-green-100 dark:border-green-500/20' };
-
-                        return (
-                          <tr key={idx} className="hover:bg-muted/20 transition-colors group select-none">
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className="font-black text-foreground text-sm tracking-tight">{dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                                <span className="text-[10px] font-bold text-muted-foreground/50 uppercase">{dateObj.getFullYear()}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              {(() => {
-                                const typeColors = {
-                                  pl: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-                                  el: 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
-                                  rh: 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
-                                  wfh: 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
-                                  office: 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
-                                };
-                                const cls = typeColors[leave.type] || 'bg-muted border-border text-foreground';
-                                return (
-                                  <span className={`px-2.5 py-1 rounded-xl border text-[10px] font-black uppercase tracking-tight ${cls}`}>
-                                    {leave.type}{isHalfDay && ' · ½'}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-1.5 h-1.5 rounded-full ${isHalfDay ? 'bg-amber-400' : 'bg-primary'}`} />
-                                <span className="text-xs font-bold text-foreground/70">{isHalfDay ? 'Half Day' : 'Full Day'}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-xs font-black text-foreground/60 uppercase tracking-tight truncate max-w-[160px] block">
-                                {leave.plan_name || '—'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-xs text-muted-foreground/70 font-medium italic line-clamp-1 max-w-[200px]">
-                                {leave.note || '—'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <button
-                                onClick={() => onDelete(leave.date)}
-                                className="text-muted-foreground hover:text-red-500 transition-all p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl opacity-0 group-hover:opacity-100"
-                                title="Delete record"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile View (Optimized Cards with Sorting) */}
-                <div className="md:hidden flex flex-col divide-y divide-border/50">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-muted/40 border-b border-border text-[9px] sm:text-[10px] uppercase text-muted-foreground font-black tracking-widest select-none">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('date')}>
+                      <div className="flex items-center">
+                        <span>DATE</span>
+                        {renderSortIcon('date')}
+                      </div>
+                    </th>
+                    <th className="px-2 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-foreground transition-colors text-center sm:text-left" onClick={() => handleSort('type')}>
+                      <div className="flex items-center justify-center sm:justify-start">
+                        <span>TYPE</span>
+                        {renderSortIcon('type')}
+                      </div>
+                    </th>
+                    <th className="hidden sm:table-cell px-6 py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('duration')}>
+                      <div className="flex items-center">
+                        <span>STATUS</span>
+                        {renderSortIcon('duration')}
+                      </div>
+                    </th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('plan')}>
+                      <div className="flex items-center">
+                        <span>ASSOCIATED PLAN</span>
+                        {renderSortIcon('plan')}
+                      </div>
+                    </th>
+                    <th className="px-2 sm:px-6 py-3 sm:py-4 w-10 sm:w-12 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
                   {sortedBookedDates.map((leave, idx) => {
                     const dateObj = new Date(leave.date);
                     const isHalfDay = leave.duration === 0.5;
-                    const color = leave.type === 'pl' ? 'text-blue-500' : leave.type === 'el' ? 'text-orange-500' : 'text-green-500';
-                    const bgColor = leave.type === 'pl' ? 'bg-blue-500/10' : leave.type === 'el' ? 'bg-orange-500/10' : 'bg-green-500/10';
+                    const typeColors = {
+                      pl: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
+                      el: 'bg-orange-500/10 text-orange-500 border-orange-500/30',
+                      rh: 'bg-green-500/10 text-green-500 border-green-500/30',
+                      wfh: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/30',
+                      office: 'bg-muted text-foreground border-border'
+                    };
+                    const cls = typeColors[leave.type] || 'bg-muted border-border text-foreground';
 
                     return (
-                      <div key={idx} className="p-5 active:bg-muted/50 transition-colors space-y-4 select-none">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-2xl ${bgColor} flex flex-col items-center justify-center border border-current opacity-20 ${color}`} />
-                            <div className="absolute w-12 h-12 flex flex-col items-center justify-center">
-                              <span className={`text-xs font-black uppercase ${color}`}>{leave.type}</span>
-                              {isHalfDay && <span className={`text-[8px] font-black uppercase ${color} -mt-1`}>½ Day</span>}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-black text-foreground text-base tracking-tight">{dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{dateObj.getFullYear()}</span>
-                            </div>
+                      <tr key={idx} className="hover:bg-muted/20 transition-colors group select-none">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <span className="font-black text-foreground text-xs sm:text-sm tracking-tight whitespace-nowrap">
+                            {dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                          </span>
+                        </td>
+                        <td className="px-2 sm:px-6 py-3 sm:py-4 text-center sm:text-left">
+                          <span className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black uppercase tracking-wider inline-flex items-center justify-center ${cls}`}>
+                            {leave.type.toUpperCase()}{isHalfDay && ' ½'}
+                          </span>
+                        </td>
+                        <td className="hidden sm:table-cell px-6 py-4">
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <div className={`w-1.5 h-1.5 rounded-full ${isHalfDay ? 'bg-amber-400' : 'bg-foreground'}`} />
+                            <span className="text-xs font-bold text-foreground/80">{isHalfDay ? 'Half Day' : 'Full Day'}</span>
                           </div>
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <span className="text-xs sm:text-sm font-black text-foreground/80 uppercase font-mono tracking-tight truncate max-w-[110px] sm:max-w-[200px] block">
+                            {leave.plan_name || '—'}
+                          </span>
+                        </td>
+                        <td className="px-2 sm:px-6 py-3 sm:py-4 text-right">
                           <button
                             onClick={() => onDelete(leave.date)}
-                            className="w-10 h-10 flex items-center justify-center text-muted-foreground bg-muted/50 border border-border/10 rounded-xl"
+                            className="text-muted-foreground hover:text-red-500 transition-all p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg active:scale-95 cursor-pointer"
+                            title="Delete record"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
-                        </div>
-
-                        {(leave.plan_name || leave.note) && (
-                          <div className="bg-muted/30 rounded-2xl p-3 space-y-2 border border-border/5">
-                            {leave.plan_name && (
-                              <div className="flex items-center gap-2">
-                                <div className="w-1 h-1 rounded-full bg-primary" />
-                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Plan:</span>
-                                <span className="text-xs font-bold text-foreground truncate">{leave.plan_name}</span>
-                              </div>
-                            )}
-                            {leave.note && (
-                              <div className="flex items-start gap-2">
-                                <div className="w-1 h-1 rounded-full bg-muted-foreground/30 mt-1.5" />
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Note:</span>
-                                  <span className="text-xs font-medium text-muted-foreground italic leading-snug">"{leave.note}"</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-              </>
+                </tbody>
+              </table>
             )}
           </div>
         </div>

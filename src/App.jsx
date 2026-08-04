@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
 import { fetchBookedLeaves, fetchLeavePlans, resetAllLeaves, removeLeave, deleteLeavePlan, updateLeavePlan, addLeave, createLeavePlan } from './services/leaveService';
 import Calendar from './components/Calendar';
-import ExistingLeaveModal, { ExistingLeaveDetailContent } from './components/ExistingLeaveModal';
+import { ExistingLeaveDetailContent } from './components/ExistingLeaveModal';
 import OptimizerPanel from './components/OptimizerPanel';
 import LeaveTracker from './components/LeaveTracker';
-import TripPlanner from './components/TripPlanner';
 import { TimePicker } from './components/TimePicker';
 import LeaveSelectionBar from './components/LeaveSelectionBar';
 import WfhCheckinModal from './components/WfhCheckinModal';
@@ -22,11 +21,11 @@ import SplashScreen from './components/SplashScreen';
 import CompanyInput from './components/CompanyInput';
 import ThemeSelector from './components/ThemeSelector';
 import DevToolsModal from './components/DevToolsModal';
-import { getLeaveColor, getShortform } from './utils/colorUtils';
+import AppleWheelPicker from './components/AppleWheelPicker';
+import { getLeaveColor, getShortform, COLOR_PALETTE } from './utils/colorUtils';
 import { getCurrentUser, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
-import { FileText as FileTextIcon } from 'lucide-react';
-import { exportUserDataToJson, exportUserDataToCsv } from './utils/dataMigration';
+import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
 import { getCompanyLogoUrl, getCompanyInitials } from './utils/companyLogoUtils';
 import './index.css';
 
@@ -70,6 +69,7 @@ function App() {
     el: { total: parseInt(localStorage.getItem('quota_el') || '10', 10), used: 0, label: leaveNames.el || 'Emergency Leave', color: leaveColors.el || 'orange', bg: getLeaveColor(leaveColors.el).bg, badge: getLeaveColor(leaveColors.el).badge },
     rh: { total: parseInt(localStorage.getItem('quota_rh') || '1', 10), used: 0, label: leaveNames.rh || 'Extra Leave', color: leaveColors.rh || 'green', bg: getLeaveColor(leaveColors.rh).bg, badge: getLeaveColor(leaveColors.rh).badge }
   });
+  const mainScrollContainerRef = useRef(null);
   const [bookedDates, setBookedDates] = useState([]);
   const [leavePlans, setLeavePlans] = useState([]);
   const [previewDates, setPreviewDates] = useState([]);
@@ -79,13 +79,32 @@ function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mobileSubView, setMobileSubView] = useState(null); // null | 'profile' | 'settings'
-  const [mobileSettingsTab, setMobileSettingsTab] = useState('account'); // 'account' | 'quotas' | 'backup'
+  const [mobileSettingsTab, setMobileSettingsTab] = useState('quotas'); // 'quotas' | 'backup'
   const [mobileFormName, setMobileFormName] = useState('');
   const [mobileFormCompany, setMobileFormCompany] = useState('');
+  const [mobileFormAvatar, setMobileFormAvatar] = useState('');
+  const [companyLogoError, setCompanyLogoError] = useState(false);
   const [mobileFormQuotas, setMobileFormQuotas] = useState({ pl: 15, el: 10, rh: 1, wfh: 10 });
   const [mobileFormNames, setMobileFormNames] = useState({});
   const [mobileFormColors, setMobileFormColors] = useState({});
   const [mobileToast, setMobileToast] = useState('');
+  const [isExportingMobile, setIsExportingMobile] = useState(false);
+  const [isExportingCsvMobile, setIsExportingCsvMobile] = useState(false);
+  const [isImportingMobile, setIsImportingMobile] = useState(false);
+  const mobileAvatarFileRef = useRef(null);
+
+  const handleMobileAvatarUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      if (uploadEvent.target?.result) {
+        setMobileFormAvatar(uploadEvent.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
   const [selectionStart, setSelectionStart] = useState(null);
   const [mobileConfirmOpen, setMobileConfirmOpen] = useState(false);
   const [viewingLeave, setViewingLeave] = useState(null);
@@ -110,14 +129,21 @@ function App() {
       if (isDark) {
         root.classList.add('dark');
         root.classList.remove('light');
+        root.style.colorScheme = 'dark';
       } else {
         root.classList.remove('dark');
         root.classList.add('light');
+        root.style.colorScheme = 'light';
       }
       if (isSystem) {
         root.classList.add('theme-system');
       } else {
         root.classList.remove('theme-system');
+      }
+
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', isDark ? '#000000' : '#ffffff');
       }
     };
 
@@ -478,6 +504,29 @@ function App() {
       localStorage.setItem('leave_colors', JSON.stringify(colors));
     }
 
+    if (names || colors || quotas) {
+      setLeaves(prev => {
+        const next = { ...prev };
+        const activeNames = names || leaveNames;
+        const activeColors = colors || leaveColors;
+        const activeQuotas = quotas || {};
+
+        if (activeQuotas.pl !== undefined) next.pl.total = activeQuotas.pl;
+        if (activeQuotas.el !== undefined) next.el.total = activeQuotas.el;
+        if (activeQuotas.rh !== undefined) next.rh.total = activeQuotas.rh;
+
+        if (activeNames.pl) next.pl.label = activeNames.pl;
+        if (activeNames.el) next.el.label = activeNames.el;
+        if (activeNames.rh) next.rh.label = activeNames.rh;
+
+        if (activeColors.pl) { next.pl.color = activeColors.pl; next.pl.bg = getLeaveColor(activeColors.pl).bg; next.pl.badge = getLeaveColor(activeColors.pl).badge; }
+        if (activeColors.el) { next.el.color = activeColors.el; next.el.bg = getLeaveColor(activeColors.el).bg; next.el.badge = getLeaveColor(activeColors.el).badge; }
+        if (activeColors.rh) { next.rh.color = activeColors.rh; next.rh.bg = getLeaveColor(activeColors.rh).bg; next.rh.badge = getLeaveColor(activeColors.rh).badge; }
+
+        return { ...next };
+      });
+    }
+
     const activeUser = currentUser || await getCurrentUser();
     if (activeUser?.id) {
       await upsertUserProfile(activeUser.id, {
@@ -561,12 +610,19 @@ function App() {
     await loadLeaves();
   };
 
+  const scrollToTop = () => {
+    if (mainScrollContainerRef.current) {
+      mainScrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const handlePreviewRange = (datesArray) => {
     setActiveTab('calendar');
     setPreviewDates(datesArray);
-    if (window.innerWidth < 768) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    scrollToTop();
   };
 
   useEffect(() => {
@@ -623,12 +679,12 @@ function App() {
         {/* Mobile Welcome Header (Mobile Calendar Page & Top Bar) */}
         <header className="md:hidden flex px-4 py-3 justify-between items-center bg-background/95 backdrop-blur-md border-b border-border/80">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            {effectiveCompanyLogo ? (
+            {effectiveCompanyLogo && !companyLogoError ? (
               <img 
                 src={effectiveCompanyLogo} 
                 alt={companyName || 'Company Logo'} 
                 className="w-9 h-9 rounded-xl object-contain border border-border bg-card p-1 shadow-sm flex-shrink-0" 
-                onError={(e) => { e.target.style.display = 'none'; }}
+                onError={() => setCompanyLogoError(true)}
               />
             ) : (
               <div className="bg-primary text-primary-foreground rounded-xl w-9 h-9 flex items-center justify-center font-black text-xs shadow-md shadow-primary/20 flex-shrink-0 font-mono">
@@ -684,12 +740,12 @@ function App() {
         <header className="hidden md:flex px-6 py-2.5 justify-between items-center gap-6">
           {/* Desktop Top Bar Left Branding */}
           <div className="flex items-center gap-3.5 flex-shrink-0">
-            {effectiveCompanyLogo ? (
+            {effectiveCompanyLogo && !companyLogoError ? (
               <img 
                 src={effectiveCompanyLogo} 
                 alt={companyName || 'Company Logo'} 
                 className="w-8 h-8 rounded-lg object-contain border border-border bg-card p-1 shadow-sm" 
-                onError={(e) => { e.target.style.display = 'none'; }}
+                onError={() => setCompanyLogoError(true)}
               />
             ) : (
               <div className="bg-primary text-primary-foreground rounded-lg p-1.5 w-8 h-8 flex items-center justify-center font-black text-xs shadow-md font-mono">
@@ -726,7 +782,7 @@ function App() {
               return (
                 <div key={key} className="flex flex-col w-28 flex-shrink-0">
                   <div className="flex justify-between items-end mb-0.5">
-                    <span className="text-[10px] font-semibold font-mono text-muted-foreground uppercase">{key} <span className={`ml-1 text-[9px] font-sans lowercase px-1 rounded ${data.badge}`}>{data.label}</span></span>
+                    <span className="text-[10px] font-semibold font-mono text-muted-foreground uppercase">{getShortform(leaveNames[key] || data.label, key)} <span className={`ml-1 text-[9px] font-sans lowercase px-1 rounded ${data.badge}`}>{leaveNames[key] || data.label}</span></span>
                   </div>
                   <div className="flex items-baseline gap-1 mb-0.5">
                     <span className="text-xl font-bold font-mono">{remainingFmt}</span>
@@ -798,8 +854,15 @@ function App() {
             <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'calendar' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('calendar')}>
               <CalendarIcon size={15} /> Calendar
             </button>
-            <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'trips' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('trips')}>
+            <button 
+              disabled 
+              className="py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground/40 opacity-50 cursor-not-allowed flex items-center gap-2 select-none"
+              title="Trip Planner is coming soon!"
+            >
               <MapPin size={15} /> Trip Planner
+              <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground/80 border border-border/50">
+                Coming Soon
+              </span>
             </button>
             <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'tracker' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('tracker')}>
               <ListTodo size={15} /> Leave Tracker
@@ -842,7 +905,7 @@ function App() {
             </div>
           )}
           
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-32 md:pb-6 relative">
+          <div ref={mainScrollContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-32 md:pb-6 relative">
             <AnimatePresence mode="wait">
               {activeTab === 'calendar' && (
                 <motion.div 
@@ -911,24 +974,6 @@ function App() {
                   />
                 </motion.div>
               )}
-              {activeTab === 'trips' && (
-                <motion.div 
-                  key="trips"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <TripPlanner 
-                    leavePlans={leavePlans} 
-                    bookedDates={bookedDates} 
-                    leaves={leaves}
-                    holidays={publicHolidays}
-                    onPreviewRange={handlePreviewRange}
-                    calendarStyle={calendarStyle}
-                  />
-                </motion.div>
-              )}
             </AnimatePresence>
           </div>
         </div>
@@ -937,7 +982,11 @@ function App() {
 
 
       {/* Dynamic Linear Blur & Multi-stop Gradient fade overlay behind floating mobile navbar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-40 pointer-events-none z-40 overflow-hidden">
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 pointer-events-none z-40 overflow-hidden transition-all duration-200 ${
+        (selectionStart !== null || previewDates.length > 0) && !mobileConfirmOpen && !isMobileMenuOpen && viewingLeave === null
+          ? 'h-24'
+          : 'h-40'
+      }`}>
         <div className="absolute inset-0 backdrop-blur-md [mask-image:linear-gradient(to_top,black_75%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_75%,transparent_100%)]" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 via-background/70 to-transparent" />
       </div>
@@ -1065,14 +1114,57 @@ function App() {
 
                   {/* Profile Card */}
                   <div className="flex flex-col items-center text-center p-4 bg-muted/30 border border-border/80 rounded-2xl relative">
-                    {effectiveAvatar ? (
-                      <img src={effectiveAvatar} alt={userName} className="w-16 h-16 rounded-2xl object-cover border-2 border-primary/30 shadow-lg mb-2" />
-                    ) : (
-                      <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground font-black text-xl flex items-center justify-center shadow-lg shadow-primary/20 mb-2">
-                        {userInitials}
-                      </div>
-                    )}
-                    <h3 className="text-base font-black text-foreground">{userName}</h3>
+                    <div className="relative mb-2">
+                      {mobileFormAvatar || effectiveAvatar ? (
+                        <img src={mobileFormAvatar || effectiveAvatar} alt={userName} className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/30 shadow-lg" />
+                      ) : (
+                        <div className="w-20 h-20 rounded-2xl bg-primary text-primary-foreground font-black text-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+                          {userInitials}
+                        </div>
+                      )}
+
+                      {/* Camera Overlay Badge Button */}
+                      <button 
+                        type="button" 
+                        onClick={() => mobileAvatarFileRef.current?.click()}
+                        className="absolute -bottom-1 -right-1 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all border-2 border-background cursor-pointer"
+                        title="Upload photo from device"
+                      >
+                        <Camera size={14} />
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={mobileAvatarFileRef} 
+                        accept="image/*" 
+                        onChange={handleMobileAvatarUpload} 
+                        className="hidden" 
+                      />
+                    </div>
+
+                    {/* Quick File Upload / Remove actions */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <button 
+                        type="button" 
+                        onClick={() => mobileAvatarFileRef.current?.click()}
+                        className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Upload size={12} /> Upload Photo
+                      </button>
+                      {(mobileFormAvatar || avatarUrl) && (
+                        <>
+                          <span className="text-muted-foreground text-xs">•</span>
+                          <button 
+                            type="button" 
+                            onClick={() => setMobileFormAvatar('')}
+                            className="text-xs font-bold text-red-500 hover:underline cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <h3 className="text-base font-black text-foreground mt-2">{userName}</h3>
                     <p className="text-xs text-muted-foreground font-medium">{currentUser?.email || 'Guest Profile'}</p>
                     <span className="mt-2 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
                       <CheckCircle2 size={10} /> {currentUser ? 'Cloud Synced' : 'Guest Account'}
@@ -1097,6 +1189,20 @@ function App() {
                         value={mobileFormCompany} 
                         onChange={(val) => setMobileFormCompany(val)} 
                         placeholder="e.g. Siemens, ABB, Google"
+                      />
+                    </div>
+
+                    {/* Profile Photo URL Input */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1">
+                        <Camera size={12} className="text-primary" /> Profile Photo URL
+                      </label>
+                      <input 
+                        type="text" 
+                        value={mobileFormAvatar} 
+                        onChange={(e) => setMobileFormAvatar(e.target.value)} 
+                        placeholder="Paste image URL (https://...)" 
+                        className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 truncate"
                       />
                     </div>
                   </div>
@@ -1136,7 +1242,7 @@ function App() {
                     <button 
                       type="button" 
                       onClick={() => {
-                        handleSaveSettings({ name: mobileFormName, companyName: mobileFormCompany });
+                        handleSaveSettings({ name: mobileFormName, companyName: mobileFormCompany, avatarUrl: mobileFormAvatar });
                         setMobileToast('Profile Saved!');
                         setTimeout(() => {
                           setMobileToast('');
@@ -1208,9 +1314,8 @@ function App() {
                   {/* Navigation Bar Aesthetic Tab Switcher */}
                   <div className="flex bg-muted p-1 rounded-2xl border border-border/80 gap-1">
                     {[
-                      { id: 'account', label: 'Account', icon: User },
-                      { id: 'quotas', label: 'Quotas', icon: SlidersHorizontal },
-                      { id: 'backup', label: 'Backups', icon: FileTextIcon }
+                      { id: 'quotas', label: 'Quotas & Themes', icon: SlidersHorizontal },
+                      { id: 'backup', label: 'Backups', icon: FileText }
                     ].map(tab => {
                       const Icon = tab.icon;
                       const isActive = mobileSettingsTab === tab.id;
@@ -1229,72 +1334,61 @@ function App() {
                     })}
                   </div>
 
-                  {/* Tab 1: Account Settings */}
-                  {mobileSettingsTab === 'account' && (
-                    <div className="flex flex-col gap-3 animate-in fade-in duration-200">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Full Display Name</label>
-                        <input 
-                          type="text" 
-                          value={mobileFormName} 
-                          onChange={(e) => setMobileFormName(e.target.value)} 
-                          className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Company / Workspace</label>
-                        <CompanyInput 
-                          value={mobileFormCompany} 
-                          onChange={(val) => setMobileFormCompany(val)} 
-                          placeholder="e.g. Siemens, ABB, Google"
-                        />
-                      </div>
-                      <div className="p-3 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-foreground">Sync Account Status</span>
-                          <span className="text-[10px] text-muted-foreground">{currentUser?.email || 'Guest Mode'}</span>
-                        </div>
-                        {currentUser ? (
-                          <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">Synced</span>
-                        ) : (
-                          <button onClick={() => { setIsMobileMenuOpen(false); setAuthModalOpen(true); }} className="text-xs font-bold text-primary hover:underline">Connect</button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab 2: Quotas & Colors */}
+                  {/* Tab 1: Quotas & Colors */}
                   {mobileSettingsTab === 'quotas' && (
                     <div className="flex flex-col gap-3 animate-in fade-in duration-200">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Leave Quotas</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Leave Quotas, Colors & Custom Names</span>
+                      
+                      {/* 2x2 Grid Layout with AppleWheelPicker Tumbler Scroll */}
                       <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { key: 'pl', label: 'PL (Planned)', color: 'text-blue-500' },
-                          { key: 'el', label: 'EL (Emergency)', color: 'text-orange-500' },
-                          { key: 'rh', label: 'RH (Restricted)', color: 'text-green-500' },
-                          { key: 'wfh', label: 'WFH (Monthly)', color: 'text-cyan-500' }
-                        ].map(q => (
-                          <div key={q.key} className="p-2.5 bg-card border border-border rounded-xl flex flex-col gap-1">
-                            <span className={`text-[10px] font-bold font-mono ${q.color}`}>{q.label}</span>
-                            <div className="flex items-center gap-2">
-                              <button 
-                                type="button"
-                                onClick={() => setMobileFormQuotas(prev => ({ ...prev, [q.key]: Math.max(0, prev[q.key] - 1) }))} 
-                                className="w-7 h-7 bg-muted text-foreground font-bold rounded-lg flex items-center justify-center text-sm"
-                              >-</button>
-                              <span className="flex-1 text-center text-sm font-black font-mono">{mobileFormQuotas[q.key]}</span>
-                              <button 
-                                type="button"
-                                onClick={() => setMobileFormQuotas(prev => ({ ...prev, [q.key]: prev[q.key] + 1 }))} 
-                                className="w-7 h-7 bg-muted text-foreground font-bold rounded-lg flex items-center justify-center text-sm"
-                              >+</button>
-                            </div>
-                          </div>
-                        ))}
+                        <AppleWheelPicker
+                          code="PL"
+                          label="Planned Leave"
+                          value={mobileFormQuotas.pl ?? leaves.pl.total}
+                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, pl: val }))}
+                          min={0} max={30}
+                          customName={mobileFormNames.pl !== undefined ? mobileFormNames.pl : (leaveNames.pl || '')}
+                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, pl: val }))}
+                          color={mobileFormColors.pl || leaveColors.pl || 'blue'}
+                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, pl: val }))}
+                        />
+                        <AppleWheelPicker
+                          code="EL"
+                          label="Emergency Leave"
+                          value={mobileFormQuotas.el ?? leaves.el.total}
+                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, el: val }))}
+                          min={0} max={20}
+                          customName={mobileFormNames.el !== undefined ? mobileFormNames.el : (leaveNames.el || '')}
+                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, el: val }))}
+                          color={mobileFormColors.el || leaveColors.el || 'orange'}
+                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, el: val }))}
+                        />
+                        <AppleWheelPicker
+                          code="RH"
+                          label="Extra Leave"
+                          value={mobileFormQuotas.rh ?? leaves.rh.total}
+                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, rh: val }))}
+                          min={0} max={10}
+                          customName={mobileFormNames.rh !== undefined ? mobileFormNames.rh : (leaveNames.rh || '')}
+                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, rh: val }))}
+                          color={mobileFormColors.rh || leaveColors.rh || 'green'}
+                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, rh: val }))}
+                        />
+                        <AppleWheelPicker
+                          code="WFH"
+                          label="Monthly WFH"
+                          value={mobileFormQuotas.wfh ?? (parseInt(localStorage.getItem('quota_wfh') || '10', 10))}
+                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, wfh: val }))}
+                          min={0} max={20}
+                          customName={mobileFormNames.wfh !== undefined ? mobileFormNames.wfh : (leaveNames.wfh || '')}
+                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, wfh: val }))}
+                          color={mobileFormColors.wfh || leaveColors.wfh || 'cyan'}
+                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, wfh: val }))}
+                        />
                       </div>
 
                       {/* Attendance Check-in Prompt Preference */}
-                      <div className="p-3 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center">
+                      <div className="p-2.5 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center mt-1">
                         <div className="flex flex-col min-w-0 pr-2">
                           <span className="text-xs font-bold text-foreground truncate">Check-in Prompt Time</span>
                           <span className="text-[10px] text-muted-foreground truncate">Daily WFH vs Office prompt</span>
@@ -1306,7 +1400,7 @@ function App() {
                             setWfhPromptHour(val);
                             localStorage.setItem('wfh_prompt_hour', val);
                           }}
-                          className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                          className="bg-card border border-border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
                         >
                           {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
                             const period = h >= 12 ? 'PM' : 'AM';
@@ -1322,31 +1416,90 @@ function App() {
                     </div>
                   )}
 
-                  {/* Tab 3: Backups */}
+                  {/* Tab 2: Backups & Restore */}
                   {mobileSettingsTab === 'backup' && (
-                    <div className="flex flex-col gap-2.5 animate-in fade-in duration-200">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Data Export & Backup</span>
-                      <button 
-                        onClick={async () => {
-                          const res = await exportUserDataToJson(currentUser?.id);
-                          if (res.success) setMobileToast('JSON Backup Downloaded!');
-                        }}
-                        className="w-full py-2.5 bg-card hover:bg-muted border border-border text-foreground text-xs font-bold rounded-xl flex items-center justify-between px-3.5 transition-all"
-                      >
-                        <span className="flex items-center gap-2"><Download size={14} className="text-primary"/> Export Data (JSON)</span>
-                        <span className="text-muted-foreground">↓</span>
-                      </button>
+                    <div className="flex flex-col gap-3.5 animate-in fade-in duration-200">
+                      
+                      {/* Export Account Data Section (matching screenshot 1:1) */}
+                      <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                        <div>
+                          <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">EXPORT ACCOUNT DATA</span>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
+                            Export your PL/EL/RH leaves, WFH logs, and trip plans into JSON backup or CSV spreadsheets.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setIsExportingMobile(true);
+                              const res = await exportUserDataToJson(currentUser?.id);
+                              setIsExportingMobile(false);
+                              if (res.success) setMobileToast(`JSON Backup Exported! (${res.count} items)`);
+                              else setMobileToast(`Export failed: ${res.error}`);
+                              setTimeout(() => setMobileToast(''), 3000);
+                            }}
+                            disabled={isExportingMobile}
+                            className="flex-1 py-2.5 bg-card border border-border text-foreground hover:bg-muted rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Download size={14} className="text-foreground" /> {isExportingMobile ? 'Exporting...' : 'JSON Backup'}
+                          </button>
 
-                      <button 
-                        onClick={async () => {
-                          const res = await exportUserDataToCsv(currentUser?.id);
-                          if (res.success) setMobileToast('CSV Spreadsheet Downloaded!');
-                        }}
-                        className="w-full py-2.5 bg-card hover:bg-muted border border-border text-foreground text-xs font-bold rounded-xl flex items-center justify-between px-3.5 transition-all"
-                      >
-                        <span className="flex items-center gap-2"><Download size={14} className="text-blue-500"/> Export CSV Spreadsheet</span>
-                        <span className="text-muted-foreground">↓</span>
-                      </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setIsExportingCsvMobile(true);
+                              const res = await exportUserDataToCsv(currentUser?.id);
+                              setIsExportingCsvMobile(false);
+                              if (res.success) setMobileToast(`CSV Exported! (${res.count} records)`);
+                              else setMobileToast(`Export failed: ${res.error}`);
+                              setTimeout(() => setMobileToast(''), 3000);
+                            }}
+                            disabled={isExportingCsvMobile}
+                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Table size={14} /> {isExportingCsvMobile ? 'Generating...' : 'Spreadsheet (CSV)'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Restore / Import File Section (matching screenshot 1:1) */}
+                      <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                        <div>
+                          <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">RESTORE / IMPORT FILE</span>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
+                            Upload a previously exported <code className="text-[10px] bg-muted px-1 py-0.5 rounded font-mono">.json</code> file to restore your leaves, WFH logs, and plans into this account.
+                          </p>
+                        </div>
+                        <label className="w-full py-3 bg-card border border-border hover:bg-muted text-foreground rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95">
+                          <Upload size={15} className="text-primary" /> {isImportingMobile ? 'Importing into Supabase...' : 'Select Backup JSON File'}
+                          <input 
+                            type="file" 
+                            accept=".json" 
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setIsImportingMobile(true);
+                              const result = await importUserDataFromJson(file, currentUser?.id);
+                              setIsImportingMobile(false);
+                              if (result.success) {
+                                setMobileToast(`Restored ${result.leavesCount} leaves & ${result.plansCount} plans!`);
+                                const updatedLeaves = await fetchBookedLeaves(currentUser?.id);
+                                const updatedPlans = await fetchLeavePlans(currentUser?.id);
+                                setBookedLeaves(updatedLeaves);
+                                setLeavePlans(updatedPlans);
+                              } else {
+                                setMobileToast(`Restore Failed: ${result.error}`);
+                              }
+                              e.target.value = '';
+                              setTimeout(() => setMobileToast(''), 4000);
+                            }} 
+                            className="hidden" 
+                            disabled={isImportingMobile} 
+                          />
+                        </label>
+                      </div>
+
                     </div>
                   )}
 
@@ -1437,7 +1590,7 @@ function App() {
                     </button>
 
                     <button 
-                      onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('account'); }}
+                      onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('quotas'); }}
                       className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm"
                     >
                       <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0">
@@ -1722,15 +1875,39 @@ function App() {
                 );
               })()}
               <div className="flex justify-around items-center px-2 py-1.5">
-                {[{tab:'calendar',Icon:CalendarIcon,label:'Calendar'},{tab:'trips',Icon:MapPin,label:'Trips'},{tab:'tracker',Icon:ListTodo,label:'Tracker',badge:bookedDates.length}].map(({tab,Icon,label,badge}) => (
-                  <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-colors ${activeTab===tab?'text-primary':'text-muted-foreground hover:text-foreground'}`}>
-                    <div className="relative">
-                      <Icon size={20} className="mb-1"/>
-                      {badge > 0 && <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">{badge}</span>}
-                    </div>
-                    <span className="text-[9px] font-bold tracking-wide">{label}</span>
-                  </button>
-                ))}
+                <button 
+                  onClick={() => setActiveTab('calendar')} 
+                  className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-colors ${activeTab === 'calendar' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <CalendarIcon size={20} className="mb-1"/>
+                  <span className="text-[9px] font-bold tracking-wide">Calendar</span>
+                </button>
+
+                <button 
+                  disabled 
+                  className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground/40 opacity-40 cursor-not-allowed relative select-none"
+                  title="Trip Planner is coming soon"
+                >
+                  <div className="relative">
+                    <MapPin size={20} className="mb-1"/>
+                    <span className="absolute -top-1.5 -right-3 bg-muted-foreground/20 text-muted-foreground text-[8px] font-mono font-bold px-1 rounded border border-border/40">
+                      SOON
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-bold tracking-wide">Trips</span>
+                </button>
+
+                <button 
+                  onClick={() => setActiveTab('tracker')} 
+                  className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-colors ${activeTab === 'tracker' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <div className="relative">
+                    <ListTodo size={20} className="mb-1"/>
+                    {bookedDates.length > 0 && <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">{bookedDates.length}</span>}
+                  </div>
+                  <span className="text-[9px] font-bold tracking-wide">Tracker</span>
+                </button>
+
                 <button onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground hover:text-foreground">
                   <Menu size={20} className="mb-1"/>
                   <span className="text-[9px] font-bold tracking-wide">Menu</span>

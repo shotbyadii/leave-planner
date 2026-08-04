@@ -58,7 +58,7 @@ export const exportUserDataToJson = async (leavesQuota = { pl: 15, el: 10, rh: 1
  * Deletes existing plans and leaves for the target profile first to prevent duplicate plans.
  */
 export const importUserDataFromJson = async (jsonFile, userId = null) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader();
 
     reader.onload = async (e) => {
