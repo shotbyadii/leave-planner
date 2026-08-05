@@ -40,7 +40,7 @@ function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [onboardingOpen, setOnboardingOpen] = useState(localStorage.getItem('onboarding_completed') !== 'true');
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [userName, setUserName] = useState(localStorage.getItem('user_name') || 'User');
   const [companyName, setCompanyName] = useState(localStorage.getItem('company_name') || '');
   const [companyLogoUrl, setCompanyLogoUrl] = useState(localStorage.getItem('company_logo_url') || '');
@@ -322,8 +322,11 @@ function App() {
           wfhPromptHour: wfhPromptHour || '12'
         });
         if (newProfile) syncProfileToState(newProfile, user);
+        // Show onboarding once for brand new account creation
+        setOnboardingOpen(true);
       } else {
         syncProfileToState(profile, user);
+        localStorage.setItem('onboarding_completed', 'true');
       }
       await loadLeaves(user);
     }
@@ -850,10 +853,16 @@ function App() {
 
         {/* Desktop Tabs */}
         <div className="hidden md:block px-6">
-          <div className="flex gap-6 overflow-x-auto whitespace-nowrap hide-scrollbar">
-            <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'calendar' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('calendar')}>
-              <CalendarIcon size={15} /> Calendar
-            </button>
+          <div className="flex justify-between items-center whitespace-nowrap hide-scrollbar border-b border-border/40">
+            <div className="flex gap-6 items-center">
+              <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'calendar' ? 'border-foreground text-foreground font-bold' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('calendar')}>
+                <CalendarIcon size={15} /> Calendar
+              </button>
+              <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'tracker' ? 'border-foreground text-foreground font-bold' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('tracker')}>
+                <ListTodo size={15} /> Leave Tracker
+                <span className="bg-muted text-foreground px-1.5 py-0.5 rounded text-xs font-mono font-bold">{bookedDates.length}</span>
+              </button>
+            </div>
             <button 
               disabled 
               className="py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground/40 opacity-50 cursor-not-allowed flex items-center gap-2 select-none"
@@ -863,10 +872,6 @@ function App() {
               <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground/80 border border-border/50">
                 Coming Soon
               </span>
-            </button>
-            <button className={`py-2.5 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${activeTab === 'tracker' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => setActiveTab('tracker')}>
-              <ListTodo size={15} /> Leave Tracker
-              <span className="bg-muted text-foreground px-1.5 py-0.5 rounded text-xs">{bookedDates.length}</span>
             </button>
           </div>
         </div>
@@ -942,17 +947,26 @@ function App() {
                     viewingLeave={viewingLeave}
                     setViewingLeave={setViewingLeave}
                   />
-                  <div className="md:hidden bg-card border border-border rounded-2xl shadow-apple-sm overflow-hidden flex-shrink-0">
-                    <OptimizerPanel 
-                      onPreviewRange={handlePreviewRange} 
-                      onHoverSuggestion={setHoveredSuggestion}
-                      bookedDates={bookedDates.map(d=>d.date)}
-                      viewMode={calendarViewMode}
-                      setFocusedMonth={setCalendarFocusedMonth}
-                      inlineOnMobile={true}
-                      leaves={leaves}
-                    />
-                  </div>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div 
+                      key={`mobile-panel-${calendarViewMode}-${calendarFocusedMonth}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18, ease: "easeInOut" }}
+                      className="md:hidden bg-card border border-border rounded-2xl shadow-apple-sm overflow-hidden flex-shrink-0"
+                    >
+                      <OptimizerPanel 
+                        onPreviewRange={handlePreviewRange} 
+                        onHoverSuggestion={setHoveredSuggestion}
+                        bookedDates={bookedDates.map(d=>d.date)}
+                        viewMode={calendarViewMode}
+                        setFocusedMonth={setCalendarFocusedMonth}
+                        inlineOnMobile={true}
+                        leaves={leaves}
+                      />
+                    </motion.div>
+                  </AnimatePresence>
                 </motion.div>
               )}
               {activeTab === 'tracker' && (
@@ -1113,12 +1127,12 @@ function App() {
                   </div>
 
                   {/* Profile Card */}
-                  <div className="flex flex-col items-center text-center p-4 bg-muted/30 border border-border/80 rounded-2xl relative">
+                  <div className="flex flex-col items-center text-center p-5 bg-muted/30 border border-border/80 rounded-2xl relative">
                     <div className="relative mb-2">
                       {mobileFormAvatar || effectiveAvatar ? (
-                        <img src={mobileFormAvatar || effectiveAvatar} alt={userName} className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/30 shadow-lg" />
+                        <img src={mobileFormAvatar || effectiveAvatar} alt={userName} className="w-28 h-28 rounded-full object-cover border-4 border-primary/30 shadow-xl" />
                       ) : (
-                        <div className="w-20 h-20 rounded-2xl bg-primary text-primary-foreground font-black text-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+                        <div className="w-28 h-28 rounded-full bg-primary text-primary-foreground font-black text-3xl flex items-center justify-center shadow-xl shadow-primary/20 border-4 border-primary/30">
                           {userInitials}
                         </div>
                       )}
@@ -1127,10 +1141,10 @@ function App() {
                       <button 
                         type="button" 
                         onClick={() => mobileAvatarFileRef.current?.click()}
-                        className="absolute -bottom-1 -right-1 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all border-2 border-background cursor-pointer"
+                        className="absolute bottom-0 right-0 p-2.5 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all border-2 border-background cursor-pointer"
                         title="Upload photo from device"
                       >
-                        <Camera size={14} />
+                        <Camera size={16} />
                       </button>
                       <input 
                         type="file" 
@@ -1139,29 +1153,6 @@ function App() {
                         onChange={handleMobileAvatarUpload} 
                         className="hidden" 
                       />
-                    </div>
-
-                    {/* Quick File Upload / Remove actions */}
-                    <div className="flex items-center gap-2 mt-1">
-                      <button 
-                        type="button" 
-                        onClick={() => mobileAvatarFileRef.current?.click()}
-                        className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Upload size={12} /> Upload Photo
-                      </button>
-                      {(mobileFormAvatar || avatarUrl) && (
-                        <>
-                          <span className="text-muted-foreground text-xs">•</span>
-                          <button 
-                            type="button" 
-                            onClick={() => setMobileFormAvatar('')}
-                            className="text-xs font-bold text-red-500 hover:underline cursor-pointer"
-                          >
-                            Remove
-                          </button>
-                        </>
-                      )}
                     </div>
 
                     <h3 className="text-base font-black text-foreground mt-2">{userName}</h3>

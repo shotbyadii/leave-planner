@@ -178,7 +178,7 @@ export const ExistingLeaveDetailContent = ({
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-2 text-center">
                 <span className="text-base font-black text-blue-500 block font-mono">{actualLeavesCount}</span>
-                <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider font-mono">Leaves</span>
+                <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider font-mono">{actualLeavesCount === 1 ? 'Leaf' : 'Leaves'}</span>
               </div>
               <div className="bg-slate-500/10 border border-slate-500/20 rounded-xl p-2 text-center">
                 <span className="text-base font-black text-slate-400 block font-mono">{weekendsCount}</span>

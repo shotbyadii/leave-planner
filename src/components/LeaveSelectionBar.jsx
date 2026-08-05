@@ -289,7 +289,7 @@ const LeaveSelectionBar = ({
               ) : (
                 <>
                   <div className="bg-background/20 text-background text-[10px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-full border border-background/20 w-fit leading-none whitespace-nowrap">
-                    {baseLeavesNeeded} leave{hasMultiple ? 's' : ''} needed
+                    {baseLeavesNeeded} {baseLeavesNeeded === 1 ? 'leaf' : 'leaves'} needed
                   </div>
                   <span className="text-xs font-medium text-background/70 whitespace-nowrap">{dates.length} days total</span>
                 </>

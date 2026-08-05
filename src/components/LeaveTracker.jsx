@@ -407,28 +407,32 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                         </div>
 
                         {/* Stat Cards & Mini Calendar - Always visible on desktop, morph animated on mobile */}
-                        <div className="hidden sm:flex flex-col xl:flex-row gap-4 sm:gap-6 pt-2">
-                          <div className="flex-1">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                              <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
-                                <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Leaves</span>
-                                <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
-                              </div>
-                              <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
-                                <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Weekends</span>
-                                <span className="text-lg font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
-                              </div>
-                              <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
-                                <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Holidays</span>
-                                <span className="text-lg font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
-                              </div>
-                              <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl shadow-md overflow-hidden">
-                                <span className="text-[9px] font-extrabold opacity-60 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Total</span>
-                                <span className="text-lg font-black leading-none">{allDatesInRange.length}d</span>
-                              </div>
+                        <div className="hidden sm:flex flex-row items-center gap-5 pt-2">
+                          <div className="grid grid-cols-2 gap-2.5 w-56 sm:w-64 flex-shrink-0">
+                            <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-3 py-2.5 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
+                              <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
+                                {leavesCount === 1 ? 'Leaf' : 'Leaves'}
+                              </span>
+                              <span className="text-xl font-black text-blue-600 leading-none">{leavesCount}</span>
+                            </div>
+                            <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-3 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
+                              <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
+                                {weekendsCount === 1 ? 'Weekend' : 'Weekends'}
+                              </span>
+                              <span className="text-xl font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
+                            </div>
+                            <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-3 py-2.5 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
+                              <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
+                                {holidaysCount === 1 ? 'Holiday' : 'Holidays'}
+                              </span>
+                              <span className="text-xl font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
+                            </div>
+                            <div className="flex flex-col bg-foreground text-background px-3 py-2.5 rounded-2xl shadow-md overflow-hidden">
+                              <span className="text-[9px] font-extrabold opacity-60 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Total</span>
+                              <span className="text-xl font-black leading-none">{allDatesInRange.length}d</span>
                             </div>
                           </div>
-                          <div className="xl:w-44 flex-shrink-0 flex items-center justify-center bg-muted/20 dark:bg-muted/5 rounded-3xl p-3 border border-border/10 shadow-inner relative z-10">
+                          <div className="flex-1 min-w-0 flex items-center justify-center">
                             {renderMiniCalendar(plan)}
                           </div>
                         </div>
@@ -446,15 +450,21 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                               >
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
-                                    <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Leaves</span>
+                                    <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
+                                      {leavesCount === 1 ? 'Leaf' : 'Leaves'}
+                                    </span>
                                     <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
                                   </div>
                                   <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
-                                    <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Weekends</span>
+                                    <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
+                                      {weekendsCount === 1 ? 'Weekend' : 'Weekends'}
+                                    </span>
                                     <span className="text-lg font-black text-slate-600 dark:text-slate-400 leading-none">{weekendsCount}</span>
                                   </div>
                                   <div className="flex flex-col bg-purple-50/50 dark:bg-purple-500/10 px-2.5 py-2 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-sm overflow-hidden">
-                                    <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">Holidays</span>
+                                    <span className="text-[9px] font-extrabold text-purple-600/70 dark:text-purple-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
+                                      {holidaysCount === 1 ? 'Holiday' : 'Holidays'}
+                                    </span>
                                     <span className="text-lg font-black text-purple-600 dark:text-purple-400 leading-none">{holidaysCount}</span>
                                   </div>
                                   <div className="flex flex-col bg-foreground text-background px-2.5 py-2 rounded-2xl shadow-md overflow-hidden">

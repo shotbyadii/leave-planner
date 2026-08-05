@@ -144,7 +144,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
               { 
                 icon: CalendarDays, 
                 title: 'Smart Optimizer', 
-                desc: 'Find long weekends with 1 leave day', 
+                desc: 'Find long weekends with 1 leaf day', 
                 cardBg: 'bg-blue-50/90 dark:bg-blue-950/30 border-blue-200/90 dark:border-blue-500/30 shadow-sm',
                 iconBox: 'bg-blue-600 text-white shadow-md shadow-blue-500/25',
                 titleColor: 'text-blue-950 dark:text-blue-100',
