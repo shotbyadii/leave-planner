@@ -1191,20 +1191,6 @@ function App() {
                         placeholder="e.g. Siemens, ABB, Google"
                       />
                     </div>
-
-                    {/* Profile Photo URL Input */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1">
-                        <Camera size={12} className="text-primary" /> Profile Photo URL
-                      </label>
-                      <input 
-                        type="text" 
-                        value={mobileFormAvatar} 
-                        onChange={(e) => setMobileFormAvatar(e.target.value)} 
-                        placeholder="Paste image URL (https://...)" 
-                        className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 truncate"
-                      />
-                    </div>
                   </div>
 
                   {/* Quotas Summary Grid */}
@@ -1334,174 +1320,185 @@ function App() {
                     })}
                   </div>
 
-                  {/* Tab 1: Quotas & Colors */}
-                  {mobileSettingsTab === 'quotas' && (
-                    <div className="flex flex-col gap-3 animate-in fade-in duration-200">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Leave Quotas, Colors & Custom Names</span>
-                      
-                      {/* 2x2 Grid Layout with AppleWheelPicker Tumbler Scroll */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <AppleWheelPicker
-                          code="PL"
-                          label="Planned Leave"
-                          value={mobileFormQuotas.pl ?? leaves.pl.total}
-                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, pl: val }))}
-                          min={0} max={30}
-                          customName={mobileFormNames.pl !== undefined ? mobileFormNames.pl : (leaveNames.pl || '')}
-                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, pl: val }))}
-                          color={mobileFormColors.pl || leaveColors.pl || 'blue'}
-                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, pl: val }))}
-                        />
-                        <AppleWheelPicker
-                          code="EL"
-                          label="Emergency Leave"
-                          value={mobileFormQuotas.el ?? leaves.el.total}
-                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, el: val }))}
-                          min={0} max={20}
-                          customName={mobileFormNames.el !== undefined ? mobileFormNames.el : (leaveNames.el || '')}
-                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, el: val }))}
-                          color={mobileFormColors.el || leaveColors.el || 'orange'}
-                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, el: val }))}
-                        />
-                        <AppleWheelPicker
-                          code="RH"
-                          label="Extra Leave"
-                          value={mobileFormQuotas.rh ?? leaves.rh.total}
-                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, rh: val }))}
-                          min={0} max={10}
-                          customName={mobileFormNames.rh !== undefined ? mobileFormNames.rh : (leaveNames.rh || '')}
-                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, rh: val }))}
-                          color={mobileFormColors.rh || leaveColors.rh || 'green'}
-                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, rh: val }))}
-                        />
-                        <AppleWheelPicker
-                          code="WFH"
-                          label="Monthly WFH"
-                          value={mobileFormQuotas.wfh ?? (parseInt(localStorage.getItem('quota_wfh') || '10', 10))}
-                          onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, wfh: val }))}
-                          min={0} max={20}
-                          customName={mobileFormNames.wfh !== undefined ? mobileFormNames.wfh : (leaveNames.wfh || '')}
-                          onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, wfh: val }))}
-                          color={mobileFormColors.wfh || leaveColors.wfh || 'cyan'}
-                          onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, wfh: val }))}
-                        />
-                      </div>
-
-                      {/* Attendance Check-in Prompt Preference */}
-                      <div className="p-2.5 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center mt-1">
-                        <div className="flex flex-col min-w-0 pr-2">
-                          <span className="text-xs font-bold text-foreground truncate">Check-in Prompt Time</span>
-                          <span className="text-[10px] text-muted-foreground truncate">Daily WFH vs Office prompt</span>
-                        </div>
-                        <select
-                          value={wfhPromptHour}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setWfhPromptHour(val);
-                            localStorage.setItem('wfh_prompt_hour', val);
-                          }}
-                          className="bg-card border border-border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
-                        >
-                          {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
-                            const period = h >= 12 ? 'PM' : 'AM';
-                            const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-                            return (
-                              <option key={h} value={h}>
-                                {displayH}:00 {period}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab 2: Backups & Restore */}
-                  {mobileSettingsTab === 'backup' && (
-                    <div className="flex flex-col gap-3.5 animate-in fade-in duration-200">
-                      
-                      {/* Export Account Data Section (matching screenshot 1:1) */}
-                      <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                        <div>
-                          <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">EXPORT ACCOUNT DATA</span>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
-                            Export your PL/EL/RH leaves, WFH logs, and trip plans into JSON backup or CSV spreadsheets.
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setIsExportingMobile(true);
-                              const res = await exportUserDataToJson(currentUser?.id);
-                              setIsExportingMobile(false);
-                              if (res.success) setMobileToast(`JSON Backup Exported! (${res.count} items)`);
-                              else setMobileToast(`Export failed: ${res.error}`);
-                              setTimeout(() => setMobileToast(''), 3000);
-                            }}
-                            disabled={isExportingMobile}
-                            className="flex-1 py-2.5 bg-card border border-border text-foreground hover:bg-muted rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Download size={14} className="text-foreground" /> {isExportingMobile ? 'Exporting...' : 'JSON Backup'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setIsExportingCsvMobile(true);
-                              const res = await exportUserDataToCsv(currentUser?.id);
-                              setIsExportingCsvMobile(false);
-                              if (res.success) setMobileToast(`CSV Exported! (${res.count} records)`);
-                              else setMobileToast(`Export failed: ${res.error}`);
-                              setTimeout(() => setMobileToast(''), 3000);
-                            }}
-                            disabled={isExportingCsvMobile}
-                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Table size={14} /> {isExportingCsvMobile ? 'Generating...' : 'Spreadsheet (CSV)'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Restore / Import File Section (matching screenshot 1:1) */}
-                      <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                        <div>
-                          <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">RESTORE / IMPORT FILE</span>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
-                            Upload a previously exported <code className="text-[10px] bg-muted px-1 py-0.5 rounded font-mono">.json</code> file to restore your leaves, WFH logs, and plans into this account.
-                          </p>
-                        </div>
-                        <label className="w-full py-3 bg-card border border-border hover:bg-muted text-foreground rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95">
-                          <Upload size={15} className="text-primary" /> {isImportingMobile ? 'Importing into Supabase...' : 'Select Backup JSON File'}
-                          <input 
-                            type="file" 
-                            accept=".json" 
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              setIsImportingMobile(true);
-                              const result = await importUserDataFromJson(file, currentUser?.id);
-                              setIsImportingMobile(false);
-                              if (result.success) {
-                                setMobileToast(`Restored ${result.leavesCount} leaves & ${result.plansCount} plans!`);
-                                const updatedLeaves = await fetchBookedLeaves(currentUser?.id);
-                                const updatedPlans = await fetchLeavePlans(currentUser?.id);
-                                setBookedLeaves(updatedLeaves);
-                                setLeavePlans(updatedPlans);
-                              } else {
-                                setMobileToast(`Restore Failed: ${result.error}`);
-                              }
-                              e.target.value = '';
-                              setTimeout(() => setMobileToast(''), 4000);
-                            }} 
-                            className="hidden" 
-                            disabled={isImportingMobile} 
+                  {/* Animated Tab Content Switcher */}
+                  <AnimatePresence mode="wait">
+                    {mobileSettingsTab === 'quotas' ? (
+                      <motion.div
+                        key="quotas"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.18, ease: "easeInOut" }}
+                        className="flex flex-col gap-3"
+                      >
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Leave Quotas, Colors & Custom Names</span>
+                        
+                        {/* 2x2 Grid Layout with AppleWheelPicker Tumbler Scroll */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <AppleWheelPicker
+                            code="PL"
+                            label="Planned Leave"
+                            value={mobileFormQuotas.pl ?? leaves.pl.total}
+                            onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, pl: val }))}
+                            min={0} max={30}
+                            customName={mobileFormNames.pl !== undefined ? mobileFormNames.pl : (leaveNames.pl || '')}
+                            onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, pl: val }))}
+                            color={mobileFormColors.pl || leaveColors.pl || 'blue'}
+                            onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, pl: val }))}
                           />
-                        </label>
-                      </div>
+                          <AppleWheelPicker
+                            code="EL"
+                            label="Emergency Leave"
+                            value={mobileFormQuotas.el ?? leaves.el.total}
+                            onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, el: val }))}
+                            min={0} max={20}
+                            customName={mobileFormNames.el !== undefined ? mobileFormNames.el : (leaveNames.el || '')}
+                            onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, el: val }))}
+                            color={mobileFormColors.el || leaveColors.el || 'orange'}
+                            onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, el: val }))}
+                          />
+                          <AppleWheelPicker
+                            code="RH"
+                            label="Extra Leave"
+                            value={mobileFormQuotas.rh ?? leaves.rh.total}
+                            onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, rh: val }))}
+                            min={0} max={10}
+                            customName={mobileFormNames.rh !== undefined ? mobileFormNames.rh : (leaveNames.rh || '')}
+                            onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, rh: val }))}
+                            color={mobileFormColors.rh || leaveColors.rh || 'green'}
+                            onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, rh: val }))}
+                          />
+                          <AppleWheelPicker
+                            code="WFH"
+                            label="Monthly WFH"
+                            value={mobileFormQuotas.wfh ?? (parseInt(localStorage.getItem('quota_wfh') || '10', 10))}
+                            onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, wfh: val }))}
+                            min={0} max={20}
+                            customName={mobileFormNames.wfh !== undefined ? mobileFormNames.wfh : (leaveNames.wfh || '')}
+                            onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, wfh: val }))}
+                            color={mobileFormColors.wfh || leaveColors.wfh || 'cyan'}
+                            onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, wfh: val }))}
+                          />
+                        </div>
 
-                    </div>
-                  )}
+                        {/* Attendance Check-in Prompt Preference */}
+                        <div className="p-2.5 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center mt-1">
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className="text-xs font-bold text-foreground truncate">Check-in Prompt Time</span>
+                            <span className="text-[10px] text-muted-foreground truncate">Daily WFH vs Office prompt</span>
+                          </div>
+                          <select
+                            value={wfhPromptHour}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setWfhPromptHour(val);
+                              localStorage.setItem('wfh_prompt_hour', val);
+                            }}
+                            className="bg-card border border-border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                          >
+                            {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
+                              const period = h >= 12 ? 'PM' : 'AM';
+                              const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+                              return (
+                                <option key={h} value={h}>
+                                  {displayH}:00 {period}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="backup"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.18, ease: "easeInOut" }}
+                        className="flex flex-col gap-3.5"
+                      >
+                        {/* Export Account Data Section */}
+                        <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">EXPORT ACCOUNT DATA</span>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
+                              Export your PL/EL/RH leaves, WFH logs, and trip plans into JSON backup or CSV spreadsheets.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setIsExportingMobile(true);
+                                const res = await exportUserDataToJson(currentUser?.id);
+                                setIsExportingMobile(false);
+                                if (res.success) setMobileToast(`JSON Backup Exported! (${res.count} items)`);
+                                else setMobileToast(`Export failed: ${res.error}`);
+                                setTimeout(() => setMobileToast(''), 3000);
+                              }}
+                              disabled={isExportingMobile}
+                              className="flex-1 py-2.5 bg-card border border-border text-foreground hover:bg-muted rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Download size={14} className="text-foreground" /> {isExportingMobile ? 'Exporting...' : 'JSON Backup'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setIsExportingCsvMobile(true);
+                                const res = await exportUserDataToCsv(currentUser?.id);
+                                setIsExportingCsvMobile(false);
+                                if (res.success) setMobileToast(`CSV Exported! (${res.count} records)`);
+                                else setMobileToast(`Export failed: ${res.error}`);
+                                setTimeout(() => setMobileToast(''), 3000);
+                              }}
+                              disabled={isExportingCsvMobile}
+                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+                            >
+                              <Table size={14} /> {isExportingCsvMobile ? 'Generating...' : 'Spreadsheet (CSV)'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Restore / Import File Section */}
+                        <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">RESTORE / IMPORT FILE</span>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
+                              Upload a previously exported <code className="text-[10px] bg-muted px-1 py-0.5 rounded font-mono">.json</code> file to restore your leaves, WFH logs, and plans into this account.
+                            </p>
+                          </div>
+                          <label className="w-full py-3 bg-card border border-border hover:bg-muted text-foreground rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95">
+                            <Upload size={15} className="text-primary" /> {isImportingMobile ? 'Importing into Supabase...' : 'Select Backup JSON File'}
+                            <input 
+                              type="file" 
+                              accept=".json" 
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setIsImportingMobile(true);
+                                const result = await importUserDataFromJson(file, currentUser?.id);
+                                setIsImportingMobile(false);
+                                if (result.success) {
+                                  setMobileToast(`Restored ${result.leavesCount} leaves & ${result.plansCount} plans!`);
+                                  const updatedLeaves = await fetchBookedLeaves(currentUser?.id);
+                                  const updatedPlans = await fetchLeavePlans(currentUser?.id);
+                                  setBookedLeaves(updatedLeaves);
+                                  setLeavePlans(updatedPlans);
+                                } else {
+                                  setMobileToast(`Restore Failed: ${result.error}`);
+                                }
+                                e.target.value = '';
+                                setTimeout(() => setMobileToast(''), 4000);
+                              }} 
+                              className="hidden" 
+                              disabled={isImportingMobile} 
+                            />
+                          </label>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Toast Message */}
                   {mobileToast && (

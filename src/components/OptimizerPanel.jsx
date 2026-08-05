@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, ChevronDown, SlidersHorizontal, Compass } from 'lucide-react';
 import { findOptimalWindows } from '../utils/leaveOptimizer';
 import { parseNaturalLanguage } from '../utils/nlpParser';
@@ -197,51 +198,67 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
         </div>
 
         {/* Mode Specific Sub-Controls */}
-        {optimizerMode === 'best' ? (
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
-            {[
-              { id: 'all', label: '🌟 All Tiers' },
-              { id: '1-2', label: '⚡ 1-2 Leaves' },
-              { id: '3-4', label: '✈️ 3-4 Leaves' },
-              { id: '5+', label: '🏝️ 5+ Leaves' }
-            ].map(tier => (
-              <button
-                key={tier.id}
-                type="button"
-                onClick={() => setLeaveFilterTier(tier.id)}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded-xl transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
-                  leaveFilterTier === tier.id
-                    ? 'bg-primary text-primary-foreground shadow-sm font-black'
-                    : 'bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                {tier.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between bg-card border border-border rounded-2xl px-3 py-1.5 shadow-sm">
-            <span className="text-xs font-bold text-muted-foreground font-mono">Target Leaves:</span>
-            <div className="flex items-center gap-2">
-              <button 
-                type="button"
-                onClick={() => { setTargetLeaves(Math.max(1, targetLeaves - 1)); setTargetDuration(null); }} 
-                className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors"
-              >
-                <Minus size={14} strokeWidth={2.5} />
-              </button>
-              <span className="text-sm font-black text-foreground w-6 text-center font-mono">{targetLeaves}</span>
-              <button 
-                type="button"
-                onClick={() => { setTargetLeaves(Math.min(maxUsableLeaves, targetLeaves + 1)); setTargetDuration(null); }} 
-                disabled={targetLeaves >= maxUsableLeaves}
-                className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-              >
-                <Plus size={14} strokeWidth={2.5} />
-              </button>
-            </div>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {optimizerMode === 'best' ? (
+            <motion.div 
+              key="best"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: "easeInOut" }}
+              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5"
+            >
+              {[
+                { id: 'all', label: '🌟 All Tiers' },
+                { id: '1-2', label: '⚡ 1-2 Leaves' },
+                { id: '3-4', label: '✈️ 3-4 Leaves' },
+                { id: '5+', label: '🏝️ 5+ Leaves' }
+              ].map(tier => (
+                <button
+                  key={tier.id}
+                  type="button"
+                  onClick={() => setLeaveFilterTier(tier.id)}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-xl transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                    leaveFilterTier === tier.id
+                      ? 'bg-primary text-primary-foreground shadow-sm font-black'
+                      : 'bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {tier.label}
+                </button>
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="manual"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: "easeInOut" }}
+              className="flex items-center justify-between bg-card border border-border rounded-2xl px-3 py-1.5 shadow-sm"
+            >
+              <span className="text-xs font-bold text-muted-foreground font-mono">Target Leaves:</span>
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={() => { setTargetLeaves(Math.max(1, targetLeaves - 1)); setTargetDuration(null); }} 
+                  className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors"
+                >
+                  <Minus size={14} strokeWidth={2.5} />
+                </button>
+                <span className="text-sm font-black text-foreground w-6 text-center font-mono">{targetLeaves}</span>
+                <button 
+                  type="button"
+                  onClick={() => { setTargetLeaves(Math.min(maxUsableLeaves, targetLeaves + 1)); setTargetDuration(null); }} 
+                  disabled={targetLeaves >= maxUsableLeaves}
+                  className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <Plus size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 3. Suggestions List Header & Cards */}

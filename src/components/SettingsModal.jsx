@@ -344,331 +344,338 @@ const SettingsModal = ({
               </div>
             )}
 
-            {/* TAB 1: PROFILE & ACCOUNT */}
-            {activeTab === 'profile' && (
-              <div className="flex flex-col gap-5 animate-in fade-in duration-200">
-                
-                {/* Inputs Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  
-                  {/* Display Name Input */}
-                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-2">
-                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
-                      <User size={14} className="text-primary" /> Full Display Name
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-card border border-border rounded-2xl px-4 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-inner"
-                      placeholder="Your Name..."
-                    />
+            {/* TAB CONTENT SWITCHER WITH ANIMATEPRESENCE */}
+            <AnimatePresence mode="wait">
+              {activeTab === 'profile' && (
+                <motion.div 
+                  key="profile"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                  className="flex flex-col gap-5"
+                >
+                  {/* Inputs Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    {/* Display Name Input */}
+                    <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-2">
+                      <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                        <User size={14} className="text-primary" /> Full Display Name
+                      </label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full bg-card border border-border rounded-2xl px-4 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-inner"
+                        placeholder="Your Name..."
+                      />
+                    </div>
+
+                    {/* Company Name Autocomplete & Logo Input */}
+                    <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-2">
+                      <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                        <Building2 size={14} className="text-cyan-500" /> Company / Workspace
+                      </label>
+                      <CompanyInput
+                        value={companyName}
+                        onChange={(val) => setCompanyName(val)}
+                        placeholder="e.g. Siemens, ABB, Google"
+                      />
+                    </div>
+
                   </div>
 
-                  {/* Company Name Autocomplete & Logo Input */}
-                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-2">
-                    <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
-                      <Building2 size={14} className="text-cyan-500" /> Company / Workspace
-                    </label>
-                    <CompanyInput
-                      value={companyName}
-                      onChange={(val) => setCompanyName(val)}
-                      placeholder="e.g. Siemens, ABB, Google"
-                    />
-                  </div>
-
-                </div>
-
-                {/* Profile Photo Custom Upload Card */}
-                <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    {effectiveAvatar ? (
-                      <img src={effectiveAvatar} alt="Profile" className="w-10 h-10 rounded-xl object-cover border border-primary/20" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs">
-                        {initials}
+                  {/* Profile Photo Custom Upload Card */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {effectiveAvatar ? (
+                        <img src={effectiveAvatar} alt="Profile" className="w-10 h-10 rounded-xl object-cover border border-primary/20" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs">
+                          {initials}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground leading-tight">Profile Photo</h4>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {isGoogle ? 'Pulled from Google Account. Upload custom photo below.' : 'Upload custom profile avatar picture.'}
+                        </p>
                       </div>
-                    )}
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground leading-tight">Profile Photo</h4>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {isGoogle ? 'Pulled from Google Account. Upload custom photo below.' : 'Upload custom profile avatar picture.'}
-                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {avatarUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setAvatarUrl('')}
+                          className="px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-card border border-border hover:bg-muted text-foreground rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                      >
+                        <Camera size={13} /> Upload Photo
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {avatarUrl && (
+                  {/* Danger Zone: Reset & Delete */}
+                  <div className="border-t border-border/60 pt-4 flex flex-col gap-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                      <ShieldCheck size={14} className="text-amber-500" /> Advanced Options
+                    </span>
+
+                    {/* Reset All Data */}
+                    {showResetConfirm ? (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col gap-2.5 animate-in fade-in duration-200">
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                          <AlertTriangle size={15} /> Confirm wipe of all booked dates & plans?
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowResetConfirm(false);
+                              onClose();
+                              if (onResetData) onResetData();
+                            }}
+                            className="flex-1 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl shadow-md"
+                          >
+                            Confirm Reset
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowResetConfirm(false)}
+                            className="flex-1 py-2 bg-muted text-foreground text-xs font-bold rounded-xl"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => setAvatarUrl('')}
-                        className="px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"
+                        onClick={() => setShowResetConfirm(true)}
+                        className="w-full py-2.5 px-4 bg-muted/40 hover:bg-muted border border-border/60 text-muted-foreground hover:text-foreground rounded-2xl text-xs font-bold transition-all flex items-center justify-between"
                       >
-                        Remove
+                        <div className="flex items-center gap-2">
+                          <RotateCw size={14} />
+                          <span>Reset All Booked Leaves & Plans</span>
+                        </div>
+                        <ChevronRight size={14} />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 bg-card border border-border hover:bg-muted text-foreground rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
-                    >
-                      <Camera size={13} /> Upload Photo
-                    </button>
-                  </div>
-                </div>
 
-                {/* Danger Zone: Reset & Delete */}
-                <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-3">
-                  <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono">
-                    Account Reset & Destruction
-                  </span>
-
-                  {/* Reset Data */}
-                  {!showResetConfirm ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowResetConfirm(true)}
-                      className="w-full py-2.5 px-4 bg-card hover:bg-muted border border-border text-foreground rounded-2xl text-xs font-bold transition-all flex items-center justify-between shadow-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <RotateCw size={14} className="text-amber-500" />
-                        <span>Reset All Booked Leaves & Trip Plans</span>
-                      </div>
-                      <ChevronRight size={14} className="text-muted-foreground" />
-                    </button>
-                  ) : (
-                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col gap-2.5 animate-in fade-in duration-200">
-                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                        <AlertTriangle size={15} /> Confirm wipe of all booked dates & plans?
-                      </span>
-                      <div className="flex gap-2">
+                    {/* Delete Account */}
+                    {showDeleteConfirm ? (
+                      <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col gap-2.5 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <Trash2 size={14} /> Delete Account & Data
+                          </span>
+                          <button type="button" onClick={() => setShowDeleteConfirm(false)} className="text-muted-foreground hover:text-foreground">
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-red-600/80 dark:text-red-400/80 font-medium">
+                          Permanently delete your profile, leave bookings, and account record from Supabase database.
+                        </p>
                         <button
                           type="button"
                           onClick={() => {
-                            setShowResetConfirm(false);
+                            setShowDeleteConfirm(false);
                             onClose();
-                            if (onResetData) onResetData();
+                            if (onDeleteAccount) onDeleteAccount();
                           }}
-                          className="flex-1 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl shadow-md"
+                          className="w-full py-2.5 bg-red-600 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2"
                         >
-                          Confirm Reset
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowResetConfirm(false)}
-                          className="px-4 py-2 bg-muted text-muted-foreground text-xs font-bold rounded-xl"
-                        >
-                          Cancel
+                          <Trash2 size={14} /> Confirm Permanently Delete
                         </button>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Delete Account */}
-                  {showDeleteConfirm ? (
-                    <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col gap-2.5 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                          <Trash2 size={14} /> Delete Account & Data
-                        </span>
-                        <button type="button" onClick={() => setShowDeleteConfirm(false)} className="text-muted-foreground hover:text-foreground">
-                          <X size={14} />
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">
-                        Type <strong className="text-foreground font-mono">DELETE</strong> below to confirm permanent deletion.
-                      </p>
-                      <input
-                        type="text"
-                        value={deleteInputText}
-                        onChange={(e) => setDeleteInputText(e.target.value)}
-                        placeholder="Type DELETE"
-                        className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-red-500/30"
-                      />
+                    ) : (
                       <button
                         type="button"
-                        disabled={deleteInputText.trim() !== 'DELETE'}
-                        onClick={() => {
-                          onClose();
-                          if (onDeleteAccount) onDeleteAccount();
-                        }}
-                        className="w-full py-2 bg-red-600 text-white font-black text-xs rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="w-full py-2.5 px-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold transition-all flex items-center justify-between"
                       >
-                        Permanently Delete Account
+                        <div className="flex items-center gap-2">
+                          <Trash2 size={14} />
+                          <span>Delete Account & Data</span>
+                        </div>
+                        <ChevronRight size={14} />
                       </button>
+                    )}
+
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'quotas' && (
+                <motion.div 
+                  key="quotas"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                  className="flex flex-col gap-4"
+                >
+                  <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5 px-1">
+                    <SlidersHorizontal size={14} className="text-cyan-500" /> Leave Quotas, Colors & Category Names
+                  </span>
+
+                  {/* Quotas & Custom Names Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <AppleWheelPicker
+                      code="PL"
+                      label="Planned Leave"
+                      value={currentQuotas.pl}
+                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, pl: val }))}
+                      min={0} max={30}
+                      customName={currentNames.pl}
+                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, pl: val }))}
+                      color={currentColors.pl}
+                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, pl: val }))}
+                    />
+
+                    <AppleWheelPicker
+                      code="EL"
+                      label="Emergency Leave"
+                      value={currentQuotas.el}
+                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, el: val }))}
+                      min={0} max={20}
+                      customName={currentNames.el}
+                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, el: val }))}
+                      color={currentColors.el}
+                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, el: val }))}
+                    />
+
+                    <AppleWheelPicker
+                      code="RH"
+                      label="Extra Leave"
+                      value={currentQuotas.rh}
+                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, rh: val }))}
+                      min={0} max={10}
+                      customName={currentNames.rh}
+                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, rh: val }))}
+                      color={currentColors.rh}
+                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, rh: val }))}
+                    />
+
+                    <AppleWheelPicker
+                      code="WFH"
+                      label="Monthly WFH"
+                      value={currentQuotas.wfh}
+                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, wfh: val }))}
+                      min={0} max={20}
+                      customName={currentNames.wfh}
+                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, wfh: val }))}
+                      color={currentColors.wfh}
+                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, wfh: val }))}
+                    />
+                  </div>
+
+                  {/* Daily Attendance Check-in Prompt Preference */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                        <Clock size={14} className="text-amber-500" /> Attendance Check-in Prompt Time
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                        Time of day to prompt for unbooked workdays (WFH vs In-Office)
+                      </span>
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="w-full py-2.5 px-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold transition-all flex items-center justify-between"
+                    <select
+                      value={wfhPromptHour}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setWfhPromptHour(val);
+                        localStorage.setItem('wfh_prompt_hour', val);
+                      }}
+                      className="bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer"
                     >
-                      <div className="flex items-center gap-2">
-                        <Trash2 size={14} />
-                        <span>Delete Account & Data</span>
-                      </div>
-                      <ChevronRight size={14} />
-                    </button>
+                      {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
+                        const period = h >= 12 ? 'PM' : 'AM';
+                        const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+                        return (
+                          <option key={h} value={h}>
+                            {displayH}:00 {period}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'backup' && (
+                <motion.div 
+                  key="backup"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                  className="flex flex-col gap-4"
+                >
+                  {backupStatusMsg && (
+                    <div className={`p-3.5 rounded-2xl border text-xs flex gap-2.5 items-start ${
+                      backupStatusMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+                    }`}>
+                      {backupStatusMsg.type === 'success' ? <CheckCircle2 size={16} className="flex-shrink-0 mt-0.5" /> : <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />}
+                      <span>{backupStatusMsg.text}</span>
+                    </div>
                   )}
 
-                </div>
+                  {/* Export Section */}
+                  <div className="bg-muted/40 border border-border/80 rounded-3xl p-4 flex flex-col gap-3">
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-foreground block">Export Account Data</span>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        Export your PL/EL/RH leaves, WFH logs, and trip plans into JSON backup or CSV spreadsheets.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleExportJson}
+                        disabled={isExporting}
+                        className="flex-1 py-3 bg-card border border-border text-foreground hover:bg-muted rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+                      >
+                        <Download size={14} /> {isExporting ? 'Exporting...' : 'JSON Backup'}
+                      </button>
 
-              </div>
-            )}
-
-            {/* TAB 2: QUOTAS & THEMES */}
-            {activeTab === 'quotas' && (
-              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5 px-1">
-                  <SlidersHorizontal size={14} className="text-cyan-500" /> Leave Quotas, Colors & Category Names
-                </span>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  
-                  {/* PL Tumbler */}
-                  <AppleWheelPicker
-                    code="PL"
-                    label="Privileged Leave"
-                    value={currentQuotas.pl}
-                    onChange={(val) => setCurrentQuotas(q => ({ ...q, pl: val }))}
-                    min={0} max={30}
-                    customName={currentNames.pl}
-                    onCustomNameChange={(val) => setCurrentNames(n => ({ ...n, pl: val }))}
-                    color={currentColors.pl}
-                    onColorChange={(val) => setCurrentColors(c => ({ ...c, pl: val }))}
-                  />
-
-                  {/* EL Tumbler */}
-                  <AppleWheelPicker
-                    code="EL"
-                    label="Emergency Leave"
-                    value={currentQuotas.el}
-                    onChange={(val) => setCurrentQuotas(q => ({ ...q, el: val }))}
-                    min={0} max={20}
-                    customName={currentNames.el}
-                    onCustomNameChange={(val) => setCurrentNames(n => ({ ...n, el: val }))}
-                    color={currentColors.el}
-                    onColorChange={(val) => setCurrentColors(c => ({ ...c, el: val }))}
-                  />
-
-                  {/* RH Tumbler */}
-                  <AppleWheelPicker
-                    code="RH"
-                    label="Extra Leave"
-                    value={currentQuotas.rh}
-                    onChange={(val) => setCurrentQuotas(q => ({ ...q, rh: val }))}
-                    min={0} max={10}
-                    customName={currentNames.rh}
-                    onCustomNameChange={(val) => setCurrentNames(n => ({ ...n, rh: val }))}
-                    color={currentColors.rh}
-                    onColorChange={(val) => setCurrentColors(c => ({ ...c, rh: val }))}
-                  />
-
-                  {/* WFH Tumbler */}
-                  <AppleWheelPicker
-                    code="WFH"
-                    label="Monthly WFH"
-                    value={currentQuotas.wfh}
-                    onChange={(val) => setCurrentQuotas(q => ({ ...q, wfh: val }))}
-                    min={0} max={20}
-                    customName={currentNames.wfh}
-                    onCustomNameChange={(val) => setCurrentNames(n => ({ ...n, wfh: val }))}
-                    color={currentColors.wfh}
-                    onColorChange={(val) => setCurrentColors(c => ({ ...c, wfh: val }))}
-                  />
-
-                </div>
-
-                {/* Daily Attendance Check-in Prompt Preference */}
-                <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
-                      <Clock size={14} className="text-amber-500" /> Attendance Check-in Prompt Time
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                      Time of day to prompt for unbooked workdays (WFH vs In-Office)
-                    </span>
+                      <button
+                        type="button"
+                        onClick={handleExportCsv}
+                        disabled={isExportingCsv}
+                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+                      >
+                        <Table size={14} /> {isExportingCsv ? 'Generating...' : 'Spreadsheet (CSV)'}
+                      </button>
+                    </div>
                   </div>
-                  <select
-                    value={wfhPromptHour}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setWfhPromptHour(val);
-                      localStorage.setItem('wfh_prompt_hour', val);
-                    }}
-                    className="bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer"
-                  >
-                    {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
-                      const period = h >= 12 ? 'PM' : 'AM';
-                      const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-                      return (
-                        <option key={h} value={h}>
-                          {displayH}:00 {period}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </div>
-            )}
 
-            {/* TAB 3: DATA & BACKUPS */}
-            {activeTab === 'backup' && (
-              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                
-                {backupStatusMsg && (
-                  <div className={`p-3.5 rounded-2xl border text-xs flex gap-2.5 items-start ${
-                    backupStatusMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
-                  }`}>
-                    {backupStatusMsg.type === 'success' ? <CheckCircle2 size={16} className="flex-shrink-0 mt-0.5" /> : <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />}
-                    <span>{backupStatusMsg.text}</span>
+                  {/* Import Section */}
+                  <div className="bg-muted/40 border border-border/80 rounded-3xl p-4 flex flex-col gap-3">
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-foreground block">Restore / Import File</span>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                        Upload a previously exported `.json` file to restore your leaves, WFH logs, and plans into this account.
+                      </p>
+                    </div>
+                    <label className="w-full py-3 bg-card border border-border hover:bg-muted text-foreground rounded-2xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm">
+                      <Upload size={15} /> {isImporting ? 'Importing into Supabase...' : 'Select Backup JSON File'}
+                      <input type="file" accept=".json" onChange={handleFileImport} className="hidden" disabled={isImporting} />
+                    </label>
                   </div>
-                )}
 
-                {/* Export Section */}
-                <div className="bg-muted/40 border border-border/80 rounded-3xl p-4 flex flex-col gap-3">
-                  <div>
-                    <span className="text-xs font-black uppercase tracking-wider text-foreground block">Export Account Data</span>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                      Export your PL/EL/RH leaves, WFH logs, and trip plans into JSON backup or CSV spreadsheets.
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleExportJson}
-                      disabled={isExporting}
-                      className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
-                    >
-                      <Download size={14} /> {isExporting ? 'Exporting...' : 'JSON Backup'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleExportCsv}
-                      disabled={isExportingCsv}
-                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
-                    >
-                      <Table size={14} /> {isExportingCsv ? 'Generating...' : 'Spreadsheet (CSV)'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Import Section */}
-                <div className="bg-muted/40 border border-border/80 rounded-3xl p-4 flex flex-col gap-3">
-                  <div>
-                    <span className="text-xs font-black uppercase tracking-wider text-foreground block">Restore / Import File</span>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                      Upload a previously exported `.json` file to restore your leaves, WFH logs, and plans into this account.
-                    </p>
-                  </div>
-                  <label className="w-full py-3 bg-card border border-border hover:bg-muted text-foreground rounded-2xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm">
-                    <Upload size={15} /> {isImporting ? 'Importing into Supabase...' : 'Select Backup JSON File'}
-                    <input type="file" accept=".json" onChange={handleFileImport} className="hidden" disabled={isImporting} />
-                  </label>
-                </div>
-
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
           </div>
 

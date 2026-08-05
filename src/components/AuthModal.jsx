@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, UserPlus, Mail, Lock, User, ArrowRight, ShieldCheck, X, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, isSupabaseConfigured } from '../services/authService';
@@ -11,11 +11,37 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [name, setName] = useState(currentProfile.name || '');
-  const [companyName, setCompanyName] = useState(currentProfile.companyName || '');
+  const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyEmailSent, setVerifyEmailSent] = useState(false);
+
+  // Clear fields appropriately on mode change or modal open
+  const handleSwitchMode = (newMode) => {
+    setMode(newMode);
+    setErrorMsg('');
+    setPassword('');
+    setConfirmPassword('');
+    if (newMode === 'signup') {
+      setName('');
+      setEmail('');
+      setCompanyName('');
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg('');
+      setPassword('');
+      setConfirmPassword('');
+      if (mode === 'signup') {
+        setName('');
+        setEmail('');
+        setCompanyName('');
+      }
+    }
+  }, [isOpen, mode]);
 
   if (!isOpen) return null;
 
@@ -178,7 +204,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
               <div className="flex border-b border-border dark:border-zinc-800 bg-muted/20 dark:bg-[#181818]">
                 <button
                   type="button"
-                  onClick={() => { setMode('login'); setErrorMsg(''); }}
+                  onClick={() => handleSwitchMode('login')}
                   className={`flex-1 py-3 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 ${
                     mode === 'login' ? 'border-b-2 border-primary dark:border-white text-foreground dark:text-white bg-card dark:bg-[#121212]' : 'text-muted-foreground dark:text-zinc-400 hover:text-foreground'
                   }`}
@@ -187,7 +213,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMode('signup'); setErrorMsg(''); }}
+                  onClick={() => handleSwitchMode('signup')}
                   className={`flex-1 py-3 text-xs font-bold font-mono transition-colors flex items-center justify-center gap-2 ${
                     mode === 'signup' ? 'border-b-2 border-primary dark:border-white text-foreground dark:text-white bg-card dark:bg-[#121212]' : 'text-muted-foreground dark:text-zinc-400 hover:text-foreground'
                   }`}
@@ -246,6 +272,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Display Name"
+                        autoComplete="off"
                         className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                     </div>
@@ -255,6 +282,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         placeholder="Company / Workplace (Optional e.g. Google)"
+                        autoComplete="off"
                         className="w-full bg-muted/40 border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                     </div>
@@ -269,6 +297,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email Address"
                     required
+                    autoComplete={mode === 'signup' ? 'off' : 'username'}
                     className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
@@ -282,6 +311,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
                     required
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                   <button
@@ -304,6 +334,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm Password"
                       required
+                      autoComplete="new-password"
                       className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                     <button

@@ -70,7 +70,12 @@
   * {
     @apply border-border;
   }
+  html {
+    background-color: hsl(var(--background));
+    height: 100%;
+  }
   body {
+    min-height: 100dvh;
     @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 select-none;
     transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease-out;
   }
