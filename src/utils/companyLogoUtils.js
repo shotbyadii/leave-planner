@@ -109,14 +109,8 @@ export const getCompanyLogoUrl = (companyInput) => {
     return trimmed;
   }
 
-  // Extract domain pattern (e.g., google.com or google)
-  let domain = trimmed.toLowerCase();
-  if (!domain.includes('.')) {
-    // Standard company name without dot: append .com for logo lookup (e.g. microsoft -> microsoft.com)
-    domain = `${domain.replace(/\s+/g, '')}.com`;
-  }
-
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+  // Unrecognized company name: return null to display crisp company initials badge!
+  return null;
 };
 
 /**
