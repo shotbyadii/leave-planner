@@ -4,7 +4,7 @@ import { addLeave, removeLeave, createLeavePlan } from '../services/leaveService
 import LeaveSelectionBar from './LeaveSelectionBar';
 import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 
 const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave }) => {
   const year = 2026;
@@ -376,14 +376,16 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
     return (
       <motion.div
-        layoutId={`month-card-${monthIndex}`}
-        key={`${monthIndex}-${isDarkMode ? 'dark' : 'light'}`}
+        layoutId={isMobile ? undefined : `month-card-${monthIndex}`}
+        layout={isMobile ? false : true}
+        key={`month-${monthIndex}`}
         onClick={onClick}
         whileHover={onClick ? { scale: 1.015 } : {}}
-        initial={{ opacity: 0.92, filter: 'blur(1px)' }}
-        animate={{ opacity: 1, filter: 'blur(0px)' }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className={`${cardBg} border flex flex-col transition-all duration-300 transform-gpu origin-center overflow-hidden ${isLarge ? 'p-4 md:p-6 rounded-2xl' : (isMini ? 'p-1.5 md:p-2.5 rounded-xl h-auto md:h-full aspect-square md:aspect-auto flex flex-col justify-start md:justify-between gap-0.5 md:gap-0' : 'p-5 rounded-2xl hover:border-foreground/20')} ${opacityClass} ${wrapperClasses}`}
+        transition={{
+          layout: { type: 'spring', stiffness: 135, damping: 21, mass: 0.95 },
+          opacity: { duration: 0.2 }
+        }}
+        className={`${cardBg} border flex flex-col transition-[opacity,background-color,border-color] duration-300 ease-out transform-gpu origin-top-left overflow-hidden ${isLarge ? 'p-4 md:p-6 rounded-2xl min-h-[300px]' : (isMini ? 'p-1.5 md:p-2.5 rounded-xl h-auto md:h-full flex flex-col justify-start md:justify-between gap-0.5 md:gap-0' : 'p-5 rounded-2xl hover:border-foreground/20')} ${isPastMonth && !isLarge ? 'opacity-50 hover:opacity-90' : opacityClass} ${wrapperClasses}`}
       >
         <div className={`flex justify-between items-center ${isLarge ? 'mb-4' : (isMini ? 'mb-2' : 'mb-4')}`}>
           <div className="flex items-center gap-2">
@@ -435,7 +437,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
   };
 
   return (
-    <>
+    <LayoutGroup id="calendar-cards">
       <div className="flex flex-col gap-6 relative z-10 h-full">
         <div className="flex justify-between items-center w-full">
           <h2 className="text-lg font-bold text-foreground">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
@@ -449,18 +451,49 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           </div>
         </div>
 
-        {viewMode === 'yearly' ? (
-          <motion.div layout className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6">
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, null, "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
+        {isMobile ? (
+          <motion.div layout transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} className="w-full">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={`mobile-view-${viewMode}-${focusedMonth}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="w-full"
+              >
+                {viewMode === 'yearly' ? (
+                  <div className="grid grid-cols-3 md:grid-cols-2 gap-2 p-1 pb-6">
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 items-start p-1 w-full">
+                    <div className="w-full">{renderMonth(focusedMonth, true)}</div>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </motion.div>
         ) : (
-          <motion.div layout className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)] p-1">
-            <div className="flex-1 flex justify-start w-full relative z-10">
-              <div className="w-full">{renderMonth(focusedMonth, true)}</div>
-            </div>
-            <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto h-full p-2 pb-24 no-scrollbar relative z-10">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-40 hover:opacity-100' : 'opacity-100'}`, () => setFocusedMonth(m)))}
-            </div>
+          <motion.div 
+            layout 
+            transition={{ layout: { type: 'spring', stiffness: 130, damping: 22, mass: 1 } }}
+            className="w-full overflow-visible"
+          >
+            {viewMode === 'yearly' ? (
+              <div className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6 overflow-visible">
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)] p-1 overflow-visible">
+                <div className="flex-1 flex justify-start w-full relative z-10 overflow-visible">
+                  <div className="w-full">{renderMonth(focusedMonth, true)}</div>
+                </div>
+                <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto overflow-x-visible h-full p-2 pb-24 no-scrollbar relative z-10">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => setFocusedMonth(m)))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
@@ -480,7 +513,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           />
         )}
       </AnimatePresence>
-    </>
+    </LayoutGroup>
   );
 };
 

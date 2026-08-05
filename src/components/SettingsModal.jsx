@@ -206,10 +206,10 @@ const SettingsModal = ({
                   <img 
                     src={effectiveAvatar} 
                     alt={userName} 
-                    className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl object-cover shadow-md border-2 border-primary/20" 
+                    className="w-24 h-24 md:w-28 md:h-28 rounded-2xl md:rounded-3xl object-cover shadow-xl border-4 border-primary/20" 
                   />
                 ) : (
-                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-primary text-primary-foreground font-black text-base md:text-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                  <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-primary text-primary-foreground font-black text-2xl md:text-3xl flex items-center justify-center shadow-xl shadow-primary/20 border-4 border-primary/20">
                     {initials}
                   </div>
                 )}
@@ -219,9 +219,9 @@ const SettingsModal = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Change Profile Photo"
-                  className="absolute -bottom-1 -right-1 p-1 bg-primary text-primary-foreground rounded-lg md:rounded-xl shadow-md hover:scale-110 active:scale-95 transition-all"
+                  className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all border-2 border-background cursor-pointer"
                 >
-                  <Camera size={11} />
+                  <Camera size={14} />
                 </button>
                 <input 
                   ref={fileInputRef} 
@@ -234,8 +234,8 @@ const SettingsModal = ({
 
               {/* User Name */}
               <div className="flex flex-col min-w-0 flex-1">
-                <h4 className="text-xs md:text-sm font-black text-foreground truncate leading-tight">{name || userName}</h4>
-                <span className="text-[10px] md:text-[11px] text-muted-foreground font-medium truncate">{currentUser?.email || 'User Account'}</span>
+                <h4 className="text-sm md:text-base font-black text-foreground truncate leading-tight">{name || userName}</h4>
+                <span className="text-[10px] md:text-xs text-muted-foreground font-medium truncate">{currentUser?.email || 'User Account'}</span>
               </div>
 
               {/* Company Badge with Automagical Logo */}
