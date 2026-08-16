@@ -154,7 +154,8 @@
 
 /* Subtle pulse style for text input targets like Plan Name */
 input[data-tutorial-target="true"],
-#tutorial-step-plan-name[data-tutorial-target="true"] {
+#tutorial-step-plan-name[data-tutorial-target="true"],
+#tutorial-step-plan-name-mobile[data-tutorial-target="true"] {
   outline: 2px solid #3b82f6 !important;
   outline-offset: 2px !important;
   animation: tutorialInputPulse 1.8s infinite ease-in-out !important;

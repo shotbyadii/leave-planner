@@ -10,6 +10,7 @@ const DevToolsModal = ({
   setDevDateStr, 
   setHasPromptedWfh,
   onStartNewUserFlow,
+  onStartTutorial,
   onOpenWfhCheckin,
   calendarStyle = 'capsule',
   onSetCalendarStyle,
@@ -214,6 +215,18 @@ const DevToolsModal = ({
                 className="w-full p-3 bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer font-mono"
               >
                 <Sparkles size={15} /> Trigger Attendance Check-in Modal
+              </button>
+
+              {/* 6. Launch Guided Walkthrough Tour */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onStartTutorial) onStartTutorial();
+                }}
+                className="w-full p-3 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer font-mono"
+              >
+                <Play size={15} /> Launch Guided Tutorial (7-Step Tour)
               </button>
             </div>
           </motion.div>

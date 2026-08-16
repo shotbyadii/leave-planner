@@ -44,31 +44,57 @@ const TutorialOverlay = ({
         el.removeAttribute('data-tutorial-target');
       });
 
-      let el = document.querySelector(currentStep.targetSelector);
-      if (el) {
-        el.setAttribute('data-tutorial-target', 'true');
+      if (currentStep.targetSelector) {
+        document.querySelectorAll(currentStep.targetSelector).forEach(el => {
+          el.setAttribute('data-tutorial-target', 'true');
+        });
       }
 
       // Dual highlight for Step 5: Highlight Plan Name box simultaneously
       if (currentStep.id === 5) {
-        const nameEl = document.querySelector('#tutorial-step-plan-name');
-        if (nameEl) {
+        document.querySelectorAll('#tutorial-step-plan-name, #tutorial-step-plan-name-mobile').forEach(nameEl => {
           nameEl.setAttribute('data-tutorial-target', 'true');
-        }
+        });
       }
     };
 
     updateTargetDOM();
     const t1 = setTimeout(updateTargetDOM, 50);
     const t2 = setTimeout(updateTargetDOM, 150);
-    const t3 = setTimeout(updateTargetDOM, 350);
-    const t4 = setTimeout(updateTargetDOM, 600);
+    const t3 = setTimeout(updateTargetDOM, 300);
+    const t4 = setTimeout(updateTargetDOM, 500);
+    const t5 = setTimeout(updateTargetDOM, 800);
+    const t6 = setTimeout(updateTargetDOM, 1200);
+
+    // Auto-scroll target element into view
+    const scrollToTarget = () => {
+      const targetEl = document.querySelector(currentStep.targetSelector);
+      if (targetEl && typeof targetEl.scrollIntoView === 'function') {
+        try {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {
+          // ignore fallback
+        }
+      }
+    };
+
+    scrollToTarget();
+    const s1 = setTimeout(scrollToTarget, 100);
+    const s2 = setTimeout(scrollToTarget, 300);
+    const s3 = setTimeout(scrollToTarget, 600);
+    const s4 = setTimeout(scrollToTarget, 1000);
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
+      clearTimeout(t5);
+      clearTimeout(t6);
+      clearTimeout(s1);
+      clearTimeout(s2);
+      clearTimeout(s3);
+      clearTimeout(s4);
     };
   }, [currentStepIndex, currentStep]);
 
@@ -97,76 +123,128 @@ const TutorialOverlay = ({
     }
   };
 
+  // Dynamic docking:
+  // - Steps 5 & 6 (index 4 & 5): Dock directly above the mobile confirm modal
+  const [mobileModalBottomOffset, setMobileModalBottomOffset] = React.useState(null);
+
+  React.useEffect(() => {
+    const updateModalDockPosition = () => {
+      if (typeof window === 'undefined' || window.innerWidth >= 768) {
+        setMobileModalBottomOffset(null);
+        return;
+      }
+      if (currentStepIndex === 4 || currentStepIndex === 5) {
+        const modalDock = document.querySelector('#mobile-floating-dock');
+        if (modalDock) {
+          const rect = modalDock.getBoundingClientRect();
+          // Distance from bottom of viewport to top of modal + 8px gap
+          const bottomFromViewport = Math.max(16, window.innerHeight - rect.top + 8);
+          setMobileModalBottomOffset(bottomFromViewport);
+          return;
+        }
+      }
+      setMobileModalBottomOffset(null);
+    };
+
+    updateModalDockPosition();
+    const interval = setInterval(updateModalDockPosition, 60);
+    window.addEventListener('resize', updateModalDockPosition);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', updateModalDockPosition);
+    };
+  }, [currentStepIndex]);
+
+  // Dynamic mobile positioning:
+  // - Steps 1-4: Place at BOTTOM (bottom-24) above navbar & selection bar
+  // - Steps 5-6: Placed dynamically right above the confirmation modal
+  // - Step 7: Place at TOP (top-3) on Tracker page
+  const isBottomStep = currentStepIndex <= 3;
+  const isModalStep = currentStepIndex === 4 || currentStepIndex === 5;
+
+  let mobilePositionClass = "top-3 left-3 right-3";
+  if (isBottomStep) {
+    mobilePositionClass = "bottom-24 left-3 right-3";
+  } else if (isModalStep && mobileModalBottomOffset !== null) {
+    mobilePositionClass = "left-3 right-3";
+  }
+
+  const dynamicStyle = (isModalStep && mobileModalBottomOffset !== null) 
+    ? { bottom: `${mobileModalBottomOffset}px` } 
+    : {};
+
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <div 
         id="tutorial-hint-card"
-        className="fixed top-4 left-4 right-4 md:top-auto md:bottom-8 md:right-8 md:left-auto z-[99999] pointer-events-auto max-w-md w-[calc(100vw-32px)] md:w-96 mx-auto"
+        key={`hint-pos-${isModalStep ? 'modal-dock' : isBottomStep ? 'bottom' : 'top'}`}
+        style={dynamicStyle}
+        className={`fixed ${mobilePositionClass} md:top-auto md:bottom-8 md:right-8 md:left-auto md:!bottom-8 z-[99999] pointer-events-auto max-w-md w-[calc(100vw-24px)] md:w-96 mx-auto transition-[bottom] duration-150`}
       >
         <motion.div
           key={`step-card-${currentStepIndex}`}
-          initial={{ opacity: 0, y: 16, scale: 0.96 }}
+          initial={{ opacity: 0, y: isBottomStep || isModalStep ? 10 : -10, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.96 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-          className="bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-3xl p-5 md:p-6 flex flex-col gap-3.5 relative overflow-hidden"
+          exit={{ opacity: 0, y: isBottomStep || isModalStep ? 10 : -10, scale: 0.97 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="bg-card/95 dark:bg-[#0e0e12]/95 backdrop-blur-xl border border-border shadow-2xl rounded-2xl sm:rounded-3xl p-3.5 sm:p-4.5 flex flex-col gap-2.5 relative overflow-hidden"
         >
           {/* Step Header & Badge */}
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-wider font-mono flex items-center gap-1">
-                <Play size={10} className="fill-primary" /> Step {currentStepIndex + 1} of {TUTORIAL_STEPS.length}
+            <div className="flex items-center gap-1.5">
+              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-wider font-mono flex items-center gap-1">
+                <Play size={9} className="fill-primary" /> Step {currentStepIndex + 1}/{TUTORIAL_STEPS.length}
               </span>
               <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border text-[9px] font-mono font-bold flex items-center gap-1">
-                <ShieldAlert size={10} className="text-amber-500" /> Walkthrough Mode
+                <ShieldAlert size={9} className="text-amber-500" /> Walkthrough Mode
               </span>
             </div>
 
             <button
               type="button"
               onClick={onSkip}
-              className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-muted/50"
             >
-              Skip <X size={14} />
+              Skip <X size={13} />
             </button>
           </div>
 
           {/* Step Title & Description */}
-          <div className="flex flex-col gap-1.5">
-            <h3 className="text-base md:text-lg font-black text-foreground">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm sm:text-base font-black text-foreground leading-snug">
               {currentStep.title}
             </h3>
-            <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {currentStep.description}
             </p>
             {!isLastStep && (
-              <div className="mt-1 flex items-center gap-1 text-[11px] font-bold text-primary">
-                <MousePointerClick size={12} /> Click pulsing target element or Next Action below
+              <div className="flex items-center gap-1 text-[10px] font-bold text-primary">
+                <MousePointerClick size={11} /> Tap highlighted target or Next Action below
               </div>
             )}
           </div>
 
           {/* Navigation Buttons Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-border/60 mt-1">
+          <div className="flex items-center justify-between pt-2 border-t border-border/60">
             <button
               type="button"
               onClick={handlePrev}
               disabled={isFirstStep}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
                 isFirstStep
                   ? 'opacity-30 cursor-not-allowed text-muted-foreground'
                   : 'bg-muted hover:bg-muted/80 text-foreground cursor-pointer'
               }`}
             >
-              <ChevronLeft size={14} /> Previous
+              <ChevronLeft size={13} /> Prev
             </button>
 
             <button
               type="button"
               onClick={handleNext}
-              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
             >
-              {isLastStep ? 'Finish Tour' : 'Next Action'} <ChevronRight size={14} />
+              {isLastStep ? 'Finish Tour' : 'Next Action'} <ChevronRight size={13} />
             </button>
           </div>
         </motion.div>
