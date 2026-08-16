@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { publicHolidays, isHoliday, isWeekend } from './data/holidays';
+import { publicHolidays, isHoliday, isWeekend, getStoredHolidays, loadHolidaysFromSupabase } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
 import { fetchBookedLeaves, fetchLeavePlans, resetAllLeaves, removeLeave, deleteLeavePlan, updateLeavePlan, addLeave, createLeavePlan } from './services/leaveService';
 import Calendar from './components/Calendar';
@@ -15,6 +15,7 @@ import NotificationPromptModal from './components/NotificationPromptModal';
 import BackupModal from './components/BackupModal';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
+import HolidayManager from './components/HolidayManager';
 import AuthModal from './components/AuthModal';
 import ProfileModal from './components/ProfileModal';
 import SplashScreen from './components/SplashScreen';
@@ -27,6 +28,8 @@ import { getCurrentUser, signOutUser, fetchUserProfile, upsertUserProfile, delet
 import { supabase } from './lib/supabase';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
 import { getCompanyLogoUrl, getCompanyInitials } from './utils/companyLogoUtils';
+import TutorialOverlay from './components/TutorialOverlay';
+import { isTutorialCompleted, markTutorialCompleted, resetTutorialStatus } from './services/tutorialService';
 import './index.css';
 
 function App() {
@@ -45,6 +48,9 @@ function App() {
   const [companyName, setCompanyName] = useState(localStorage.getItem('company_name') || '');
   const [companyLogoUrl, setCompanyLogoUrl] = useState(localStorage.getItem('company_logo_url') || '');
   const [avatarUrl, setAvatarUrl] = useState(localStorage.getItem('avatar_url') || '');
+  const [isTutorialActive, setIsTutorialActive] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const [tutorialCustomName, setTutorialCustomName] = useState('Sep Getaway (Walkthrough Demo)');
   
   const [leaveNames, setLeaveNames] = useState(() => {
     try {
@@ -73,6 +79,21 @@ function App() {
   const [bookedDates, setBookedDates] = useState([]);
   const [leavePlans, setLeavePlans] = useState([]);
   const [previewDates, setPreviewDates] = useState([]);
+
+  // Reactive Custom Company Public Holidays State
+  const [currentHolidays, setCurrentHolidays] = useState(() => getStoredHolidays());
+
+  useEffect(() => {
+    // Initial sync from Supabase cloud database
+    loadHolidaysFromSupabase();
+
+    const handleHolidaysUpdated = (e) => {
+      if (e.detail) setCurrentHolidays(e.detail);
+      else setCurrentHolidays(getStoredHolidays());
+    };
+    window.addEventListener('company_holidays_updated', handleHolidaysUpdated);
+    return () => window.removeEventListener('company_holidays_updated', handleHolidaysUpdated);
+  }, []);
   const [hoveredSuggestion, setHoveredSuggestion] = useState(null);
   const [calendarViewMode, setCalendarViewMode] = useState(window.innerWidth < 768 ? 'monthly' : 'yearly');
   const [calendarFocusedMonth, setCalendarFocusedMonth] = useState(new Date().getMonth());
@@ -91,6 +112,12 @@ function App() {
   const [isExportingMobile, setIsExportingMobile] = useState(false);
   const [isExportingCsvMobile, setIsExportingCsvMobile] = useState(false);
   const [isImportingMobile, setIsImportingMobile] = useState(false);
+  const [mobileHolidaysStagingState, setMobileHolidaysStagingState] = useState({
+    isStaging: false,
+    stagedCount: 0,
+    confirmStaging: null,
+    discardStaging: null
+  });
   const mobileAvatarFileRef = useRef(null);
 
   const handleMobileAvatarUpload = (e) => {
@@ -922,7 +949,7 @@ function App() {
                   className="flex flex-col gap-6"
                 >
                   <Calendar 
-                    holidays={publicHolidays} 
+                    holidays={currentHolidays} 
                     bookedDates={bookedDates}
                     setBookedDates={setBookedDates}
                     leaves={leaves}
@@ -939,6 +966,7 @@ function App() {
                     selectionStart={selectionStart}
                     setSelectionStart={setSelectionStart}
                     onMobileConfirm={() => setMobileConfirmOpen(true)}
+                    onAdvanceTutorial={isTutorialActive ? () => setTutorialStepIndex(prev => prev + 1) : undefined}
                     leavePlans={leavePlans}
                     todayDate={getTodayDate()}
                     calendarStyle={calendarStyle}
@@ -1024,8 +1052,8 @@ function App() {
       <div className="md:hidden fixed bottom-6 left-0 right-0 z-[50] flex justify-center px-4 pointer-events-none">
         <motion.div
           layout
-          transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-          className={`pointer-events-auto overflow-hidden border border-border/80 backdrop-blur-2xl shadow-[0_12px_40px_-5px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] ${
+          transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
+          className={`pointer-events-auto overflow-hidden border border-border/80 backdrop-blur-2xl transition-[border-radius,background-color,box-shadow,width,max-width] duration-200 shadow-[0_12px_40px_-5px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] ${
             isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null
               ? 'w-full rounded-[28px] bg-card/95 dark:bg-card/95'
               : (selectionStart !== null || previewDates.length > 0)
@@ -1033,13 +1061,13 @@ function App() {
                 : 'w-full max-w-sm rounded-[28px] bg-card/95 dark:bg-card/95'
           }`}
         >
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="wait">
 
           {/* ── EXISTING LEAVE DETAIL MORPHING STATE ── */}
           {viewingLeave && !isMobileMenuOpen && (
-            <motion.div layout key="viewing-leave"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+            <motion.div key="viewing-leave"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
               className="max-h-[82vh] overflow-y-auto no-scrollbar bg-card"
             >
               {/* Handle */}
@@ -1087,9 +1115,9 @@ function App() {
 
           {/* ── MENU STATE ── */}
           {isMobileMenuOpen && (
-            <motion.div layout key="menu"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+            <motion.div key="menu"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
               className="max-h-[85vh] overflow-y-auto no-scrollbar"
             >
               {/* Handle */}
@@ -1231,13 +1259,7 @@ function App() {
                       <Save size={14} /> Save Profile Changes
                     </button>
 
-                    <button 
-                      type="button" 
-                      onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('quotas'); }}
-                      className="w-full py-2.5 bg-muted border border-border text-foreground text-xs font-bold rounded-xl flex items-center justify-center gap-2"
-                    >
-                      <SlidersHorizontal size={14} className="text-purple-500" /> Edit Quotas & Colors
-                    </button>
+
 
                     <button 
                       type="button" 
@@ -1289,9 +1311,10 @@ function App() {
                   </div>
 
                   {/* Navigation Bar Aesthetic Tab Switcher */}
-                  <div className="flex bg-muted p-1 rounded-2xl border border-border/80 gap-1">
+                  <div className="flex bg-muted p-1 rounded-2xl border border-border/80 gap-1 overflow-x-auto no-scrollbar">
                     {[
-                      { id: 'quotas', label: 'Quotas & Themes', icon: SlidersHorizontal },
+                      { id: 'quotas', label: 'Quotas', icon: SlidersHorizontal },
+                      { id: 'holidays', label: 'Public Holidays', icon: Clock },
                       { id: 'backup', label: 'Backups', icon: FileText }
                     ].map(tab => {
                       const Icon = tab.icon;
@@ -1300,12 +1323,12 @@ function App() {
                         <button
                           key={tab.id}
                           onClick={() => setMobileSettingsTab(tab.id)}
-                          className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all flex-shrink-0 ${
                             isActive ? 'bg-background shadow-apple-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
                           }`}
                         >
                           <Icon size={13} className={isActive ? 'text-primary' : ''} />
-                          <span>{tab.label}</span>
+                          <span className="whitespace-nowrap">{tab.label}</span>
                         </button>
                       );
                     })}
@@ -1398,6 +1421,21 @@ function App() {
                             })}
                           </select>
                         </div>
+                      </motion.div>
+                    ) : mobileSettingsTab === 'holidays' ? (
+                      <motion.div
+                        key="holidays"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.18, ease: "easeInOut" }}
+                        className="flex flex-col gap-2 min-h-[380px] max-h-[72vh] overflow-hidden"
+                      >
+                        <HolidayManager 
+                          showTitle={false} 
+                          initialHolidays={currentHolidays}
+                          onStagingChange={setMobileHolidaysStagingState} 
+                        />
                       </motion.div>
                     ) : (
                       <motion.div
@@ -1499,35 +1537,66 @@ function App() {
                   )}
 
                   {/* Footer Action Buttons */}
-                  <div className="flex gap-2 pt-2 border-t border-border">
-                    <button 
-                      type="button" 
-                      onClick={() => setMobileSubView(null)} 
-                      className="flex-1 py-2.5 bg-muted text-foreground text-xs font-bold rounded-xl"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        handleSaveSettings({
-                          name: mobileFormName,
-                          companyName: mobileFormCompany,
-                          quotas: mobileFormQuotas,
-                          names: mobileFormNames,
-                          colors: mobileFormColors
-                        });
-                        setMobileToast('Settings Saved!');
-                        setTimeout(() => {
-                          setMobileToast('');
-                          setMobileSubView(null);
-                        }, 500);
-                      }} 
-                      className="flex-1 py-3 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-md flex items-center justify-center gap-1.5"
-                    >
-                      <Save size={14} /> Save Settings
-                    </button>
-                  </div>
+                  {mobileSettingsTab === 'holidays' && mobileHolidaysStagingState.isStaging ? (
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          if (mobileHolidaysStagingState.discardStaging) {
+                            mobileHolidaysStagingState.discardStaging();
+                          }
+                        }} 
+                        className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <X size={14} /> Discard
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          if (mobileHolidaysStagingState.confirmStaging) {
+                            mobileHolidaysStagingState.confirmStaging();
+                          }
+                          setMobileToast('Holidays Confirmed & Saved!');
+                          setTimeout(() => {
+                            setMobileToast('');
+                          }, 2000);
+                        }} 
+                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle2 size={15} /> Confirm & Save Holidays ({mobileHolidaysStagingState.stagedCount})
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <button 
+                        type="button" 
+                        onClick={() => setMobileSubView(null)} 
+                        className="flex-1 py-2.5 bg-muted text-foreground text-xs font-bold rounded-xl"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          handleSaveSettings({
+                            name: mobileFormName,
+                            companyName: mobileFormCompany,
+                            quotas: mobileFormQuotas,
+                            names: mobileFormNames,
+                            colors: mobileFormColors
+                          });
+                          setMobileToast('Settings Saved!');
+                          setTimeout(() => {
+                            setMobileToast('');
+                            setMobileSubView(null);
+                          }, 500);
+                        }} 
+                        className="flex-1 py-3 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-md flex items-center justify-center gap-1.5"
+                      >
+                        <Save size={14} /> Save Settings
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
 
               /* ── MAIN MENU SUBVIEW ── */
@@ -1651,11 +1720,11 @@ function App() {
             </motion.div>
           )}
 
-          {/* ── CONFIRMATION FORM STATE ── */}
-          {mobileConfirmOpen && !isMobileMenuOpen && (
-            <motion.div layout key="confirm-form"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+          {/* ── CONFIRM STATE ── */}
+          {mobileConfirmOpen && !isMobileMenuOpen && viewingLeave === null && (
+            <motion.div key="confirm"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
               className="flex flex-col max-h-[85vh] overflow-y-auto"
             >
               <div className="flex justify-center pt-3 pb-1">
@@ -1781,8 +1850,8 @@ function App() {
 
           {/* ── SELECTION STATE (date selected, not yet confirmed) ── */}
           {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && (selectionStart !== null || previewDates.length > 0) && (
-            <motion.div layout key="selection"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div key="selection"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
               className="flex items-center gap-3 px-4 h-[62px]"
             >
@@ -1818,8 +1887,8 @@ function App() {
             </motion.div>
           )}
           {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && selectionStart === null && previewDates.length === 0 && (
-            <motion.div layout key="nav"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div key="nav"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
             >
               {/* Mini usage bar */}
@@ -1937,16 +2006,40 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Desktop Selection Modal — Lifted for layering */}
-      <div className="hidden md:block">
+      {/* Selection Modal — Lifted for layering (desktop & mobile) */}
+      <div className="block">
         {((selectionStart || previewDates.length > 0)) && (
           <LeaveSelectionBar 
             selectionStart={selectionStart}
             previewDates={previewDates}
             bookedDates={bookedDates}
             leaveNames={leaveNames}
+            onAdvanceTutorial={isTutorialActive ? () => setTutorialStepIndex(prev => prev + 1) : undefined}
+            forceExpandModal={isTutorialActive && (tutorialStepIndex === 4 || tutorialStepIndex === 5)}
+            tutorialStepIndex={tutorialStepIndex}
             onCancel={() => { setSelectionStart(null); setPreviewDates([]); }}
             onApply={async (dates, type, note, planName, duration) => {
+              if (isTutorialActive) {
+                const finalName = planName || 'Sep Getaway (Walkthrough Demo)';
+                setTutorialCustomName(finalName);
+                setLeavePlans(prev => [
+                  {
+                    id: 'tutorial-demo-plan-temp',
+                    name: finalName,
+                    start_date: '2026-09-10',
+                    end_date: '2026-09-15',
+                    startDate: '2026-09-10',
+                    endDate: '2026-09-15',
+                    type: 'pl',
+                    is_demo: true
+                  },
+                  ...prev.filter(p => p.id !== 'tutorial-demo-plan-temp')
+                ]);
+                setPreviewDates([]);
+                setSelectionStart(null);
+                return;
+              }
+              if (planName) setTutorialCustomName(planName);
               // Reuse logic or call a common handler
               let planId = null;
               if (dates.length > 1) {
@@ -2000,38 +2093,46 @@ function App() {
       />
 
       {/* Unified Settings & Account Hub Modal */}
-      <SettingsModal
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-        userName={userName}
-        companyName={companyName}
-        avatarUrl={avatarUrl}
-        quotas={{
-          pl: leaves.pl.total,
-          el: leaves.el.total,
-          rh: leaves.rh.total,
-          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
-        }}
-        leaveNames={leaveNames}
-        leaveColors={leaveColors}
-        onSaveSettings={handleSaveSettings}
-        currentUser={currentUser}
-        onOpenAuthModal={() => setAuthModalOpen(true)}
-        onResetData={handleReset}
-        onDeleteAccount={handleDeleteAccount}
-        onSignOut={handleSignOut}
-        leavesQuota={leaves}
-        onImportSuccess={async (importedQuotaSettings) => {
-          await loadLeaves(currentUser);
-          if (importedQuotaSettings) {
-            setLeaves(prev => ({
-              pl: { ...prev.pl, total: importedQuotaSettings.pl || prev.pl.total },
-              el: { ...prev.el, total: importedQuotaSettings.el || prev.el.total },
-              rh: { ...prev.rh, total: importedQuotaSettings.rh || prev.rh.total }
-            }));
-          }
-        }}
-      />
+      <AnimatePresence>
+        {settingsModalOpen && (
+          <SettingsModal
+            isOpen={settingsModalOpen}
+            onClose={() => setSettingsModalOpen(false)}
+            userName={userName}
+            companyName={companyName}
+            avatarUrl={avatarUrl}
+            quotas={{
+              pl: leaves.pl.total,
+              el: leaves.el.total,
+              rh: leaves.rh.total,
+              wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+            }}
+            leaveNames={leaveNames}
+            leaveColors={leaveColors}
+            onSaveSettings={handleSaveSettings}
+            currentUser={currentUser}
+            onOpenAuthModal={() => setAuthModalOpen(true)}
+            onResetData={handleReset}
+            onDeleteAccount={handleDeleteAccount}
+            onSignOut={handleSignOut}
+            onReplayTutorial={() => {
+              setTutorialStepIndex(0);
+              setIsTutorialActive(true);
+            }}
+            leavesQuota={leaves}
+            onImportSuccess={async (importedQuotaSettings) => {
+              await loadLeaves(currentUser);
+              if (importedQuotaSettings) {
+                setLeaves(prev => ({
+                  pl: { ...prev.pl, total: importedQuotaSettings.pl || prev.pl.total },
+                  el: { ...prev.el, total: importedQuotaSettings.el || prev.el.total },
+                  rh: { ...prev.rh, total: importedQuotaSettings.rh || prev.rh.total }
+                }));
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Supabase & OAuth Multi-User Auth Modal */}
       <AuthModal
@@ -2081,8 +2182,103 @@ function App() {
           await handleSaveSettings(data);
           localStorage.setItem('onboarding_completed', 'true');
           setOnboardingOpen(false);
+          setTutorialStepIndex(0);
+          setIsTutorialActive(true);
         }}
       />
+
+      {/* Post-Onboarding Interactive Guided Tutorial Overlay & Self-Executing Demo */}
+      {isTutorialActive && (
+        <TutorialOverlay
+          currentStepIndex={tutorialStepIndex}
+          setCurrentStepIndex={setTutorialStepIndex}
+          onExecuteStepAction={(action) => {
+            switch (action) {
+              case 'prompt-open-month':
+                setActiveTab('calendar');
+                setCalendarViewMode('yearly');
+                setSelectionStart(null);
+                setPreviewDates([]);
+                break;
+              case 'select-start-date':
+                setActiveTab('calendar');
+                setCalendarViewMode('monthly');
+                setCalendarFocusedMonth(8); // September
+                setSelectionStart(null); // Wait for user to click Sept 10
+                setPreviewDates([]);
+                break;
+              case 'select-end-range':
+                setActiveTab('calendar');
+                setCalendarViewMode('monthly');
+                setCalendarFocusedMonth(8);
+                setSelectionStart('2026-09-10'); // Sept 10 active
+                setPreviewDates([]); // Wait for user to click Sept 15
+                break;
+              case 'prompt-confirm-plan':
+                setActiveTab('calendar');
+                setCalendarViewMode('monthly');
+                setCalendarFocusedMonth(8);
+                setSelectionStart('2026-09-10');
+                setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                break;
+              case 'select-modal-category':
+                setActiveTab('calendar');
+                setSelectionStart('2026-09-10');
+                setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                break;
+              case 'apply-modal-leave':
+                setActiveTab('calendar');
+                setSelectionStart('2026-09-10');
+                setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                break;
+              case 'review-created-plan':
+                setActiveTab('tracker');
+                setSelectionStart(null);
+                setPreviewDates([]);
+                // Inject temporary sandboxed demo plan for review step
+                setLeavePlans(prev => {
+                  if (prev.some(p => p.id === 'tutorial-demo-plan-temp')) return prev;
+                  return [
+                    {
+                      id: 'tutorial-demo-plan-temp',
+                      name: tutorialCustomName || 'Sep Getaway (Walkthrough Demo)',
+                      start_date: '2026-09-10',
+                      end_date: '2026-09-15',
+                      startDate: '2026-09-10',
+                      endDate: '2026-09-15',
+                      type: 'pl',
+                      is_demo: true
+                    },
+                    ...prev
+                  ];
+                });
+                break;
+              default:
+                break;
+            }
+          }}
+          onComplete={() => {
+            markTutorialCompleted();
+            setIsTutorialActive(false);
+            setSelectionStart(null);
+            setPreviewDates([]);
+            setHoveredSuggestion(null);
+            setActiveTab('calendar');
+            setCalendarViewMode('yearly');
+            setLeavePlans(prev => prev.filter(p => p.id !== 'tutorial-demo-plan-temp'));
+          }}
+          onSkip={() => {
+            markTutorialCompleted();
+            setIsTutorialActive(false);
+            setSelectionStart(null);
+            setPreviewDates([]);
+            setHoveredSuggestion(null);
+            setActiveTab('calendar');
+            setCalendarViewMode('yearly');
+            setLeavePlans(prev => prev.filter(p => p.id !== 'tutorial-demo-plan-temp'));
+          }}
+        />
+      )}
 
       {/* Developer Suite FAB & Modal (Local Builds Only) */}
       {import.meta.env.DEV && (

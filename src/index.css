@@ -130,3 +130,81 @@
 .animate-pulse-subtle {
   animation: pulse-subtle 3s infinite ease-in-out;
 }
+
+/* Native Tutorial Target Pulsing Effect */
+[data-tutorial-target="true"] {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 3px !important;
+  animation: tutorialElementPulse 1.6s infinite ease-in-out !important;
+  position: relative !important;
+  z-index: 9998 !important;
+  transition: all 0.3s ease !important;
+}
+
+@keyframes tutorialElementPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7), 0 0 15px rgba(59, 130, 246, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0), 0 0 25px rgba(59, 130, 246, 0.8);
+    transform: scale(1.04);
+  }
+}
+
+/* Subtle pulse style for text input targets like Plan Name */
+input[data-tutorial-target="true"],
+#tutorial-step-plan-name[data-tutorial-target="true"] {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  animation: tutorialInputPulse 1.8s infinite ease-in-out !important;
+  position: relative !important;
+  z-index: 9998 !important;
+  transform: none !important;
+}
+
+@keyframes tutorialInputPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5), 0 0 8px rgba(59, 130, 246, 0.3);
+    border-color: #3b82f6 !important;
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0), 0 0 18px rgba(59, 130, 246, 0.6);
+    border-color: #60a5fa !important;
+  }
+}
+
+/* Non-target element dimming when tutorial is active */
+body[data-tutorial-active="true"] .bg-card:not(#tutorial-step-calendar *):not(.z-\[9990\] *):not([data-tutorial-target="true"]):not(#tutorial-hint-card),
+body[data-tutorial-active="true"] .grid > [id^="month-card-"]:not([data-tutorial-target="true"]) {
+  opacity: 0.35 !important;
+  transition: opacity 0.3s ease !important;
+}
+
+body[data-tutorial-active="true"] #tutorial-step-calendar,
+body[data-tutorial-active="true"] .z-\[9990\],
+body[data-tutorial-active="true"] .z-\[9990\] *,
+body[data-tutorial-active="true"] [data-tutorial-target="true"] {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Lighten dark modal backdrop during tutorial so modal stays crystal bright */
+body[data-tutorial-active="true"] .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: none !important;
+}
+
+/* Disable pointer events on non-target elements when tutorial is active */
+body[data-tutorial-active="true"] button:not([data-tutorial-target="true"]):not([data-tutorial-target="true"] *):not(#tutorial-hint-card *),
+body[data-tutorial-active="true"] [id^="date-cell-"]:not([data-tutorial-target="true"]),
+body[data-tutorial-active="true"] [id^="month-card-"]:not([data-tutorial-target="true"]) {
+  pointer-events: none !important;
+}
+
+body[data-tutorial-active="true"] [data-tutorial-target="true"],
+body[data-tutorial-active="true"] [data-tutorial-target="true"] *,
+body[data-tutorial-active="true"] #tutorial-hint-card,
+body[data-tutorial-active="true"] #tutorial-hint-card * {
+  pointer-events: auto !important;
+}

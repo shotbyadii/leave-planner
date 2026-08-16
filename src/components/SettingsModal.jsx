@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
+import HolidayManager from './HolidayManager';
+import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 
@@ -27,6 +29,7 @@ const SettingsModal = ({
   onDeleteAccount,
   onSignOut,
   onImportSuccess,
+  onReplayTutorial,
   leavesQuota
 }) => {
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'quotas' | 'backup'
@@ -39,6 +42,32 @@ const SettingsModal = ({
   const [currentNames, setCurrentNames] = useState({ ...leaveNames });
   const [currentColors, setCurrentColors] = useState({ ...leaveColors });
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Holidays Staging State (from HolidayManager)
+  const [holidaysStagingState, setHolidaysStagingState] = useState({
+    isStaging: false,
+    stagedCount: 0,
+    confirmStaging: null,
+    discardStaging: null
+  });
+
+  const isDirty = (
+    name.trim() !== (userName || '').trim() ||
+    companyName.trim() !== (propCompanyName || '').trim() ||
+    avatarUrl !== propAvatarUrl ||
+    JSON.stringify(currentQuotas) !== JSON.stringify(quotas) ||
+    JSON.stringify(currentNames) !== JSON.stringify(leaveNames) ||
+    JSON.stringify(currentColors) !== JSON.stringify(leaveColors)
+  );
+
+  const handleDiscardChanges = () => {
+    setName(userName || '');
+    setCompanyName(propCompanyName || '');
+    setAvatarUrl(propAvatarUrl || '');
+    setCurrentQuotas({ ...quotas });
+    setCurrentNames({ ...leaveNames });
+    setCurrentColors({ ...leaveColors });
+  };
 
   // Deletion & Reset Inline States
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -160,10 +189,10 @@ const SettingsModal = ({
     e.target.value = '';
   };
 
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 md:p-6">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 md:p-6">
           {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }} 
@@ -206,10 +235,10 @@ const SettingsModal = ({
                   <img 
                     src={effectiveAvatar} 
                     alt={userName} 
-                    className="w-24 h-24 md:w-28 md:h-28 rounded-2xl md:rounded-3xl object-cover shadow-xl border-4 border-primary/20" 
+                    className="w-12 h-12 md:w-28 md:h-28 rounded-2xl md:rounded-3xl object-cover shadow-md md:shadow-xl border-2 md:border-4 border-primary/20" 
                   />
                 ) : (
-                  <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-primary text-primary-foreground font-black text-2xl md:text-3xl flex items-center justify-center shadow-xl shadow-primary/20 border-4 border-primary/20">
+                  <div className="w-12 h-12 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-primary text-primary-foreground font-black text-base md:text-3xl flex items-center justify-center shadow-md md:shadow-xl shadow-primary/20 border-2 md:border-4 border-primary/20">
                     {initials}
                   </div>
                 )}
@@ -219,9 +248,9 @@ const SettingsModal = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Change Profile Photo"
-                  className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all border-2 border-background cursor-pointer"
+                  className="absolute -bottom-1 -right-1 md:bottom-0 md:right-0 p-1 md:p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all border-2 border-background cursor-pointer"
                 >
-                  <Camera size={14} />
+                  <Camera size={11} className="md:w-3.5 md:h-3.5" />
                 </button>
                 <input 
                   ref={fileInputRef} 
@@ -261,6 +290,7 @@ const SettingsModal = ({
             <nav className="flex flex-row md:flex-col gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
               {[
                 { id: 'profile', label: 'Account & Profile', icon: User, color: 'text-primary' },
+                { id: 'holidays', label: 'Public Holidays', icon: Clock, color: 'text-amber-500' },
                 { id: 'quotas', label: 'Quotas & Themes', icon: SlidersHorizontal, color: 'text-cyan-500' },
                 { id: 'backup', label: 'Data & Backups', icon: FileText, color: 'text-blue-500' }
               ].map((tab) => {
@@ -289,13 +319,13 @@ const SettingsModal = ({
 
           </div>
 
-          {/* Left Footer Action: Sign Out & Close */}
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/60">
+          {/* Left Footer Action: Sign Out & Close (Desktop only) */}
+          <div className="hidden md:flex items-center gap-2 mt-4 pt-4 border-t border-border/60">
             {currentUser && (
               <button
                 type="button"
                 onClick={() => { onClose(); if (onSignOut) onSignOut(); }}
-                className="flex-1 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <LogOut size={13} /> Sign Out
               </button>
@@ -303,7 +333,7 @@ const SettingsModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="hidden md:flex p-2.5 text-muted-foreground hover:text-foreground bg-card hover:bg-muted rounded-xl transition-colors"
+              className="p-2.5 text-muted-foreground hover:text-foreground bg-card hover:bg-muted rounded-xl transition-colors cursor-pointer"
               title="Close Settings"
             >
               <X size={16} />
@@ -320,11 +350,13 @@ const SettingsModal = ({
             <div>
               <h3 className="text-base font-black text-foreground uppercase tracking-tight font-mono">
                 {activeTab === 'profile' && 'Account & Profile Settings'}
+                {activeTab === 'holidays' && 'Company Public Holidays'}
                 {activeTab === 'quotas' && 'Leave Quotas & Theme Palette'}
                 {activeTab === 'backup' && 'Data Restore & JSON Backups'}
               </h3>
               <p className="text-[11px] text-muted-foreground font-medium">
                 {activeTab === 'profile' && 'Customize your display name, company logo, and profile photo'}
+                {activeTab === 'holidays' && 'Manage approved company holidays and auto-extract from PDF/Images'}
                 {activeTab === 'quotas' && 'Set annual leave balances, custom category titles & color themes'}
                 {activeTab === 'backup' && 'Export JSON backups, CSV spreadsheets, or restore data'}
               </p>
@@ -336,16 +368,33 @@ const SettingsModal = ({
           </div>
 
           {/* Scrollable Content */}
-          <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5 no-scrollbar">
+          <div className={`p-5 flex-1 flex flex-col min-h-0 no-scrollbar ${activeTab === 'holidays' ? 'overflow-hidden' : 'overflow-y-auto gap-5'}`}>
             
             {savedSuccess && (
-              <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in zoom-in-95 duration-200 flex-shrink-0">
                 <CheckCircle2 size={16} /> Settings Saved Successfully!
               </div>
             )}
 
             {/* TAB CONTENT SWITCHER WITH ANIMATEPRESENCE */}
             <AnimatePresence mode="wait">
+              {activeTab === 'holidays' && (
+                <motion.div
+                  key="holidays"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                  className="h-full min-h-0 flex-1 flex flex-col overflow-hidden"
+                >
+                  <HolidayManager 
+                    showTitle={false} 
+                    initialHolidays={getStoredHolidays()} 
+                    onStagingChange={setHolidaysStagingState}
+                  />
+                </motion.div>
+              )}
+
               {activeTab === 'profile' && (
                 <motion.div 
                   key="profile"
@@ -422,6 +471,30 @@ const SettingsModal = ({
                         <Camera size={13} /> Upload Photo
                       </button>
                     </div>
+                  </div>
+
+                  {/* Replay Interactive Tutorial Button */}
+                  <div className="bg-primary/5 border border-primary/20 rounded-3xl p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-primary/10 text-primary rounded-2xl">
+                        <RotateCw size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground leading-tight">Interactive Walkthrough</h4>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Replay the guided feature tour and trial sandbox anytime.</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onReplayTutorial) onReplayTutorial();
+                      }}
+                      className="px-3.5 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl text-xs font-bold shadow-sm transition-all flex-shrink-0 cursor-pointer"
+                    >
+                      Replay Tour
+                    </button>
                   </div>
 
                   {/* Danger Zone: Reset & Delete */}
@@ -681,29 +754,73 @@ const SettingsModal = ({
 
           {/* Right Bottom Footer Actions */}
           <div className="p-4 border-t border-border bg-muted/20 flex justify-between items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 bg-muted border border-border text-muted-foreground hover:text-foreground font-bold text-xs rounded-2xl transition-all"
-            >
-              Cancel
-            </button>
+            {activeTab === 'holidays' && holidaysStagingState.isStaging ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (holidaysStagingState.discardStaging) {
+                      holidaysStagingState.discardStaging();
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-bold text-xs rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X size={14} /> Discard
+                </button>
 
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-6 py-2.5 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto"
-            >
-              <Save size={14} /> Save Changes
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (holidaysStagingState.confirmStaging) {
+                      holidaysStagingState.confirmStaging();
+                    }
+                    setSavedSuccess(true);
+                    setTimeout(() => {
+                      setSavedSuccess(false);
+                    }, 1500);
+                  }}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto cursor-pointer"
+                >
+                  <CheckCircle2 size={15} /> Confirm & Save Holidays ({holidaysStagingState.stagedCount})
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center">
+                  <AnimatePresence>
+                    {isDirty && (
+                      <motion.button
+                        key="discard-btn"
+                        initial={{ opacity: 0, scale: 0.94, x: -6 }}
+                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                        exit={{ opacity: 0, scale: 0.94, x: -6 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        type="button"
+                        onClick={handleDiscardChanges}
+                        className="px-4 py-2.5 bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-300 dark:hover:text-white border border-border/80 dark:border-zinc-700 font-bold text-xs rounded-2xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <RotateCw size={13} className="text-muted-foreground" />
+                        <span>Discard Changes</span>
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="px-6 py-2.5 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto cursor-pointer"
+                >
+                  <Save size={14} /> Save Changes
+                </button>
+              </>
+            )}
           </div>
 
         </div>
 
       </motion.div>
     </div>
-      )}
-    </AnimatePresence>
   );
 };
 

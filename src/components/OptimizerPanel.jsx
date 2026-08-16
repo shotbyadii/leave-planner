@@ -104,7 +104,7 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
   };
 
   return (
-    <div className={`flex flex-col bg-card relative ${inlineOnMobile ? 'h-auto md:h-full' : 'h-full'}`}>
+    <div id="tutorial-step-optimizer" className={`flex flex-col bg-card relative ${inlineOnMobile ? 'h-auto md:h-full' : 'h-full'}`}>
       
       {/* 1. Natural Language Search Input */}
       <form onSubmit={handleAgenticSubmit} className="p-3 md:p-3.5 border-b border-border bg-card">

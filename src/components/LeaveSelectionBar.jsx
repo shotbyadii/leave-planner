@@ -14,13 +14,33 @@ const LeaveSelectionBar = ({
   onApply, 
   balances,
   bookedDates = [],
-  leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' }
+  leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' },
+  onAdvanceTutorial,
+  forceExpandModal = false,
+  tutorialStepIndex = 0
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedType, setSelectedType] = useState('pl');
+  const isTutorialMode = Boolean(onAdvanceTutorial);
+  const effectiveBalances = isTutorialMode 
+    ? { pl: 15, el: 10, rh: 1, wfh: 10 }
+    : balances;
+
+  const [internalExpanded, setIsExpanded] = useState(false);
+  const isExpanded = forceExpandModal || internalExpanded;
+
+  const [selectedType, setSelectedType] = useState(isTutorialMode ? null : 'pl');
   const [toHour, setToHour] = useState(18);
   const [note, setNote] = useState('');
   const [fromHour, setFromHour] = useState(9);
+
+  useEffect(() => {
+    if (isTutorialMode) {
+      if (tutorialStepIndex === 4) {
+        setSelectedType(null);
+      } else if (tutorialStepIndex === 5) {
+        setSelectedType('pl');
+      }
+    }
+  }, [isTutorialMode, tutorialStepIndex]);
 
   const colors = {
     pl: { 
@@ -82,7 +102,9 @@ const LeaveSelectionBar = ({
   if (dates.length === 0) return null;
 
   const handleApply = () => {
-    onApply(dates, selectedType, note, planName, durationPerDay);
+    onApply(dates, selectedType || 'pl', note, planName || defaultName, durationPerDay);
+    setIsExpanded(false);
+    if (onAdvanceTutorial) onAdvanceTutorial();
   };
 
   let displayDate = '';
@@ -118,7 +140,7 @@ const LeaveSelectionBar = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="hidden md:block fixed inset-0 bg-black/60 backdrop-blur-md z-[200]"
+            className="hidden md:block fixed inset-0 bg-black/75 backdrop-blur-md z-[9989]"
             onClick={() => setIsExpanded(false)}
           />
         )}
@@ -133,7 +155,7 @@ const LeaveSelectionBar = ({
             animate={{ opacity: 1, scale: 1, y: '-50%', x: '-50%' }}
             exit={{ opacity: 0, scale: 0.95, y: '-45%', x: '-50%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            className="hidden md:flex fixed top-1/2 left-1/2 bg-card text-foreground w-[480px] max-w-[92vw] flex-col max-h-[88vh] rounded-[32px] shadow-2xl shadow-black/80 border border-border overflow-hidden z-[201]"
+            className="hidden md:flex fixed top-1/2 left-1/2 bg-slate-900 text-slate-50 dark:bg-zinc-900 dark:text-zinc-50 w-[480px] max-w-[92vw] flex-col max-h-[88vh] rounded-[32px] shadow-2xl shadow-black/90 border border-border overflow-hidden z-[9990] opacity-100"
           >
             <div className="p-5 sm:p-6 pt-4 md:pt-6 border-b border-border bg-muted flex justify-between items-start flex-shrink-0">
               <div>{displayDate}</div>
@@ -168,6 +190,7 @@ const LeaveSelectionBar = ({
               <div>
                 <label className="text-sm font-semibold text-foreground mb-1.5 block">Plan Name</label>
                 <input
+                  id="tutorial-step-plan-name"
                   type="text"
                   value={planName}
                   onChange={(e) => setPlanName(e.target.value)}
@@ -180,22 +203,33 @@ const LeaveSelectionBar = ({
               <div>
                 <label className="text-sm font-semibold text-foreground mb-3 block">Leave Type</label>
                 <div className="flex flex-col gap-3">
-                  <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'pl' ? `${colors.pl.border} ${colors.pl.bg}` : 'border-border hover:border-foreground/30'} ${balances.pl < baseLeavesNeeded ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <label 
+                    id="tutorial-step-category-pl" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedType('pl');
+                      if (onAdvanceTutorial) {
+                        onAdvanceTutorial();
+                      }
+                    }}
+                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'pl' ? `${colors.pl.border} ${colors.pl.bg}` : 'border-border hover:border-foreground/30'}`}
+                  >
                     <div className="flex items-center gap-3">
-                      <input type="radio" name="leaveType" value="pl" checked={selectedType === 'pl'} onChange={() => {}} onClick={() => balances.pl >= baseLeavesNeeded && setSelectedType('pl')} disabled={balances.pl < baseLeavesNeeded} className="w-4 h-4 text-blue-600 focus:ring-blue-500" />
+                      <input type="radio" name="leaveType" value="pl" checked={selectedType === 'pl'} onChange={() => {}} className="w-4 h-4 text-blue-600 focus:ring-blue-500" />
                       <span className={`font-medium ${selectedType === 'pl' ? colors.pl.text : 'text-foreground'}`}>{getShortform(leaveNames.pl, 'PL')} — {leaveNames.pl}</span>
                     </div>
-                    <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'pl' ? colors.pl.badge : 'bg-background border-border text-muted-foreground'}`}>{balances.pl} left</span>
+                    <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'pl' ? colors.pl.badge : 'bg-background border-border text-muted-foreground'}`}>{effectiveBalances.pl} left</span>
                   </label>
 
                   {/* EL with clock picker */}
                   <div className="flex flex-col gap-2">
-                    <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'el' ? `${colors.el.border} ${colors.el.bg}` : 'border-border hover:border-foreground/30'} ${balances.el < baseLeavesNeeded ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'el' ? `${colors.el.border} ${colors.el.bg}` : 'border-border hover:border-foreground/30'} ${(effectiveBalances.el < baseLeavesNeeded || isTutorialMode) ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}>
                       <div className="flex items-center gap-3">
-                        <input type="radio" name="leaveType" value="el" checked={selectedType === 'el'} onChange={() => {}} onClick={() => balances.el >= baseLeavesNeeded && setSelectedType('el')} disabled={balances.el < baseLeavesNeeded} className="w-4 h-4 text-orange-500 focus:ring-orange-400" />
+                        <input type="radio" name="leaveType" value="el" checked={selectedType === 'el'} onChange={() => {}} onClick={() => !isTutorialMode && effectiveBalances.el >= baseLeavesNeeded && setSelectedType('el')} disabled={isTutorialMode || effectiveBalances.el < baseLeavesNeeded} className="w-4 h-4 text-orange-500 focus:ring-orange-400" />
                         <span className={`font-medium ${selectedType === 'el' ? colors.el.text : 'text-foreground'}`}>{getShortform(leaveNames.el, 'EL')} — {leaveNames.el}</span>
                       </div>
-                      <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'el' ? colors.el.badge : 'bg-background border-border text-muted-foreground'}`}>{balances.el} left</span>
+                      <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'el' ? colors.el.badge : 'bg-background border-border text-muted-foreground'}`}>{effectiveBalances.el} left</span>
                     </label>
 
                     {selectedType === 'el' && !isMultiple && (
@@ -209,17 +243,17 @@ const LeaveSelectionBar = ({
                     )}
                   </div>
 
-                  <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'rh' ? 'border-green-500 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400' : 'border-border hover:border-foreground/30'} ${(balances.rh < baseLeavesNeeded || baseLeavesNeeded > 1) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'rh' ? 'border-green-500 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400' : 'border-border hover:border-foreground/30'} ${(effectiveBalances.rh < baseLeavesNeeded || baseLeavesNeeded > 1 || isTutorialMode) ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}>
                     <div className="flex items-center gap-3">
-                      <input type="radio" name="leaveType" value="rh" checked={selectedType === 'rh'} onChange={() => {}} onClick={() => baseLeavesNeeded <= 1 && balances.rh >= baseLeavesNeeded && setSelectedType('rh')} disabled={balances.rh < baseLeavesNeeded || baseLeavesNeeded > 1} className="w-4 h-4 text-green-600 focus:ring-green-500" />
+                      <input type="radio" name="leaveType" value="rh" checked={selectedType === 'rh'} onChange={() => {}} onClick={() => !isTutorialMode && baseLeavesNeeded <= 1 && effectiveBalances.rh >= baseLeavesNeeded && setSelectedType('rh')} disabled={isTutorialMode || effectiveBalances.rh < baseLeavesNeeded || baseLeavesNeeded > 1} className="w-4 h-4 text-green-600 focus:ring-green-500" />
                       <span className={`font-medium ${selectedType === 'rh' ? 'text-green-700 dark:text-green-400' : 'text-foreground'}`}>{getShortform(leaveNames.rh, 'RH')} — {leaveNames.rh}</span>
                     </div>
-                    <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'rh' ? 'bg-green-100/50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' : 'bg-background border-border text-muted-foreground'}`}>{balances.rh} left</span>
+                    <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'rh' ? 'bg-green-100/50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300' : 'bg-background border-border text-muted-foreground'}`}>{effectiveBalances.rh} left</span>
                   </label>
 
-                  <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'wfh' ? `${colors.wfh.border} ${colors.wfh.bg}` : 'border-border hover:border-foreground/30'}`}>
+                  <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedType === 'wfh' ? `${colors.wfh.border} ${colors.wfh.bg}` : 'border-border hover:border-foreground/30'} ${isTutorialMode ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}>
                     <div className="flex items-center gap-3">
-                      <input type="radio" name="leaveType" value="wfh" checked={selectedType === 'wfh'} onChange={() => {}} onClick={() => setSelectedType('wfh')} className="w-4 h-4 text-cyan-500 focus:ring-cyan-400" />
+                      <input type="radio" name="leaveType" value="wfh" checked={selectedType === 'wfh'} onChange={() => {}} onClick={() => !isTutorialMode && setSelectedType('wfh')} disabled={isTutorialMode} className="w-4 h-4 text-cyan-500 focus:ring-cyan-400" />
                       <span className={`font-medium ${selectedType === 'wfh' ? colors.wfh.text : 'text-foreground'}`}>{getShortform(leaveNames.wfh, 'WFH')} — {leaveNames.wfh}</span>
                     </div>
                     <span className={`text-xs font-medium border px-2 py-1 rounded ${selectedType === 'wfh' ? colors.wfh.badge : 'bg-background border-border text-muted-foreground'}`}>Max 10/mo</span>
@@ -254,8 +288,9 @@ const LeaveSelectionBar = ({
                 Cancel
               </button>
               <button
+                id="tutorial-step-modal-apply-btn"
                 onClick={handleApply}
-                disabled={balances[selectedType] < leavesNeeded}
+                disabled={!isTutorialMode && balances[selectedType] < leavesNeeded}
                 className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-md flex-[1.5]"
               >
                 Confirm & Apply
@@ -271,6 +306,7 @@ const LeaveSelectionBar = ({
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: 50, x: "-50%" }}
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            id="tutorial-step-selection-bar"
             className="hidden md:flex fixed bottom-8 left-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-3.5 rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[60] overflow-hidden items-center justify-between gap-6"
           >
             <motion.div layout className="flex items-center gap-3 flex-1">
@@ -296,7 +332,7 @@ const LeaveSelectionBar = ({
               )}
             </motion.div>
             
-            <motion.div layout className="flex gap-2 border-l border-background/20 pl-4 md:pl-6 flex-shrink-0 items-center">
+            <motion.div id="tutorial-step-confirm-modal" layout className="flex gap-2 border-l border-background/20 pl-4 md:pl-6 flex-shrink-0 items-center">
               <button 
                 onClick={onCancel}
                 className="text-xs font-bold text-background/70 hover:text-background px-3 py-2 rounded-full hover:bg-background/20 transition-colors whitespace-nowrap"
@@ -313,7 +349,8 @@ const LeaveSelectionBar = ({
               )}
               {previewDates.length > 0 && (
                 <button 
-                  onClick={() => setIsExpanded(true)}
+                  id="tutorial-step-confirm-plan-btn"
+                  onClick={() => { setIsExpanded(true); if (onAdvanceTutorial) onAdvanceTutorial(); }}
                   className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap"
                 >
                   Confirm Plan <Check size={14} strokeWidth={3} />

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { COLOR_PALETTE } from '../utils/colorUtils';
 
 const AppleWheelPicker = ({ 
@@ -15,10 +15,25 @@ const AppleWheelPicker = ({
   onColorChange
 }) => {
   const scrollRef = useRef(null);
+  const isScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef(null);
   const itemHeight = 36;
 
   const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  const [internalValue, setInternalValue] = useState(value);
 
+  // Sync internal value with prop when not actively scrolling
+  useEffect(() => {
+    setInternalValue(value);
+    if (scrollRef.current && !isScrollingRef.current) {
+      const selectedIndex = numbers.indexOf(value);
+      if (selectedIndex !== -1) {
+        scrollRef.current.scrollTop = selectedIndex * itemHeight;
+      }
+    }
+  }, [value, min, max]);
+
+  // Initial position sync on mount
   useEffect(() => {
     if (scrollRef.current) {
       const selectedIndex = numbers.indexOf(value);
@@ -28,13 +43,42 @@ const AppleWheelPicker = ({
     }
   }, []);
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
+    isScrollingRef.current = true;
+
     const scrollTop = scrollRef.current.scrollTop;
     const index = Math.round(scrollTop / itemHeight);
-    const selectedNum = numbers[Math.min(Math.max(0, index), numbers.length - 1)];
-    if (selectedNum !== undefined && selectedNum !== value && onChange) {
-      onChange(selectedNum);
+    const clampedIndex = Math.min(Math.max(0, index), numbers.length - 1);
+    const selectedNum = numbers[clampedIndex];
+
+    if (selectedNum !== undefined && selectedNum !== internalValue) {
+      setInternalValue(selectedNum);
+    }
+
+    // Debounce calling the parent onChange so scroll momentum is never blocked
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      isScrollingRef.current = false;
+      if (selectedNum !== undefined && onChange) {
+        onChange(selectedNum);
+      }
+    }, 80);
+  }, [numbers, internalValue, onChange]);
+
+  const selectNumber = (num) => {
+    if (!scrollRef.current) return;
+    const idx = numbers.indexOf(num);
+    if (idx !== -1) {
+      scrollRef.current.scrollTo({
+        top: idx * itemHeight,
+        behavior: 'smooth'
+      });
+      setInternalValue(num);
+      if (onChange) onChange(num);
     }
   };
 
@@ -69,7 +113,7 @@ const AppleWheelPicker = ({
           value={customName}
           onChange={(e) => onCustomNameChange(e.target.value)}
           placeholder={`${code || label} Name...`}
-          className="w-full bg-muted/40 border border-border/60 rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          className="w-full bg-muted/40 border border-border/60 rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors"
         />
       )}
 
@@ -81,7 +125,7 @@ const AppleWheelPicker = ({
               key={c.id}
               type="button"
               onClick={() => onColorChange(c.id)}
-              className={`w-4 h-4 rounded-full ${c.bg} transition-all duration-200 ${
+              className={`w-4 h-4 rounded-full ${c.bg} transition-transform duration-150 cursor-pointer ${
                 color === c.id 
                   ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card scale-110' 
                   : 'opacity-60 hover:opacity-100 hover:scale-105'
@@ -93,7 +137,7 @@ const AppleWheelPicker = ({
       )}
 
       {/* Compact Wheel Tumbler */}
-      <div className="relative h-28 w-full overflow-hidden rounded-xl bg-muted/30 border border-border/40 flex items-center justify-center select-none">
+      <div className="relative h-28 w-full overflow-hidden rounded-xl bg-muted/30 border border-border/40 flex items-center justify-center select-none touch-pan-y">
         
         {/* Top & Bottom Fade Gradients */}
         <div className="absolute top-0 inset-x-0 h-7 bg-gradient-to-b from-card via-card/80 to-transparent z-10 pointer-events-none" />
@@ -106,21 +150,15 @@ const AppleWheelPicker = ({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar relative z-10 py-[38px]"
-          style={{ scrollBehavior: 'smooth' }}
+          className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar relative z-10 py-[38px] overscroll-contain"
         >
           {numbers.map((num) => {
-            const isSelected = num === value;
+            const isSelected = num === internalValue;
             return (
               <div
                 key={num}
-                onClick={() => {
-                  if (scrollRef.current) {
-                    const idx = numbers.indexOf(num);
-                    scrollRef.current.scrollTop = idx * itemHeight;
-                  }
-                }}
-                className={`h-[36px] snap-center flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                onClick={() => selectNumber(num)}
+                className={`h-[36px] snap-center flex items-center justify-center gap-1 transition-transform duration-100 cursor-pointer ${
                   isSelected 
                     ? `text-xl font-black ${currentColor.text} font-mono scale-110` 
                     : 'text-xs font-bold text-muted-foreground/40 font-mono opacity-50 hover:opacity-80'
