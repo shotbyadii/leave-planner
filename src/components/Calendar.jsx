@@ -6,7 +6,7 @@ import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -165,6 +165,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       if (previewDates.length > 0) setPreviewDates([]);
       _setSelectionStart(dateStr);
     }
+    if (onAdvanceTutorial) onAdvanceTutorial();
   };
 
   const handleModalApply = async (datesArray, type, note, planName, durationPerDay = 1) => {
@@ -354,7 +355,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       const isWfh = bookedLeave?.type === 'wfh';
 
       days.push(
-        <div key={`d-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
+        <div key={`d-${i}`} id={`date-cell-${year}-${monthIndex}-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
           {!isCapsule && isWfh && (
             <span className={isMini ? "absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none ring-1 ring-background/40" : "absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none"} />
           )}
@@ -376,6 +377,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
     return (
       <motion.div
+        id={`month-card-${monthIndex}`}
         layoutId={isMobile ? undefined : `month-card-${monthIndex}`}
         layout={isMobile ? false : true}
         key={`month-${monthIndex}`}
@@ -438,7 +440,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
   return (
     <LayoutGroup id="calendar-cards">
-      <div className="flex flex-col gap-6 relative z-10 h-full">
+      <div id="tutorial-step-calendar" className="flex flex-col gap-6 relative z-10 h-full">
         <div className="flex justify-between items-center w-full">
           <h2 className="text-lg font-bold text-foreground">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
           <div className="flex bg-muted p-1 rounded-xl w-fit ml-auto shadow-inner">
@@ -482,7 +484,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           >
             {viewMode === 'yearly' ? (
               <div className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6 overflow-visible">
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); if (onAdvanceTutorial) onAdvanceTutorial(); }))}
               </div>
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)] p-1 overflow-visible">

@@ -308,7 +308,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
               <p className="text-sm text-muted-foreground max-w-xs">Select date ranges on the calendar and apply leaves to create plans.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div id="tutorial-step-leave-plans" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {leavePlans.map((plan) => {
                 const planLeaves = getLeavesForPlan(plan.id);
                 const start = new Date(plan.start_date);
@@ -327,7 +327,11 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                 const isExpanded = expandedPlans[plan.id] || false;
 
                 return (
-                  <div key={plan.id} className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm p-4 sm:p-7 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-4 sm:gap-6 relative overflow-hidden">
+                  <div 
+                    key={plan.id} 
+                    id={plan.id === 'tutorial-demo-plan-temp' ? 'tutorial-demo-plan-card' : undefined}
+                    className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm p-4 sm:p-7 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-4 sm:gap-6 relative overflow-hidden"
+                  >
                     <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     
                     <div className="flex-1 relative z-10 flex flex-col justify-between">

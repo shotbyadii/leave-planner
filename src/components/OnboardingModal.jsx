@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
+import HolidayManager from './HolidayManager';
+import { getStoredHolidays, saveStoredHolidays } from '../data/holidays';
 
 const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
   const [step, setStep] = useState(1);
@@ -15,6 +17,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
   const [notifGranted, setNotifGranted] = useState(
     typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
   );
+  const [holidays, setHolidays] = useState(() => getStoredHolidays());
 
   // Quotas, Names & Colors State
   const [quotas, setQuotas] = useState({
@@ -60,6 +63,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
   };
 
   const handleFinish = () => {
+    saveStoredHolidays(holidays);
     if (onComplete) {
       onComplete({
         name: name.trim() || 'User',
@@ -68,13 +72,14 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
         notifEnabled: notifGranted,
         quotas,
         names,
-        colors
+        colors,
+        holidays
       });
     }
     onClose();
   };
 
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   const slides = [
     {
@@ -106,7 +111,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
             </span>
           </div>
           <div className="flex gap-1.5">
-            {[1, 2, 3, 4].map(s => (
+            {[1, 2, 3, 4, 5].map(s => (
               <div 
                 key={s} 
                 className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -283,10 +288,28 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
               </motion.div>
             )}
 
-            {/* STEP 4: Prompt Time & Notifications */}
+            {/* STEP 4: Company Public Holidays */}
             {step === 4 && (
-              <motion.div 
+              <motion.div
                 key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
+              >
+                <HolidayManager
+                  initialHolidays={holidays}
+                  onChange={(updated) => setHolidays(updated)}
+                  showTitle={true}
+                />
+              </motion.div>
+            )}
+
+            {/* STEP 5: Prompt Time & Notifications */}
+            {step === 5 && (
+              <motion.div 
+                key="step5"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
