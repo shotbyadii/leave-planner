@@ -27,28 +27,28 @@ export const TUTORIAL_STEPS = [
   {
     id: 4,
     title: "4. Click 'Confirm Plan' on Selection Bar",
-    targetSelector: "#tutorial-step-confirm-plan-btn",
+    targetSelector: "#tutorial-step-confirm-plan-btn, #tutorial-step-confirm-plan-btn-mobile",
     description: "Click 'Confirm Plan' on the selection bar to open the leave details modal.",
     executeAction: "prompt-confirm-plan"
   },
   {
     id: 5,
     title: "5. Select Leave Category (PL)",
-    targetSelector: "#tutorial-step-category-pl",
+    targetSelector: "#tutorial-step-category-pl, #tutorial-step-category-pl-mobile",
     description: "Click Planned Leave (PL) to pick your category. (Optional: Type a custom plan name above).",
     executeAction: "select-modal-category"
   },
   {
     id: 6,
     title: "6. Click 'Confirm & Apply' inside Modal",
-    targetSelector: "#tutorial-step-modal-apply-btn",
+    targetSelector: "#tutorial-step-modal-apply-btn, #tutorial-step-modal-apply-btn-mobile",
     description: "Click 'Confirm & Apply' to log your sandboxed demo leave!",
     executeAction: "apply-modal-leave"
   },
   {
     id: 7,
     title: "7. Review Created Plan in Leave Tracker",
-    targetSelector: "#tutorial-demo-plan-card",
+    targetSelector: "#tutorial-demo-plan-card, #tutorial-step-leave-plans > div:first-child",
     description: "Your demo 6-day leave plan is logged! Track total leaves used, weekends gained, and holiday overlaps here.",
     executeAction: "review-created-plan"
   }

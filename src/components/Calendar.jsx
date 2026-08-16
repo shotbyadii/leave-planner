@@ -466,7 +466,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
               >
                 {viewMode === 'yearly' ? (
                   <div className="grid grid-cols-3 md:grid-cols-2 gap-2 p-1 pb-6">
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); }))}
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); if (onAdvanceTutorial) onAdvanceTutorial(); }))}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 items-start p-1 w-full">

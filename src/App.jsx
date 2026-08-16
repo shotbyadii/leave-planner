@@ -667,6 +667,18 @@ function App() {
   }, [previewDates.length]);
 
   const handleMobileApply = async () => {
+    if (isTutorialActive) {
+      // Sandboxed demo plan for tutorial mode: do NOT write to real database
+      const chosenName = mobilePlanName || 'Sep Getaway (Walkthrough Demo)';
+      setTutorialCustomName(chosenName);
+      setPreviewDates([]);
+      setSelectionStart(null);
+      setMobileConfirmOpen(false);
+      setMobileNote('');
+      setMobileLeaveType('pl');
+      setTutorialStepIndex(6);
+      return;
+    }
     const dates = previewDates;
     const elDiffHours = mobileToHour > mobileFromHour ? mobileToHour - mobileFromHour : 0;
     const isHalfDay = mobileLeaveType === 'el' && dates.length === 1 && elDiffHours > 0 && elDiffHours < 4.5;
@@ -1051,6 +1063,7 @@ function App() {
 
       <div className="md:hidden fixed bottom-6 left-0 right-0 z-[50] flex justify-center px-4 pointer-events-none">
         <motion.div
+          id="mobile-floating-dock"
           layout
           transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
           className={`pointer-events-auto overflow-hidden border border-border/80 backdrop-blur-2xl transition-[border-radius,background-color,box-shadow,width,max-width] duration-200 shadow-[0_12px_40px_-5px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] ${
@@ -1260,6 +1273,19 @@ function App() {
                     </button>
 
 
+
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setMobileSubView(null);
+                        setIsMobileMenuOpen(false);
+                        setTutorialStepIndex(0);
+                        setIsTutorialActive(true);
+                      }}
+                      className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Play size={14} className="fill-amber-500/40" /> Launch Interactive Tour (Walkthrough)
+                    </button>
 
                     <button 
                       type="button" 
@@ -1631,7 +1657,7 @@ function App() {
                   <div className="p-3 grid grid-cols-2 gap-2 border-b border-border/60 bg-muted/10">
                     <button 
                       onClick={() => { setMobileSubView('profile'); }}
-                      className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm"
+                      className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
                     >
                       {effectiveAvatar ? (
                         <img src={effectiveAvatar} alt={userName} className="w-8 h-8 rounded-xl object-cover border border-primary/20 flex-shrink-0 shadow-sm" />
@@ -1648,7 +1674,7 @@ function App() {
 
                     <button 
                       onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('quotas'); }}
-                      className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm"
+                      className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
                     >
                       <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0">
                         <Settings size={16} />
@@ -1741,6 +1767,7 @@ function App() {
                 <div>
                   <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Plan Name</label>
                   <input
+                    id="tutorial-step-plan-name-mobile"
                     type="text"
                     value={mobilePlanName}
                     onChange={(e) => setMobilePlanName(e.target.value)}
@@ -1786,8 +1813,12 @@ function App() {
                       return (
                         <button
                           key={item.key}
+                          id={item.key === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
                           type="button"
-                          onClick={() => setMobileLeaveType(item.key)}
+                          onClick={() => {
+                            setMobileLeaveType(item.key);
+                            if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
+                          }}
                           className={`py-3 px-1 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
                             isActive ? `${colorStyle.border} ${colorStyle.bg} ${colorStyle.text} shadow-sm ${colorStyle.shadow} ring-1 ring-inset ring-black/5` : 'border-border bg-card text-muted-foreground opacity-60'
                           }`}
@@ -1840,7 +1871,14 @@ function App() {
                   <button onClick={() => setMobileConfirmOpen(false)} className="flex-1 py-3 bg-muted border border-border text-foreground rounded-xl text-xs font-bold shadow-sm">
                     Back
                   </button>
-                  <button onClick={handleMobileApply} className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2">
+                  <button 
+                    id="tutorial-step-modal-apply-btn-mobile"
+                    onClick={() => {
+                      handleMobileApply();
+                      if (isTutorialActive && tutorialStepIndex === 5) setTutorialStepIndex(6);
+                    }} 
+                    className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2"
+                  >
                     Confirm & Apply <Check size={14} strokeWidth={3} />
                   </button>
                 </div>
@@ -1880,7 +1918,14 @@ function App() {
                 </button>
               )}
               {previewDates.length > 0 && (
-                <button onClick={() => setMobileConfirmOpen(true)} className="flex items-center gap-1.5 text-xs font-black text-black bg-white hover:bg-slate-100 px-4 py-2 rounded-full shadow-md whitespace-nowrap">
+                <button 
+                  id="tutorial-step-confirm-plan-btn-mobile"
+                  onClick={() => { 
+                    setMobileConfirmOpen(true); 
+                    if (isTutorialActive && tutorialStepIndex === 3) setTutorialStepIndex(4); 
+                  }} 
+                  className="flex items-center gap-1.5 text-xs font-black text-black bg-white hover:bg-slate-100 px-4 py-2 rounded-full shadow-md whitespace-nowrap"
+                >
                   Confirm <Check size={13} strokeWidth={3}/>
                 </button>
               )}
@@ -2225,16 +2270,21 @@ function App() {
                 setActiveTab('calendar');
                 setSelectionStart('2026-09-10');
                 setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                setMobileConfirmOpen(true);
                 break;
               case 'apply-modal-leave':
                 setActiveTab('calendar');
                 setSelectionStart('2026-09-10');
                 setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                setMobileConfirmOpen(true);
                 break;
               case 'review-created-plan':
                 setActiveTab('tracker');
                 setSelectionStart(null);
                 setPreviewDates([]);
+                setMobileConfirmOpen(false);
+                setIsMobileMenuOpen(false);
+                setMobileSubView(null);
                 // Inject temporary sandboxed demo plan for review step
                 setLeavePlans(prev => {
                   if (prev.some(p => p.id === 'tutorial-demo-plan-temp')) return prev;
@@ -2263,6 +2313,9 @@ function App() {
             setSelectionStart(null);
             setPreviewDates([]);
             setHoveredSuggestion(null);
+            setMobileConfirmOpen(false);
+            setIsMobileMenuOpen(false);
+            setMobileSubView(null);
             setActiveTab('calendar');
             setCalendarViewMode('yearly');
             setLeavePlans(prev => prev.filter(p => p.id !== 'tutorial-demo-plan-temp'));
@@ -2273,6 +2326,9 @@ function App() {
             setSelectionStart(null);
             setPreviewDates([]);
             setHoveredSuggestion(null);
+            setMobileConfirmOpen(false);
+            setIsMobileMenuOpen(false);
+            setMobileSubView(null);
             setActiveTab('calendar');
             setCalendarViewMode('yearly');
             setLeavePlans(prev => prev.filter(p => p.id !== 'tutorial-demo-plan-temp'));
@@ -2313,6 +2369,15 @@ function App() {
               setShowSplash(false);
               setAuthModalOpen(false);
               setOnboardingOpen(true);
+            }}
+            onStartTutorial={() => {
+              setShowSplash(false);
+              setAuthModalOpen(false);
+              setOnboardingOpen(false);
+              setIsMobileMenuOpen(false);
+              setMobileSubView(null);
+              setTutorialStepIndex(0);
+              setIsTutorialActive(true);
             }}
             onOpenWfhCheckin={() => setWfhModalOpen(true)}
           />
