@@ -376,18 +376,11 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     }
 
     return (
-      <motion.div
+      <div
         id={`month-card-${monthIndex}`}
-        layoutId={isMobile ? undefined : `month-card-${monthIndex}`}
-        layout={isMobile ? false : true}
         key={`month-${monthIndex}`}
         onClick={onClick}
-        whileHover={onClick ? { scale: 1.015 } : {}}
-        transition={{
-          layout: { type: 'spring', stiffness: 135, damping: 21, mass: 0.95 },
-          opacity: { duration: 0.2 }
-        }}
-        className={`${cardBg} border flex flex-col transition-[opacity,background-color,border-color] duration-300 ease-out transform-gpu origin-top-left overflow-hidden ${isLarge ? 'p-4 md:p-6 rounded-2xl min-h-[300px]' : (isMini ? 'p-1.5 md:p-2.5 rounded-xl h-auto md:h-full flex flex-col justify-start md:justify-between gap-0.5 md:gap-0' : 'p-5 rounded-2xl hover:border-foreground/20')} ${isPastMonth && !isLarge ? 'opacity-50 hover:opacity-90' : opacityClass} ${wrapperClasses}`}
+        className={`${cardBg} border flex flex-col transition-all duration-200 ease-out transform-gpu origin-top-left overflow-hidden ${isLarge ? 'p-4 md:p-6 rounded-2xl min-h-[300px]' : (isMini ? 'p-1.5 md:p-2.5 rounded-xl h-auto md:h-full flex flex-col justify-start md:justify-between gap-0.5 md:gap-0' : 'p-5 rounded-2xl hover:border-foreground/20 hover:scale-[1.015] cursor-pointer')} ${isPastMonth && !isLarge ? 'opacity-50 hover:opacity-90' : opacityClass} ${wrapperClasses}`}
       >
         <div className={`flex justify-between items-center ${isLarge ? 'mb-4' : (isMini ? 'mb-2' : 'mb-4')}`}>
           <div className="flex items-center gap-2">
@@ -434,12 +427,12 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             <div className={`italic ${isLarge ? 'text-sm' : 'text-[10px]'} ${useNavy ? 'text-white/40' : 'text-muted-foreground/50'} ${isMini ? 'hidden md:block' : ''}`}>No holidays</div>
           )}
         </div>
-      </motion.div>
+      </div>
     );
   };
 
   return (
-    <LayoutGroup id="calendar-cards">
+    <>
       <div id="tutorial-step-calendar" className="flex flex-col gap-6 relative z-10 h-full">
         <div className="flex justify-between items-center w-full">
           <h2 className="text-lg font-bold text-foreground">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
@@ -454,14 +447,14 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         </div>
 
         {isMobile ? (
-          <motion.div layout transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }} className="w-full">
+          <div className="w-full">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={`mobile-view-${viewMode}-${focusedMonth}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
                 className="w-full"
               >
                 {viewMode === 'yearly' ? (
@@ -475,28 +468,77 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
                 )}
               </motion.div>
             </AnimatePresence>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div 
-            layout 
-            transition={{ layout: { type: 'spring', stiffness: 130, damping: 22, mass: 1 } }}
-            className="w-full overflow-visible"
-          >
+          <div className="w-full overflow-visible">
             {viewMode === 'yearly' ? (
-              <div className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6 overflow-visible">
+              <motion.div 
+                initial={{ opacity: 0.9, scale: 0.99 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6 overflow-visible"
+              >
                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); if (onAdvanceTutorial) onAdvanceTutorial(); }))}
-              </div>
+              </motion.div>
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)] p-1 overflow-visible">
-                <div className="flex-1 flex justify-start w-full relative z-10 overflow-visible">
+                {/* Main Focused Month Card */}
+                <motion.div 
+                  key={`main-focused-${focusedMonth}`}
+                  initial={{ opacity: 0.85, scale: 0.98, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex-1 flex justify-start w-full relative z-10 overflow-visible"
+                >
                   <div className="w-full">{renderMonth(focusedMonth, true)}</div>
-                </div>
-                <div className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto overflow-x-visible h-full p-2 pb-24 no-scrollbar relative z-10">
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(m => m !== focusedMonth).sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => setFocusedMonth(m)))}
-                </div>
+                </motion.div>
+
+                {/* Right Side Vertical Stack of Mini Cards */}
+                <motion.div 
+                  key={`mini-stack-${focusedMonth}`}
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    hidden: { opacity: 1 },
+                    visible: {
+                      opacity: 1,
+                      transition: {
+                        staggerChildren: 0.05,
+                        delayChildren: 0.02
+                      }
+                    }
+                  }}
+                  className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto overflow-x-visible h-full p-2 pb-24 no-scrollbar relative z-10"
+                >
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+                    .filter(m => m !== focusedMonth)
+                    .sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1))
+                    .map((m) => (
+                      <motion.div
+                        key={`mini-month-card-${m}`}
+                        variants={{
+                          hidden: { opacity: 0, y: 24, scale: 0.96 },
+                          visible: {
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                            transition: {
+                              type: 'spring',
+                              stiffness: 240,
+                              damping: 24,
+                              mass: 0.7
+                            }
+                          }
+                        }}
+                        className="w-full flex-shrink-0"
+                      >
+                        {renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => setFocusedMonth(m))}
+                      </motion.div>
+                    ))}
+                </motion.div>
               </div>
             )}
-          </motion.div>
+          </div>
         )}
       </div>
 
@@ -515,7 +557,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           />
         )}
       </AnimatePresence>
-    </LayoutGroup>
+    </>
   );
 };
 

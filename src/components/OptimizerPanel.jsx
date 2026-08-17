@@ -291,93 +291,95 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
             </button>
           </div>
         ) : (
-          suggestions.map((s, idx) => {
-            const isHero = idx === 0 && optimizerMode === 'best';
-            let badgeBg = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
-            if (s.leavesRequired >= 5) badgeBg = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-            else if (s.leavesRequired >= 3) badgeBg = 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20';
+          <div className="flex flex-col gap-3">
+            {suggestions.map((s, idx) => {
+              const isHero = idx === 0 && optimizerMode === 'best';
+              let badgeBg = 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
+              if (s.leavesRequired >= 5) badgeBg = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+              else if (s.leavesRequired >= 3) badgeBg = 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20';
 
-            const startMonthStr = new Date(s.startDate).toLocaleString('default', { month: 'short' });
-            const startDay = new Date(s.startDate).getDate();
-            const endMonthStr = new Date(s.endDate).toLocaleString('default', { month: 'short' });
-            const endDay = new Date(s.endDate).getDate();
-            const dateRangeStr = `${startDay} ${startMonthStr} – ${endDay} ${endMonthStr}`;
-            const displayTitle = s.holidayName ? s.holidayName : `${startMonthStr} ${startDay} – ${endMonthStr} ${endDay}`;
+              const startMonthStr = new Date(s.startDate).toLocaleString('default', { month: 'short' });
+              const startDay = new Date(s.startDate).getDate();
+              const endMonthStr = new Date(s.endDate).toLocaleString('default', { month: 'short' });
+              const endDay = new Date(s.endDate).getDate();
+              const dateRangeStr = `${startDay} ${startMonthStr} – ${endDay} ${endMonthStr}`;
+              const displayTitle = s.holidayName ? s.holidayName : `${startMonthStr} ${startDay} – ${endMonthStr} ${endDay}`;
 
-            return (
-              <div
-                key={`${s.startDate.toISOString()}-${s.endDate.toISOString()}`}
-                onClick={() => handlePreviewClick(s)}
-                onMouseEnter={() => handleHover(s)}
-                onMouseLeave={() => handleHover(null)}
-                className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center select-none ${
-                  isHero 
-                    ? 'bg-foreground text-background shadow-apple border border-foreground/10 hover:opacity-90' 
-                    : 'bg-card border border-border shadow-apple-sm hover:shadow-apple hover:border-foreground/20'
-                }`}
-              >
-                {/* Left accent strip */}
-                {!isHero && (
-                  <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full ${
-                    s.leavesRequired >= 5 ? 'bg-emerald-500' : s.leavesRequired >= 3 ? 'bg-purple-500' : 'bg-blue-500'
-                  }`} />
-                )}
-                {isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-background/40 rounded-r-full" />}
-                
-                <div className="flex flex-col gap-1 pl-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-bold ${
-                      isHero ? 'bg-background/20 text-background/80' : 'bg-muted text-foreground'
-                    }`}>
-                      {startMonthStr}
-                    </span>
-
-                    <span className={`text-[10px] uppercase tracking-wider font-bold ${
-                      isHero ? 'text-orange-300' : 'text-orange-500'
-                    }`}>
-                      {s.totalDaysOff} Days Off
-                    </span>
-
-                    {!isHero && (
-                      <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${badgeBg}`}>
-                        {s.leavesRequired <= 2 ? 'Quick' : s.leavesRequired <= 4 ? 'Vacation' : 'Mega Trip'}
+              return (
+                <div
+                  key={`${s.startDate.toISOString()}-${s.endDate.toISOString()}`}
+                  onClick={() => handlePreviewClick(s)}
+                  onMouseEnter={() => handleHover(s)}
+                  onMouseLeave={() => handleHover(null)}
+                  className={`group relative rounded-2xl p-4 transition-all cursor-pointer flex justify-between items-center select-none ${
+                    isHero 
+                      ? 'bg-foreground text-background shadow-apple border border-foreground/10 hover:opacity-90' 
+                      : 'bg-card border border-border shadow-apple-sm hover:shadow-apple hover:border-foreground/20'
+                  }`}
+                >
+                  {/* Left accent strip */}
+                  {!isHero && (
+                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full ${
+                      s.leavesRequired >= 5 ? 'bg-emerald-500' : s.leavesRequired >= 3 ? 'bg-purple-500' : 'bg-blue-500'
+                    }`} />
+                  )}
+                  {isHero && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-background/40 rounded-r-full" />}
+                  
+                  <div className="flex flex-col gap-1 pl-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-bold ${
+                        isHero ? 'bg-background/20 text-background/80' : 'bg-muted text-foreground'
+                      }`}>
+                        {startMonthStr}
                       </span>
-                    )}
 
-                    {isHero && (
-                      <span className="text-[8px] font-bold uppercase tracking-wider bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">
-                        Top Pick
+                      <span className={`text-[10px] uppercase tracking-wider font-bold ${
+                        isHero ? 'text-orange-300' : 'text-orange-500'
+                      }`}>
+                        {s.totalDaysOff} Days Off
                       </span>
-                    )}
+
+                      {!isHero && (
+                        <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${badgeBg}`}>
+                          {s.leavesRequired <= 2 ? 'Quick' : s.leavesRequired <= 4 ? 'Vacation' : 'Mega Trip'}
+                        </span>
+                      )}
+
+                      {isHero && (
+                        <span className="text-[8px] font-bold uppercase tracking-wider bg-background/10 text-background/60 px-1.5 py-0.5 rounded-sm">
+                          Top Pick
+                        </span>
+                      )}
+                    </div>
+
+                    <h4 className={`font-bold text-sm leading-tight ${isHero ? 'text-background' : 'text-foreground'}`}>
+                      {displayTitle}
+                    </h4>
+
+                    <p className={`text-[10px] font-medium uppercase tracking-wider ${isHero ? 'text-background/50' : 'text-muted-foreground'}`}>
+                      {dateRangeStr}
+                    </p>
                   </div>
 
-                  <h4 className={`font-bold text-sm leading-tight ${isHero ? 'text-background' : 'text-foreground'}`}>
-                    {displayTitle}
-                  </h4>
-
-                  <p className={`text-[10px] font-medium uppercase tracking-wider ${isHero ? 'text-background/50' : 'text-muted-foreground'}`}>
-                    {dateRangeStr}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-end">
+                      <span className={`text-lg font-black leading-none font-mono ${isHero ? 'text-background' : 'text-foreground'}`}>
+                        {s.leavesRequired}<span className={`text-[10px] ml-0.5 ${isHero ? 'text-background/50' : 'text-muted-foreground'}`}>L</span>
+                      </span>
+                      <span className={`text-[8px] uppercase font-bold tracking-wider mt-0.5 ${isHero ? 'text-background/40' : 'text-muted-foreground'}`}>
+                        Cost
+                      </span>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                      isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600 dark:group-hover:bg-purple-900/40 dark:group-hover:text-purple-300'
+                    }`}>
+                      <ChevronRight size={16} />
+                    </div>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col items-end">
-                    <span className={`text-lg font-black leading-none font-mono ${isHero ? 'text-background' : 'text-foreground'}`}>
-                      {s.leavesRequired}<span className={`text-[10px] ml-0.5 ${isHero ? 'text-background/50' : 'text-muted-foreground'}`}>L</span>
-                    </span>
-                    <span className={`text-[8px] uppercase font-bold tracking-wider mt-0.5 ${isHero ? 'text-background/40' : 'text-muted-foreground'}`}>
-                      Cost
-                    </span>
-                  </div>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                    isHero ? 'bg-background/20 text-background' : 'bg-muted group-hover:bg-purple-50 text-muted-foreground group-hover:text-purple-600 dark:group-hover:bg-purple-900/40 dark:group-hover:text-purple-300'
-                  }`}>
-                    <ChevronRight size={16} />
-                  </div>
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
