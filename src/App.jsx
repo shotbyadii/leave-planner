@@ -19,12 +19,13 @@ import HolidayManager from './components/HolidayManager';
 import AuthModal from './components/AuthModal';
 import ProfileModal from './components/ProfileModal';
 import SplashScreen from './components/SplashScreen';
+import AppSkeleton from './components/AppSkeleton';
 import CompanyInput from './components/CompanyInput';
 import ThemeSelector from './components/ThemeSelector';
 import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import { getLeaveColor, getShortform, COLOR_PALETTE } from './utils/colorUtils';
-import { getCurrentUser, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
+import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
 import { getCompanyLogoUrl, getCompanyInitials } from './utils/companyLogoUtils';
@@ -33,7 +34,9 @@ import { isTutorialCompleted, markTutorialCompleted, resetTutorialStatus } from 
 import './index.css';
 
 function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const isInitialAuthDone = useRef(false);
+  const [showSplash, setShowSplash] = useState(false);
   const [activeTab, setActiveTab] = useState('calendar');
   const [wfhModalOpen, setWfhModalOpen] = useState(false);
   const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
@@ -209,6 +212,8 @@ function App() {
 
     // Listen to Supabase auth state changes (e.g. Google OAuth redirect return)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Do not allow initial auth state changes to disrupt initial skeleton window
+      if (!isInitialAuthDone.current) return;
       if (session?.user) {
         handleAuthSuccess(session.user);
       }
@@ -310,26 +315,76 @@ function App() {
   };
 
   const checkAuthUser = async () => {
-    const user = await getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setShowSplash(false);
-      const profile = await fetchUserProfile(user.id);
-      if (profile) {
-        syncProfileToState(profile, user);
-      } else {
-        const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User';
-        setUserName(fallbackName);
-        localStorage.setItem('user_name', fallbackName);
+    const startTime = Date.now();
+    const waitRemaining = async (minMs = 1000) => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < minMs) {
+        await new Promise(res => setTimeout(res, minMs - elapsed));
       }
-      await loadLeaves(user);
-    } else {
+    };
+
+    try {
+      // 1. Instant check for cached session from local storage
+      const session = await getCurrentSession();
+      if (session?.user) {
+        setCurrentUser(session.user);
+        const profilePromise = fetchUserProfile(session.user.id);
+        const leavesPromise = loadLeaves(session.user);
+        
+        // Wait for profile & leaves data while ensuring a crisp 1-second skeleton animation window
+        const [profile] = await Promise.all([profilePromise, leavesPromise, waitRemaining(1000)]);
+
+        if (profile) {
+          syncProfileToState(profile, session.user);
+        } else {
+          const fallbackName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User';
+          setUserName(fallbackName);
+          localStorage.setItem('user_name', fallbackName);
+        }
+
+        isInitialAuthDone.current = true;
+        setIsAuthChecking(false);
+        setShowSplash(false);
+        return;
+      }
+
+      // 2. Server validation fallback
+      const user = await getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+        const profilePromise = fetchUserProfile(user.id);
+        const leavesPromise = loadLeaves(user);
+        const [profile] = await Promise.all([profilePromise, leavesPromise, waitRemaining(1000)]);
+
+        if (profile) {
+          syncProfileToState(profile, user);
+        } else {
+          const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+          setUserName(fallbackName);
+          localStorage.setItem('user_name', fallbackName);
+        }
+
+        isInitialAuthDone.current = true;
+        setIsAuthChecking(false);
+        setShowSplash(false);
+      } else {
+        await waitRemaining(600);
+        isInitialAuthDone.current = true;
+        setIsAuthChecking(false);
+        setShowSplash(true);
+      }
+    } catch (err) {
+      console.warn('Auth check encounter:', err);
+      await waitRemaining(600);
+      isInitialAuthDone.current = true;
+      setIsAuthChecking(false);
       setShowSplash(true);
     }
   };
 
   const handleAuthSuccess = async (user) => {
     setCurrentUser(user);
+    setIsAuthChecking(false);
     setShowSplash(false);
 
     if (user) {
@@ -364,12 +419,14 @@ function App() {
       await deleteUserAccount(currentUser.id);
     }
     setCurrentUser(null);
+    setIsAuthChecking(false);
     setShowSplash(true);
   };
 
   const handleSignOut = async () => {
     await signOutUser();
     setCurrentUser(null);
+    setIsAuthChecking(false);
     setShowSplash(true);
   };
 
@@ -713,6 +770,10 @@ function App() {
   const effectiveAvatar = avatarUrl || googleAvatar || null;
   const effectiveCompanyLogo = companyLogoUrl || (companyName ? getCompanyLogoUrl(companyName) : null);
   const userInitials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'LV';
+
+  if (isAuthChecking) {
+    return <AppSkeleton />;
+  }
 
   return (
     <div className="h-screen bg-background flex flex-col font-sans text-foreground overflow-hidden">
@@ -1074,98 +1135,98 @@ function App() {
                 : 'w-full max-w-sm rounded-[28px] bg-card/95 dark:bg-card/95'
           }`}
         >
-        <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait">
+            {/* ── EXISTING LEAVE DETAIL MORPHING STATE ── */}
+            {viewingLeave && !isMobileMenuOpen && (
+              <motion.div key="viewing-leave"
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18, ease: "easeInOut" }}
+                className="max-h-[82vh] overflow-y-auto no-scrollbar bg-card"
+              >
+                {/* Handle */}
+                <div className="flex justify-center pt-3 pb-1 bg-card">
+                  <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+                </div>
+                <ExistingLeaveDetailContent 
+                  leaveObj={viewingLeave} 
+                  onClose={() => setViewingLeave(null)} 
+                  onCancelLeave={async (date) => {
+                    await removeLeave(date);
+                    await loadLeaves();
+                    setViewingLeave(null);
+                  }}
+                  onCancelPlan={async (planId) => {
+                    await deleteLeavePlan(planId);
+                    await loadLeaves();
+                    setViewingLeave(null);
+                  }}
+                  onConvertToOffice={async (date) => {
+                    await removeLeave(date);
+                    await addLeave(date, 'office');
+                    await loadLeaves();
+                    setViewingLeave(null);
+                  }}
+                  onConvertToWfh={async (date) => {
+                    await removeLeave(date);
+                    await addLeave(date, 'wfh');
+                    await loadLeaves();
+                    setViewingLeave(null);
+                  }}
+                  onConvertToLeave={async (date) => {
+                    await removeLeave(date);
+                    await loadLeaves();
+                    setViewingLeave(null);
+                    setSelectionStart(date);
+                    setPreviewDates([date]);
+                    setMobileConfirmOpen(true);
+                  }}
+                  leaves={leaves}
+                  calendarStyle={calendarStyle}
+                />
+              </motion.div>
+            )}
 
-          {/* ── EXISTING LEAVE DETAIL MORPHING STATE ── */}
-          {viewingLeave && !isMobileMenuOpen && (
-            <motion.div key="viewing-leave"
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="max-h-[82vh] overflow-y-auto no-scrollbar bg-card"
-            >
-              {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1 bg-card">
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-              </div>
-              <ExistingLeaveDetailContent 
-                leaveObj={viewingLeave} 
-                onClose={() => setViewingLeave(null)}
-                onCancelLeave={async (date) => {
-                  await removeLeave(date);
-                  await loadLeaves();
-                  setViewingLeave(null);
-                }}
-                onCancelPlan={async (planId) => {
-                  await deleteLeavePlan(planId);
-                  await loadLeaves();
-                  setViewingLeave(null);
-                }}
-                onConvertToOffice={async (date) => {
-                  await removeLeave(date);
-                  await addLeave(date, 'office');
-                  await loadLeaves();
-                  setViewingLeave(null);
-                }}
-                onConvertToWfh={async (date) => {
-                  await removeLeave(date);
-                  await addLeave(date, 'wfh');
-                  await loadLeaves();
-                  setViewingLeave(null);
-                }}
-                onConvertToLeave={async (date) => {
-                  await removeLeave(date);
-                  await loadLeaves();
-                  setViewingLeave(null);
-                  setSelectionStart(date);
-                  setPreviewDates([date]);
-                  setMobileConfirmOpen(true);
-                }}
-                leaves={leaves}
-                calendarStyle={calendarStyle}
-              />
-            </motion.div>
-          )}
+            {/* ── MENU STATE ── */}
+            {isMobileMenuOpen && (
+              <motion.div key="menu"
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18, ease: "easeInOut" }}
+                className="max-h-[85vh] overflow-y-auto no-scrollbar"
+              >
+                {/* Handle */}
+                <div className="flex justify-center pt-3 pb-1">
+                  <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+                </div>
 
-          {/* ── MENU STATE ── */}
-          {isMobileMenuOpen && (
-            <motion.div key="menu"
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="max-h-[85vh] overflow-y-auto no-scrollbar"
-            >
-              {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-              </div>
-
-              {/* ── PROFILE MORPHING SUBVIEW ── */}
-              {mobileSubView === 'profile' ? (
-                <motion.div 
-                  key="mobile-profile" 
-                  initial={{ opacity: 0, x: 20 }} 
-                  animate={{ opacity: 1, x: 0 }} 
-                  exit={{ opacity: 0, x: -20 }} 
-                  transition={{ duration: 0.2 }} 
-                  className="p-4 flex flex-col gap-4"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between pb-2 border-b border-border">
-                    <button 
-                      onClick={() => setMobileSubView(null)} 
-                      className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors flex-shrink-0"
-                      title="Back to menu"
+                <AnimatePresence mode="wait">
+                  {/* ── PROFILE MORPHING SUBVIEW ── */}
+                  {mobileSubView === 'profile' ? (
+                    <motion.div 
+                      key="mobile-profile" 
+                      initial={{ opacity: 0, y: 6 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      exit={{ opacity: 0, y: -6 }} 
+                      transition={{ duration: 0.18, ease: "easeInOut" }} 
+                      className="p-4 flex flex-col gap-4"
                     >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <span className="text-xs font-black uppercase tracking-wider text-foreground font-mono text-center flex-1 truncate px-2">My Profile & Account</span>
-                    <button 
-                      onClick={() => { setIsMobileMenuOpen(false); setMobileSubView(null); }} 
-                      className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors flex-shrink-0"
-                      title="Close"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-2 border-b border-border">
+                        <button 
+                          onClick={() => setMobileSubView(null)} 
+                          className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors flex-shrink-0"
+                          title="Back to menu"
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                        <span className="text-xs font-black uppercase tracking-wider text-foreground font-mono text-center flex-1 truncate px-2">My Profile & Account</span>
+                        <button 
+                          onClick={() => { setIsMobileMenuOpen(false); setMobileSubView(null); }} 
+                          className="w-8 h-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors flex-shrink-0"
+                          title="Close"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
 
                   {/* Profile Card */}
                   <div className="flex flex-col items-center text-center p-5 bg-muted/30 border border-border/80 rounded-2xl relative">
@@ -1508,23 +1569,23 @@ function App() {
                                 setTimeout(() => setMobileToast(''), 3000);
                               }}
                               disabled={isExportingCsvMobile}
-                              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
+                              className="flex-1 py-2.5 bg-card border border-border text-foreground hover:bg-muted rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer"
                             >
-                              <Table size={14} /> {isExportingCsvMobile ? 'Generating...' : 'Spreadsheet (CSV)'}
+                              <FileSpreadsheet size={14} className="text-foreground" /> {isExportingCsvMobile ? 'Exporting...' : 'CSV Report'}
                             </button>
                           </div>
                         </div>
 
-                        {/* Restore / Import File Section */}
+                        {/* Import / Restore Section */}
                         <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
                           <div>
-                            <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">RESTORE / IMPORT FILE</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-foreground block font-mono">RESTORE BACKUP</span>
                             <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed font-sans">
-                              Upload a previously exported <code className="text-[10px] bg-muted px-1 py-0.5 rounded font-mono">.json</code> file to restore your leaves, WFH logs, and plans into this account.
+                              Upload an exported JSON backup to seamlessly restore your leaves and plans.
                             </p>
                           </div>
-                          <label className="w-full py-3 bg-card border border-border hover:bg-muted text-foreground rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm active:scale-95">
-                            <Upload size={15} className="text-primary" /> {isImportingMobile ? 'Importing into Supabase...' : 'Select Backup JSON File'}
+                          <label className="w-full py-2.5 bg-card border border-dashed border-border hover:border-foreground/40 text-foreground rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer">
+                            <Upload size={14} className="text-primary" /> {isImportingMobile ? 'Restoring...' : 'Upload JSON Backup File'}
                             <input 
                               type="file" 
                               accept=".json" 
@@ -1578,18 +1639,16 @@ function App() {
                       </button>
                       <button 
                         type="button" 
-                        onClick={() => {
-                          if (mobileHolidaysStagingState.confirmStaging) {
-                            mobileHolidaysStagingState.confirmStaging();
+                        onClick={async () => {
+                          if (mobileHolidaysStagingState.saveStaging) {
+                            await mobileHolidaysStagingState.saveStaging();
+                            setMobileToast('Holidays saved to cloud!');
+                            setTimeout(() => setMobileToast(''), 3000);
                           }
-                          setMobileToast('Holidays Confirmed & Saved!');
-                          setTimeout(() => {
-                            setMobileToast('');
-                          }, 2000);
                         }} 
-                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <CheckCircle2 size={15} /> Confirm & Save Holidays ({mobileHolidaysStagingState.stagedCount})
+                        <Check size={14} strokeWidth={3} /> Save Holidays
                       </button>
                     </div>
                   ) : (
@@ -1627,7 +1686,13 @@ function App() {
 
               /* ── MAIN MENU SUBVIEW ── */
               ) : (
-                <>
+                <motion.div 
+                  key="mobile-main-menu"
+                  initial={{ opacity: 0, y: 6 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  exit={{ opacity: 0, y: -6 }} 
+                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                >
                   {/* Header row */}
                   <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-muted/20">
                     <div className="flex items-center gap-3">
@@ -1741,16 +1806,17 @@ function App() {
                       <LogOut size={15}/> <span>Sign Out</span>
                     </button>
                   </div>
-                </>
+                </motion.div>
               )}
-            </motion.div>
-          )}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
           {/* ── CONFIRM STATE ── */}
           {mobileConfirmOpen && !isMobileMenuOpen && viewingLeave === null && (
             <motion.div key="confirm"
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeInOut" }}
               className="flex flex-col max-h-[85vh] overflow-y-auto"
             >
               <div className="flex justify-center pt-3 pb-1">
@@ -1890,7 +1956,7 @@ function App() {
           {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && (selectionStart !== null || previewDates.length > 0) && (
             <motion.div key="selection"
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.18, ease: "easeInOut" }}
               className="flex items-center gap-3 px-4 h-[62px]"
             >
               <div className="flex-1">
@@ -1934,7 +2000,7 @@ function App() {
           {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && selectionStart === null && previewDates.length === 0 && (
             <motion.div key="nav"
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.18, ease: "easeInOut" }}
             >
               {/* Mini usage bar */}
               {(() => {

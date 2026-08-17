@@ -73,8 +73,34 @@ export const signOutUser = async () => {
   return await supabase.auth.signOut();
 };
 
+export const hasStoredSession = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && ((key.startsWith('sb-') && key.endsWith('-auth-token')) || key === 'supabase.auth.token')) {
+        const item = localStorage.getItem(key);
+        if (item && item !== 'null' && item !== '{}') return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+};
+
+export const getCurrentSession = async () => {
+  if (!isSupabaseConfigured) return null;
+  const { data } = await supabase.auth.getSession();
+  return data?.session || null;
+};
+
 export const getCurrentUser = async () => {
   if (!isSupabaseConfigured) return null;
+
+  // Fast-path: check active session in memory/storage first
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (sessionData?.session?.user) {
+    return sessionData.session.user;
+  }
 
   const { data } = await supabase.auth.getUser();
   return data?.user || null;

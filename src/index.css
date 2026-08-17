@@ -77,10 +77,6 @@
   body {
     min-height: 100dvh;
     @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 select-none;
-    transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease-out;
-  }
-  body *, body *::before, body *::after {
-    transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease-out, box-shadow 0.4s ease-out;
   }
   input, textarea {
     user-select: text !important;
@@ -129,6 +125,45 @@
 
 .animate-pulse-subtle {
   animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+@keyframes skeleton-sheen {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: hsl(var(--muted));
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.08) 20%,
+    rgba(255, 255, 255, 0.2) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: skeleton-sheen 1.6s infinite ease-in-out;
+}
+
+.dark .skeleton-shimmer::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.03) 20%,
+    rgba(255, 255, 255, 0.07) 60%,
+    rgba(255, 255, 255, 0)
+  );
 }
 
 /* Native Tutorial Target Pulsing Effect */
