@@ -4,7 +4,7 @@ import {
   Settings, X, Save, FileText, CheckCircle2, User, SlidersHorizontal, 
   LogIn, LogOut, Download, Upload, Table, AlertCircle, ShieldCheck, 
   RotateCw, Trash2, AlertTriangle, ChevronRight, Camera, Building2, 
-  Globe, Image as ImageIcon, Clock
+  Globe, Image as ImageIcon, Clock, Sparkles, Key, ExternalLink, Eye, EyeOff, Loader2
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -12,6 +12,15 @@ import HolidayManager from './HolidayManager';
 import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
+import { 
+  getStoredGeminiApiKey, 
+  setStoredGeminiApiKey, 
+  hasGeminiApiKey, 
+  queryGeminiAssistant,
+  AVAILABLE_MODELS,
+  getStoredGeminiModel,
+  setStoredGeminiModel
+} from '../services/aiAssistantService';
 
 const SettingsModal = ({ 
   isOpen, 
@@ -28,21 +37,34 @@ const SettingsModal = ({
   onOpenAuthModal,
   onResetData,
   onDeleteAccount,
-  onSignOut,
   onImportSuccess,
   onReplayTutorial,
-  leavesQuota
+  leavesQuota,
+  initialTab = 'profile'
 }) => {
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'quotas' | 'backup'
+  const [activeTab, setActiveTab] = useState(initialTab); // 'profile' | 'ai' | 'holidays' | 'quotas' | 'backup'
   const [name, setName] = useState(userName);
   const [companyName, setCompanyName] = useState(propCompanyName);
   const [avatarUrl, setAvatarUrl] = useState(propAvatarUrl);
   const [wfhPromptHour, setWfhPromptHour] = useState(propWfhPromptHour || localStorage.getItem('wfh_prompt_hour') || '12');
 
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
+
   const [currentQuotas, setCurrentQuotas] = useState({ ...quotas });
   const [currentNames, setCurrentNames] = useState({ ...leaveNames });
   const [currentColors, setCurrentColors] = useState({ ...leaveColors });
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Gemini AI State
+  const [geminiKey, setGeminiKey] = useState(() => getStoredGeminiApiKey());
+  const [selectedModel, setSelectedModel] = useState(() => getStoredGeminiModel());
+  const [showKeyPlain, setShowKeyPlain] = useState(false);
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [testGeminiResult, setTestGeminiResult] = useState(null);
 
   // Holidays Staging State (from HolidayManager)
   const [holidaysStagingState, setHolidaysStagingState] = useState({
@@ -57,6 +79,8 @@ const SettingsModal = ({
     companyName.trim() !== (propCompanyName || '').trim() ||
     avatarUrl !== propAvatarUrl ||
     String(wfhPromptHour) !== String(propWfhPromptHour || '12') ||
+    geminiKey.trim() !== getStoredGeminiApiKey() ||
+    selectedModel !== getStoredGeminiModel() ||
     JSON.stringify(currentQuotas) !== JSON.stringify(quotas) ||
     JSON.stringify(currentNames) !== JSON.stringify(leaveNames) ||
     JSON.stringify(currentColors) !== JSON.stringify(leaveColors)
@@ -67,9 +91,31 @@ const SettingsModal = ({
     setCompanyName(propCompanyName || '');
     setAvatarUrl(propAvatarUrl || '');
     setWfhPromptHour(propWfhPromptHour || '12');
+    setGeminiKey(getStoredGeminiApiKey());
+    setSelectedModel(getStoredGeminiModel());
     setCurrentQuotas({ ...quotas });
     setCurrentNames({ ...leaveNames });
     setCurrentColors({ ...leaveColors });
+  };
+
+  const handleTestGeminiKey = async () => {
+    if (!geminiKey.trim()) {
+      setTestGeminiResult({ success: false, msg: 'Please enter a Gemini API Key first.' });
+      return;
+    }
+    setTestingGemini(true);
+    setTestGeminiResult(null);
+    try {
+      const res = await queryGeminiAssistant({
+        message: 'Ping: check connectivity and quota.',
+        customApiKey: geminiKey.trim()
+      });
+      setTestGeminiResult({ success: true, msg: `Connected successfully using ${res.modelUsed || 'Gemini 2.5 Flash'}!` });
+    } catch (err) {
+      setTestGeminiResult({ success: false, msg: `Test failed: ${err.message || 'Check your key.'}` });
+    } finally {
+      setTestingGemini(false);
+    }
   };
 
   // Deletion & Reset Inline States
@@ -130,6 +176,8 @@ const SettingsModal = ({
   };
 
   const handleSave = () => {
+    setStoredGeminiApiKey(geminiKey.trim());
+    setStoredGeminiModel(selectedModel);
     if (onSaveSettings) {
       onSaveSettings({
         name: name.trim() || 'User',
@@ -295,6 +343,7 @@ const SettingsModal = ({
             <nav className="flex flex-row md:flex-col gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
               {[
                 { id: 'profile', label: 'Account & Profile', icon: User, color: 'text-primary' },
+                { id: 'ai', label: 'Calendar Assistant', icon: Sparkles, color: 'text-purple-500' },
                 { id: 'holidays', label: 'Public Holidays', icon: Clock, color: 'text-amber-500' },
                 { id: 'quotas', label: 'Quotas & Themes', icon: SlidersHorizontal, color: 'text-cyan-500' },
                 { id: 'backup', label: 'Data & Backups', icon: FileText, color: 'text-blue-500' }
@@ -355,12 +404,14 @@ const SettingsModal = ({
             <div>
               <h3 className="text-base font-black text-foreground uppercase tracking-tight font-mono">
                 {activeTab === 'profile' && 'Account & Profile Settings'}
+                {activeTab === 'ai' && 'Calendar Assistant & API'}
                 {activeTab === 'holidays' && 'Company Public Holidays'}
                 {activeTab === 'quotas' && 'Leave Quotas & Theme Palette'}
                 {activeTab === 'backup' && 'Data Restore & JSON Backups'}
               </h3>
               <p className="text-[11px] text-muted-foreground font-medium">
                 {activeTab === 'profile' && 'Customize your display name, company logo, and profile photo'}
+                {activeTab === 'ai' && 'Chat naturally to plan trips, log leaves, and auto-import holiday calendars'}
                 {activeTab === 'holidays' && 'Manage approved company holidays and auto-extract from PDF/Images'}
                 {activeTab === 'quotas' && 'Set annual leave balances, custom category titles & color themes'}
                 {activeTab === 'backup' && 'Export JSON backups, CSV spreadsheets, or restore data'}
@@ -686,6 +737,207 @@ const SettingsModal = ({
                         );
                       })}
                     </select>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Gemini AI Assistant Settings Tab */}
+              {activeTab === 'ai' && (
+                <motion.div 
+                  key="ai"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: "easeInOut" }}
+                  className="flex flex-col gap-4"
+                >
+                  {/* Engine Overview Card */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-primary/10 text-primary rounded-2xl flex-shrink-0">
+                        <Sparkles size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground leading-tight">Bring Your Own API Key</h4>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Private • Zero data tracking • Stored locally on your device
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-full border ${
+                      geminiKey.trim() 
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                    }`}>
+                      {geminiKey.trim() ? 'Connected ✓' : 'Not Connected'}
+                    </span>
+                  </div>
+
+                  {/* API Key Input Card */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                        <Key size={14} className="text-primary" /> API Key
+                      </label>
+                      <a 
+                        href="https://aistudio.google.com/app/apikey" 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1"
+                      >
+                        Get a free key (Google Gemini) <ExternalLink size={11} />
+                      </a>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type={showKeyPlain ? 'text' : 'password'}
+                        value={geminiKey}
+                        onChange={(e) => setGeminiKey(e.target.value)}
+                        placeholder="Paste your API key (starts with AIzaSy...)"
+                        className="w-full bg-card border border-border rounded-2xl px-4 pr-20 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-inner"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1">
+                        {geminiKey && (
+                          <button
+                            type="button"
+                            onClick={() => setGeminiKey('')}
+                            title="Clear Key"
+                            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowKeyPlain(!showKeyPlain)}
+                          title={showKeyPlain ? "Hide Key" : "Show Key"}
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          {showKeyPlain ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] text-muted-foreground">
+                        Key stays strictly in your browser's local storage.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleTestGeminiKey}
+                        disabled={testingGemini || !geminiKey.trim()}
+                        className="px-4 py-2 bg-card border border-border hover:bg-muted text-foreground disabled:opacity-40 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                      >
+                        {testingGemini ? <Loader2 size={13} className="animate-spin text-primary" /> : <Sparkles size={13} className="text-primary" />}
+                        {testingGemini ? 'Testing...' : 'Test Connection'}
+                      </button>
+                    </div>
+
+                    {testGeminiResult && (
+                      <div className={`p-3 rounded-2xl border text-xs flex gap-2 items-center ${
+                        testGeminiResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+                      }`}>
+                        {testGeminiResult.success ? <CheckCircle2 size={15} className="flex-shrink-0" /> : <AlertCircle size={15} className="flex-shrink-0" />}
+                        <span className="font-medium">{testGeminiResult.msg}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Accessible Models Selection Section */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <label className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                          <SlidersHorizontal size={14} className="text-primary" /> Active AI Model Selection
+                        </label>
+                        <span className="text-[11px] text-muted-foreground mt-0.5">
+                          Select the Gemini model your API key connects to.
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        {AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || 'Gemini 2.5 Flash'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      {AVAILABLE_MODELS.map((m) => {
+                        const isSelected = selectedModel === m.id;
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => setSelectedModel(m.id)}
+                            className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20'
+                                : 'bg-card hover:bg-muted/60 border-border/70'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
+                                isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50'
+                              }`}>
+                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-foreground">
+                                    {m.name}
+                                  </span>
+                                  <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/80">
+                                    {m.badge}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-muted-foreground">
+                                    • {m.speed}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  {m.description}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono text-muted-foreground flex-shrink-0 font-medium hidden sm:inline">
+                              {m.tier}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Important Note About API Rate Limits vs Google AI Pro */}
+                  <div className="bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/40 rounded-3xl p-4 flex flex-col gap-2">
+                    <h4 className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-blue-500" /> Google AI Pro vs Google AI Studio API Keys
+                    </h4>
+                    <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80 leading-relaxed">
+                      Your Google AI Pro / Gemini Advanced consumer subscription powers consumer web chat (<code className="px-1 rounded bg-blue-100 dark:bg-blue-900/40 font-mono text-[10px]">gemini.google.com</code>) and Antigravity OAuth. Developer API calls use <strong>Google AI Studio project quotas</strong>.
+                    </p>
+                    <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80 leading-relaxed">
+                      • <strong>Free Tier Keys</strong> have strict rate limits (~15–20 requests/minute).<br />
+                      • To unlock <strong>1,000+ RPM</strong> and avoid quota throttling, switch to <strong>Gemini 2.5 Flash</strong> or enable Pay-as-you-go billing in <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="underline font-bold hover:text-blue-600 dark:hover:text-blue-200">Google AI Studio</a>.
+                    </p>
+                  </div>
+
+                  {/* Capabilities List Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-1.5">
+                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        🌴 Conversational Trip Staging
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Ask things like "Plan a 4-day trip in October" to automatically find dates, optimize leaves, and stage your vacation.
+                      </p>
+                    </div>
+
+                    <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col gap-1.5">
+                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        📑 Instant Holiday Extraction
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Drop an image or PDF of your company's holiday list to automatically detect all dates and holiday names with zero manual entry.
+                      </p>
+                    </div>
                   </div>
                 </motion.div>
               )}

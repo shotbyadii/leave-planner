@@ -2,21 +2,22 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, 
-  SlidersHorizontal, Building2, Clock, Bell, ShieldCheck 
+  SlidersHorizontal, Building2, Clock, Bell, ShieldCheck, Key, ExternalLink 
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
 import HolidayManager from './HolidayManager';
 import { getStoredHolidays, saveStoredHolidays } from '../data/holidays';
+import { showAppNotification, requestNotificationPermission, isNotificationGranted } from '../utils/notificationService';
+import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../services/aiAssistantService';
 
 const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(initialName && initialName !== 'User' ? initialName : (typeof window !== 'undefined' ? localStorage.getItem('user_name') || '' : ''));
   const [companyName, setCompanyName] = useState('');
   const [wfhPromptHour, setWfhPromptHour] = useState('12');
-  const [notifGranted, setNotifGranted] = useState(
-    typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
-  );
+  const [geminiApiKey, setGeminiApiKey] = useState(() => getStoredGeminiApiKey());
+  const [notifGranted, setNotifGranted] = useState(() => isNotificationGranted());
   const [holidays, setHolidays] = useState(() => getStoredHolidays());
 
   React.useEffect(() => {
@@ -57,32 +58,28 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
   if (!isOpen) return null;
 
   const handleRequestNotif = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          setNotifGranted(true);
-          try {
-            new Notification('Attendance Reminders Enabled', {
-              body: `Daily check-in reminders set for ${wfhPromptHour}:00.`,
-              icon: '/favicon.ico'
-            });
-          } catch (e) {}
-        }
-      } catch (err) {
-        console.warn('Notification permission error:', err);
-      }
+    const perm = await requestNotificationPermission();
+    if (perm === 'granted') {
+      setNotifGranted(true);
+      showAppNotification('Attendance Reminders Enabled', {
+        body: `Daily check-in reminders set for ${wfhPromptHour}:00.`,
+        tag: 'onboarding-welcome'
+      });
     }
   };
 
   const handleFinish = () => {
     saveStoredHolidays(holidays);
+    if (geminiApiKey.trim()) {
+      setStoredGeminiApiKey(geminiApiKey.trim());
+    }
     if (onComplete) {
       onComplete({
         name: name.trim() || 'User',
         companyName: companyName.trim(),
         wfhPromptHour,
         notifEnabled: notifGranted,
+        geminiApiKey: geminiApiKey.trim(),
         quotas,
         names,
         colors,
@@ -430,6 +427,34 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
                       <Check size={14} strokeWidth={3} /> Notifications active and configured!
                     </div>
                   )}
+                </div>
+
+                {/* Smart Assistant & Document Extractor Card (Optional) */}
+                <div className="bg-gradient-to-r from-[#0f172a] via-[#1e3a6e] to-[#1d4ed8] text-white rounded-2xl p-4 text-left flex flex-col gap-2.5 border border-blue-500/30 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-blue-300 animate-pulse" />
+                      <span className="text-xs font-bold uppercase tracking-wider font-mono">Assistant Key (Optional)</span>
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] font-bold text-blue-200 hover:text-white flex items-center gap-1"
+                    >
+                      Get Free Key (Gemini) <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-white/80 leading-relaxed font-medium">
+                    Enables conversational trip planning, natural language leave booking, and automatic holiday sheet extraction.
+                  </p>
+                  <input
+                    type="password"
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    placeholder="Paste API key (or skip for later)"
+                    className="w-full bg-card/20 border border-white/20 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder:text-white/40 focus:outline-none focus:border-white transition-colors shadow-inner"
+                  />
                 </div>
               </motion.div>
             )}

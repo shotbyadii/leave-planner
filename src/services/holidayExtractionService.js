@@ -3,6 +3,8 @@
  * using Gemini API (with multimodal inline_data for PDF / Image support).
  */
 
+import { getStoredGeminiApiKey } from './aiAssistantService';
+
 // Helper to convert File object to Base64
 const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
@@ -24,9 +26,7 @@ const fileToBase64 = (file) => {
  * @returns {Promise<Array<{date: string, name: string}>>} Array of extracted holidays
  */
 export async function extractHolidaysFromFile(file, apiKey = null) {
-  const effectiveApiKey = apiKey || 
-    (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
-    localStorage.getItem('gemini_api_key');
+  const effectiveApiKey = apiKey || getStoredGeminiApiKey();
 
   if (!effectiveApiKey || !effectiveApiKey.trim()) {
     throw new Error('Please configure a valid Gemini API Key starting with AIzaSy...');

@@ -88,7 +88,8 @@ const AppleBalanceTicker = ({
   leaveLabel = 'Planned Leave',
   leaveColor = null,
   deductedCount = 1,
-  actionType = 'leave', // 'leave' | 'wfh' | 'office'
+  actionType = 'leave', // 'leave' | 'wfh' | 'office' | 'restore' | 'cancel'
+  compact = false,
   onComplete,
   autoDismissMs = 1600
 }) => {
@@ -292,30 +293,30 @@ const AppleBalanceTicker = ({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
       transition={{ duration: 0.2 }}
-      className="w-full flex flex-col items-center gap-4 text-center py-2"
+      className={`w-full flex flex-col items-center text-center ${compact ? 'gap-2 py-1' : 'gap-4 py-2'}`}
     >
       {/* Top Category Badge */}
       <div className="flex items-center gap-2">
-        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black font-mono uppercase tracking-wider border ${theme.badge}`}>
+        <span className={`px-2 py-0.5 rounded-full ${compact ? 'text-[9px]' : 'text-[10px]'} font-black font-mono uppercase tracking-wider border ${theme.badge}`}>
           {shortCode} • {leaveLabel} {actionType === 'restore' || actionType === 'cancel' ? '• RESTORED' : ''}
         </span>
       </div>
 
       {/* Apple Ticker Number Display */}
-      <div className="relative w-full max-w-[280px] bg-gradient-to-b from-card via-muted/40 to-muted/20 border border-border/80 rounded-3xl p-5 shadow-2xl overflow-hidden flex flex-col items-center">
+      <div className={`relative w-full ${compact ? 'max-w-[210px] p-3 rounded-2xl' : 'max-w-[280px] p-5 rounded-3xl'} bg-gradient-to-b from-card via-muted/40 to-muted/20 border border-border/80 shadow-md overflow-hidden flex flex-col items-center`}>
         {/* Subtle Ambient Glow */}
-        <div className={`absolute -top-10 inset-x-0 h-24 bg-gradient-to-b ${theme.glow} blur-xl opacity-60 pointer-events-none`} />
+        <div className={`absolute -top-10 inset-x-0 ${compact ? 'h-16' : 'h-24'} bg-gradient-to-b ${theme.glow} blur-xl opacity-60 pointer-events-none`} />
 
         {/* Mechanical Tumbler Roll Window */}
-        <div className="relative h-16 w-full flex items-center justify-center overflow-hidden">
+        <div className={`relative ${compact ? 'h-9' : 'h-16'} w-full flex items-center justify-center overflow-hidden`}>
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={currentValue}
-              initial={{ y: isIncrement ? 30 : -30, opacity: 0, scale: 0.9 }}
+              initial={{ y: isIncrement ? 20 : -20, opacity: 0, scale: 0.9 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: isIncrement ? -30 : 30, opacity: 0, scale: 0.9 }}
+              exit={{ y: isIncrement ? -20 : 20, opacity: 0, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 450, damping: 30 }}
-              className={`text-5xl font-black font-mono tracking-tight ${theme.text} drop-shadow-sm`}
+              className={`${compact ? 'text-3xl' : 'text-5xl'} font-black font-mono tracking-tight ${theme.text} drop-shadow-sm`}
             >
               {currentValue}
             </motion.div>
@@ -323,14 +324,14 @@ const AppleBalanceTicker = ({
         </div>
 
         {/* Units / Quota Label */}
-        <div className="text-[11px] font-bold font-mono text-muted-foreground uppercase tracking-widest mt-1 flex items-center gap-1.5">
+        <div className={`${compact ? 'text-[9px] mt-0.5' : 'text-[11px] mt-1'} font-bold font-mono text-muted-foreground uppercase tracking-widest flex items-center gap-1.5`}>
           <span>Days Left</span>
           <span className="text-muted-foreground/40">•</span>
           <span className="text-muted-foreground/70">{totalQuota} Total</span>
         </div>
 
         {/* Synchronized Animated Progress Bar */}
-        <div className="w-full h-2 bg-muted rounded-full mt-4 overflow-hidden border border-border/50">
+        <div className={`w-full ${compact ? 'h-1.5 mt-2' : 'h-2 mt-4'} bg-muted rounded-full overflow-hidden border border-border/50`}>
           <motion.div
             className={`h-full rounded-full ${theme.bar}`}
             initial={{ width: `${Math.min(100, (initialValue / totalQuota) * 100)}%` }}
@@ -340,39 +341,43 @@ const AppleBalanceTicker = ({
         </div>
       </div>
 
-      {/* Adaptive Context Message Box */}
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className={`w-full max-w-sm p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-colors duration-300 ${theme.bg} ${theme.border}`}
-      >
-        <div className={`p-1.5 rounded-xl bg-card border ${theme.border} ${theme.text} flex-shrink-0 mt-0.5 shadow-sm`}>
-          <IconComponent size={18} />
-        </div>
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className={`text-xs font-black tracking-tight ${theme.text}`}>
-            {msg.title}
-          </span>
-          <span className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-            {msg.desc}
-          </span>
-        </div>
-      </motion.div>
+      {/* Adaptive Context Message Box (Only in full modal/view, deferred to post-action card in compact mode) */}
+      {!compact && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="w-full max-w-sm p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-colors duration-300 ${theme.bg} ${theme.border}"
+        >
+          <div className={`p-1.5 rounded-xl bg-card border ${theme.border} ${theme.text} flex-shrink-0 mt-0.5 shadow-xs`}>
+            <IconComponent size={18} />
+          </div>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className={`text-xs font-black tracking-tight ${theme.text}`}>
+              {msg.title}
+            </span>
+            <span className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+              {msg.desc}
+            </span>
+          </div>
+        </motion.div>
+      )}
 
       {/* Done Confirmation Indicator */}
-      <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/70">
-        <motion.div
-          animate={isDoneTicking ? { scale: [1, 1.2, 1] } : {}}
-          transition={{ duration: 0.3 }}
-          className={`w-2 h-2 rounded-full ${isDoneTicking ? theme.bar : 'bg-muted-foreground/40 animate-pulse'}`}
-        />
-        <span>
-          {isDoneTicking 
-            ? (isIncrement ? 'Balance restored!' : 'Balance updated!') 
-            : (isIncrement ? 'Restoring your quota...' : 'Applying deduction...')}
-        </span>
-      </div>
+      {!compact && (
+        <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/70">
+          <motion.div
+            animate={isDoneTicking ? { scale: [1, 1.2, 1] } : {}}
+            transition={{ duration: 0.3 }}
+            className={`w-1.5 h-1.5 rounded-full ${isDoneTicking ? theme.bar : 'bg-muted-foreground/40 animate-pulse'}`}
+          />
+          <span>
+            {isDoneTicking 
+              ? (isIncrement ? 'Balance restored!' : 'Balance updated!') 
+              : (isIncrement ? 'Restoring quota...' : 'Updating quota...')}
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 };

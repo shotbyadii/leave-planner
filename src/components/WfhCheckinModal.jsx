@@ -4,6 +4,7 @@ import { Home, Building2, CalendarX2, Bell, AlertTriangle, X, Check, Sparkles } 
 import { isWeekend, publicHolidays } from '../data/holidays';
 import { getShortform } from '../utils/colorUtils';
 import AppleBalanceTicker from './AppleBalanceTicker';
+import { showAppNotification, requestNotificationPermission, isNotificationSupported } from '../utils/notificationService';
 
 const WfhCheckinModal = ({ 
   isOpen, 
@@ -29,7 +30,7 @@ const WfhCheckinModal = ({
     return `${hour12}:00 ${period}`;
   };
 
-  const isNotificationSupported = typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification);
+  const notificationSupported = isNotificationSupported();
 
   useEffect(() => {
     if (!isOpen) {
@@ -38,32 +39,25 @@ const WfhCheckinModal = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (isNotificationSupported) {
+    if (notificationSupported) {
       try {
         setNotifPermission(Notification.permission);
       } catch (e) {
         console.warn('Notification permission check error:', e);
       }
     }
-  }, [isNotificationSupported]);
+  }, [notificationSupported]);
 
   const handleRequestNotif = async () => {
-    if (!isNotificationSupported) return;
+    if (!notificationSupported) return;
     try {
-      let res;
-      if (typeof Notification.requestPermission === 'function') {
-        res = await Notification.requestPermission();
-      }
+      const res = await requestNotificationPermission();
       if (res) setNotifPermission(res);
       if (res === 'granted') {
-        try {
-          new Notification('WFH & Attendance Check-in', {
-            body: 'Notifications enabled! You will be reminded daily at your preferred check-in time.',
-            icon: '/favicon.ico'
-          });
-        } catch (e) {
-          console.warn('Notification constructor error:', e);
-        }
+        showAppNotification('WFH & Attendance Check-in', {
+          body: 'Notifications enabled! You will be reminded daily at your preferred check-in time.',
+          tag: 'wfh-checkin-confirmation'
+        });
       }
     } catch (err) {
       console.warn('Notification requestPermission error:', err);
@@ -275,7 +269,7 @@ const WfhCheckinModal = ({
                       <CalendarX2 size={15} /> Taking a Leave Today Instead?
                     </button>
 
-                    {isNotificationSupported && notifPermission !== 'granted' && (
+                    {notificationSupported && notifPermission !== 'granted' && (
                       <button
                         onClick={handleRequestNotif}
                         className="mt-1 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1.5 cursor-pointer"

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { extractHolidaysFromFile } from '../services/holidayExtractionService';
 import { defaultPublicHolidays, saveStoredHolidays, getStoredHolidays, deduplicateHolidays } from '../data/holidays';
+import { getStoredGeminiApiKey, setStoredGeminiApiKey, hasGeminiApiKey } from '../services/aiAssistantService';
 
 const MONTH_SHORT_NAMES = [
   'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 
@@ -128,7 +129,7 @@ export default function HolidayManager({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [apiKeyInput, setApiKeyInput] = useState(() => getStoredGeminiApiKey());
   const [pendingFile, setPendingFile] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -344,8 +345,8 @@ export default function HolidayManager({
 
   // Click on "Upload Sheet (PDF/Img)" Button (Checks key first)
   const handleUploadButtonClick = () => {
-    const storedKey = localStorage.getItem('gemini_api_key') || (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY);
-    if (!storedKey || !storedKey.trim()) {
+    if (!hasGeminiApiKey()) {
+      setApiKeyInput(getStoredGeminiApiKey());
       setShowApiKeyModal(true);
       return;
     }
@@ -357,26 +358,25 @@ export default function HolidayManager({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const storedKey = localStorage.getItem('gemini_api_key') || (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY);
-    if (!storedKey || !storedKey.trim()) {
+    if (!hasGeminiApiKey()) {
       setPendingFile(file);
+      setApiKeyInput(getStoredGeminiApiKey());
       setShowApiKeyModal(true);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    await processExtraction(file, storedKey);
+    await processExtraction(file, getStoredGeminiApiKey());
   };
 
   const handleSaveApiKeyAndExtract = () => {
     const trimmed = apiKeyInput.trim();
     if (!trimmed) return;
 
-    localStorage.setItem('gemini_api_key', trimmed);
+    setStoredGeminiApiKey(trimmed);
+    setShowApiKeyModal(false);
     if (pendingFile) {
       processExtraction(pendingFile, trimmed);
-    } else {
-      setShowApiKeyModal(false);
     }
   };
 
@@ -499,7 +499,7 @@ export default function HolidayManager({
               <div className="flex items-center justify-between border-b border-border/50 pb-2.5">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-purple-500 animate-pulse" />
-                  <h4 className="text-sm font-bold text-foreground">Gemini API Key Required</h4>
+                  <h4 className="text-sm font-bold text-foreground">API Key Required</h4>
                 </div>
                 <button onClick={() => setShowApiKeyModal(false)} className="p-1 text-muted-foreground hover:text-foreground">
                   <X className="w-4 h-4" />
@@ -507,14 +507,14 @@ export default function HolidayManager({
               </div>
 
               <p className="text-xs text-muted-foreground leading-relaxed">
-                To extract dates & event names automatically from uploaded holiday sheets (images/PDFs), connect your Google Gemini API Key. Your key is saved locally in your browser.
+                To extract dates & event names automatically from uploaded holiday sheets (images/PDFs), connect your API key. (Gemini keys are completely free to generate).
               </p>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase font-mono">Gemini API Key</label>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase font-mono">API Key</label>
                 <input
                   type="password"
-                  placeholder="AIzaSy..."
+                  placeholder="Paste API key..."
                   value={apiKeyInput}
                   onChange={e => setApiKeyInput(e.target.value)}
                   className="w-full px-3.5 py-2 text-xs bg-background border border-border rounded-xl text-foreground font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none"
@@ -524,9 +524,9 @@ export default function HolidayManager({
                   href="https://aistudio.google.com/app/apikey" 
                   target="_blank" 
                   rel="noreferrer"
-                  className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 mt-1 font-medium"
+                  className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 mt-1"
                 >
-                  <span>Get a free API key from Google AI Studio →</span>
+                  Get free key (Gemini) <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
 
@@ -581,8 +581,8 @@ export default function HolidayManager({
         <div className="flex-shrink-0 p-3 bg-purple-500/10 border border-purple-500/30 rounded-2xl flex items-center gap-3 text-purple-700 dark:text-purple-300 animate-pulse shadow-sm">
           <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <div>
-            <div className="text-xs font-bold">Parsing document table with Gemini AI...</div>
-            <div className="text-[11px] opacity-80">Detecting official holidays, dates, and event titles.</div>
+            <div className="text-xs font-bold">Scanning document table...</div>
+            <div className="text-[11px] opacity-80">Detecting official holidays, dates, and festival titles.</div>
           </div>
         </div>
       )}
@@ -1250,7 +1250,7 @@ export default function HolidayManager({
       <div className="flex-shrink-0 flex items-center gap-2 pt-2 border-t border-border/50">
         <button
           onClick={() => setShowApiKeyModal(true)}
-          title="Configure Gemini API Key"
+          title="Configure API Key"
           className="p-2.5 bg-purple-500/10 dark:bg-purple-500/20 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 rounded-2xl transition-all cursor-pointer flex-shrink-0"
         >
           <Key className="w-4 h-4" />
@@ -1264,7 +1264,7 @@ export default function HolidayManager({
           {isUploading ? (
             <>
               <div className="w-3.5 h-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-              <span>Parsing Document with Gemini AI...</span>
+              <span>Scanning Document Table...</span>
             </>
           ) : (
             <>

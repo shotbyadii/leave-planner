@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid 
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial, leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }, leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' } }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial, leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }, leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' }, onClearAiPreview }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -142,6 +142,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
   };
 
   const handleDayClick = async (month, day) => {
+    if (onClearAiPreview) onClearAiPreview();
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const existingLeave = bookedDates.find(d => d.date === dateStr);
     if (existingLeave) {
@@ -288,10 +289,12 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           baseClasses += "bg-yellow-400/30 text-yellow-500 font-black border border-yellow-300 scale-105 z-10";
         } else if (bookedLeave) {
           const type = bookedLeave.type;
-          if (['pl', 'el', 'rh', 'wfh'].includes(type)) {
+          if (['pl', 'el', 'rh'].includes(type)) {
             const colorId = leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'cyan');
             const theme = getLeaveTheme(colorId);
             baseClasses += `${theme.activeBoxBg} border ${theme.activeBoxBorder} ${theme.activeText} font-black cursor-pointer shadow-sm`;
+          } else if (type === 'wfh') {
+            baseClasses += useNavy ? "bg-white/10 border border-cyan-500/40 hover:bg-white/20 cursor-pointer text-white font-bold" : "bg-card border border-border/60 hover:bg-muted/70 cursor-pointer text-foreground font-bold shadow-2xs";
           } else if (type === 'office') {
             baseClasses += "bg-slate-500/15 border border-slate-500/40 text-slate-400 font-black cursor-pointer shadow-sm";
           } else {
@@ -357,7 +360,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
       days.push(
         <div key={`d-${i}`} id={`date-cell-${year}-${monthIndex}-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? (leaveNames.wfh || 'Work From Home') : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
-          {!isCapsule && isWfh && (
+          {isWfh && (
             <span className={isMini ? `absolute top-0.5 right-0.5 w-1.5 h-1.5 ${getLeaveColor(leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none ring-1 ring-background/40` : `absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 ${getLeaveColor(leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none`} />
           )}
           <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
@@ -479,7 +482,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
                 transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                 className="grid grid-cols-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 md:gap-6 items-stretch p-2 pb-6 overflow-visible"
               >
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); if (onAdvanceTutorial) onAdvanceTutorial(); }))}
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { if (onClearAiPreview) onClearAiPreview(); setFocusedMonth(m); setViewMode('monthly'); if (onAdvanceTutorial) onAdvanceTutorial(); }))}
               </motion.div>
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start h-full min-h-0 p-1 overflow-hidden">
@@ -534,7 +537,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
                           }}
                           className="w-full flex-shrink-0"
                         >
-                          {renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => setFocusedMonth(m))}
+                          {renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => { if (onClearAiPreview) onClearAiPreview(); setFocusedMonth(m); })}
                         </motion.div>
                       ))}
                   </motion.div>

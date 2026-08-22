@@ -42,6 +42,8 @@ import {
   clearDemoSession
 } from './services/demoService';
 import { isDemoModeActive } from './services/leaveService';
+import { showAppNotification, requestNotificationPermission, isNotificationSupported, isNotificationGranted } from './utils/notificationService';
+import AiAssistantModal, { AiAssistantChatContent } from './components/AiAssistantModal';
 import './index.css';
 
 function App() {
@@ -52,12 +54,16 @@ function App() {
   const [activeTab, setActiveTab] = useState('calendar');
   const [wfhModalOpen, setWfhModalOpen] = useState(false);
   const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [isMobileAiOpen, setIsMobileAiOpen] = useState(false);
+  const [isAiPreview, setIsAiPreview] = useState(false);
   const [notifModalOpen, setNotifModalOpen] = useState(false);
   const [installModalOpen, setInstallModalOpen] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
   const [isStandaloneApp, setIsStandaloneApp] = useState(false);
   const [backupModalOpen, setBackupModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('profile');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -91,7 +97,8 @@ function App() {
   const [leaves, setLeaves] = useState({
     pl: { total: parseInt(localStorage.getItem('quota_pl') || '15', 10), used: 0, label: leaveNames.pl || 'Planned Leave', color: leaveColors.pl || 'blue', bg: getLeaveColor(leaveColors.pl).bg, badge: getLeaveColor(leaveColors.pl).badge },
     el: { total: parseInt(localStorage.getItem('quota_el') || '10', 10), used: 0, label: leaveNames.el || 'Emergency Leave', color: leaveColors.el || 'orange', bg: getLeaveColor(leaveColors.el).bg, badge: getLeaveColor(leaveColors.el).badge },
-    rh: { total: parseInt(localStorage.getItem('quota_rh') || '1', 10), used: 0, label: leaveNames.rh || 'Extra Leave', color: leaveColors.rh || 'green', bg: getLeaveColor(leaveColors.rh).bg, badge: getLeaveColor(leaveColors.rh).badge }
+    rh: { total: parseInt(localStorage.getItem('quota_rh') || '1', 10), used: 0, label: leaveNames.rh || 'Extra Leave', color: leaveColors.rh || 'green', bg: getLeaveColor(leaveColors.rh).bg, badge: getLeaveColor(leaveColors.rh).badge },
+    wfh: { total: parseInt(localStorage.getItem('quota_wfh') || '10', 10), used: 0, label: leaveNames.wfh || 'Work From Home', color: leaveColors.wfh || 'cyan', bg: getLeaveColor(leaveColors.wfh).bg, badge: getLeaveColor(leaveColors.wfh).badge }
   });
   const mainScrollContainerRef = useRef(null);
   const [bookedDates, setBookedDates] = useState([]);
@@ -377,6 +384,14 @@ function App() {
         color: colorsToUse.rh || prev.rh.color,
         bg: getLeaveColor(colorsToUse.rh || prev.rh.color).bg,
         badge: getLeaveColor(colorsToUse.rh || prev.rh.color).badge
+      },
+      wfh: { 
+        ...prev.wfh, 
+        total: wfhQuota, 
+        label: namesToUse.wfh || prev.wfh?.label || 'Work From Home', 
+        color: colorsToUse.wfh || prev.wfh?.color || 'cyan',
+        bg: getLeaveColor(colorsToUse.wfh || prev.wfh?.color || 'cyan').bg,
+        badge: getLeaveColor(colorsToUse.wfh || prev.wfh?.color || 'cyan').badge
       }
     }));
   };
@@ -573,7 +588,7 @@ function App() {
   useEffect(() => {
     if (!isLeavesLoaded || onboardingOpen || isTutorialActive || installModalOpen || wfhModalOpen || showSplash) return;
     const isDismissed = localStorage.getItem('notif_prompt_dismissed') === 'true';
-    if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
+    if (isNotificationSupported()) {
       try {
         if (Notification.permission !== 'granted' && !isDismissed) {
           setNotifModalOpen(true);
@@ -585,15 +600,13 @@ function App() {
   }, [isLeavesLoaded, onboardingOpen, isTutorialActive, installModalOpen, wfhModalOpen, showSplash]);
 
   const handleEnableNotif = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          setNotifModalOpen(false);
-        }
-      } catch (e) {
-        console.warn('Error requesting notification permission:', e);
-      }
+    const perm = await requestNotificationPermission();
+    if (perm === 'granted') {
+      showAppNotification('Attendance Reminders Active', {
+        body: 'You will receive daily attendance check-in reminders on this device.',
+        tag: 'leave-vault-welcome'
+      });
+      setNotifModalOpen(false);
     } else {
       setNotifModalOpen(false);
     }
@@ -604,35 +617,49 @@ function App() {
   // Daily Working Day Attendance Check-in Prompt
   useEffect(() => {
     if (!isLeavesLoaded) return;
-    const todayStr = getTodayStr();
-    
-    const isWorkday = !isWeekend(todayStr) && !isHoliday(todayStr);
-    const hasStatusRecorded = bookedDates.some(b => b.date === todayStr);
-    const now = getTodayDate();
-    const promptHourNum = parseInt(wfhPromptHour || '12', 10);
-    const isAfterPromptHour = devDateStr ? true : now.getHours() >= promptHourNum;
 
-    // Only prompt attendance if onboarding, tutorial, splash, and install modal are not active
-    if (isWorkday && !hasStatusRecorded && isAfterPromptHour && !hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
-      setWfhModalOpen(true);
-      setHasPromptedWfh(true);
+    const checkAndTriggerAttendancePrompt = () => {
+      const todayStr = getTodayStr();
+      const isWorkday = !isWeekend(todayStr) && !isHoliday(todayStr);
+      const hasStatusRecorded = bookedDates.some(b => b.date === todayStr);
+      const now = getTodayDate();
+      const promptHourNum = parseInt(wfhPromptHour || '12', 10);
+      const isAfterPromptHour = devDateStr ? true : now.getHours() >= promptHourNum;
 
-      if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
-        try {
-          if (Notification.permission === 'granted') {
-            const period = promptHourNum >= 12 ? 'PM' : 'AM';
-            const displayH = promptHourNum > 12 ? promptHourNum - 12 : (promptHourNum === 0 ? 12 : promptHourNum);
-            new Notification('Daily Attendance Check-in', {
-              body: `It is past ${displayH} ${period}. Please confirm if ${todayStr} is WFH or In-Office.`,
-              icon: '/favicon.ico'
-            });
-          }
-        } catch (e) {
-          console.warn('Mobile notification toast error:', e);
-        }
+      // Only prompt attendance if onboarding, tutorial, splash, and install modal are not active
+      if (isWorkday && !hasStatusRecorded && isAfterPromptHour && !hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
+        setWfhModalOpen(true);
+        setHasPromptedWfh(true);
+
+        const period = promptHourNum >= 12 ? 'PM' : 'AM';
+        const displayH = promptHourNum > 12 ? promptHourNum - 12 : (promptHourNum === 0 ? 12 : promptHourNum);
+        showAppNotification('Daily Attendance Check-in', {
+          body: `It is past ${displayH} ${period}. Please confirm if today (${todayStr}) is WFH or In-Office.`,
+          tag: `wfh-checkin-${todayStr}`
+        });
       }
-    }
-  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, onboardingOpen, isTutorialActive, installModalOpen]);
+    };
+
+    // Run check immediately
+    checkAndTriggerAttendancePrompt();
+
+    // Check every 30 seconds and when app gains focus or becomes visible
+    const intervalId = setInterval(checkAndTriggerAttendancePrompt, 30000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndTriggerAttendancePrompt();
+      }
+    };
+
+    window.addEventListener('focus', checkAndTriggerAttendancePrompt);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', checkAndTriggerAttendancePrompt);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, onboardingOpen, isTutorialActive, installModalOpen, showSplash]);
 
   const handleWfhStatusSelect = async (statusType) => {
     const todayStr = getTodayStr();
@@ -648,6 +675,80 @@ function App() {
     setSelectionStart(todayStr);
     setPreviewDates([todayStr]);
     setMobileConfirmOpen(true);
+  };
+
+  const handleExecuteAiAction = async (action, details) => {
+    if (!details) return;
+
+    if (action === 'stage_plan') {
+      const planName = details.planName || 'Vacation Plan';
+      const startDate = details.startDate;
+      const endDate = details.endDate || startDate;
+      const leaveType = details.leaveType || 'pl';
+
+      const sDate = new Date(startDate);
+      const eDate = new Date(endDate);
+      const dates = [];
+      for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+        dates.push(`${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      }
+
+      const lType = (leaveType || 'pl').toLowerCase();
+      const curTotal = leaves && leaves[lType] ? leaves[lType].total : 15;
+      const curUsed = leaves && leaves[lType] ? leaves[lType].used : 0;
+      const curRemaining = Math.max(0, curTotal - curUsed);
+      const requiredDays = details.leaveDaysCost || dates.length || 1;
+
+      if (curRemaining < requiredDays) {
+        alert(`Cannot book leave: Insufficient ${leaveNames[lType] || lType.toUpperCase()} quota (only ${curRemaining} remaining, but ${requiredDays} required).`);
+        return;
+      }
+
+      await createLeavePlan(planName, dates, leaveType, details.note || planName, currentUser?.id);
+      await loadLeaves();
+      setAiModalOpen(false);
+    } else if (action === 'stage_leave') {
+      const lType = (details.leaveType || 'pl').toLowerCase();
+      const curTotal = leaves && leaves[lType] ? leaves[lType].total : 15;
+      const curUsed = leaves && leaves[lType] ? leaves[lType].used : 0;
+      const curRemaining = Math.max(0, curTotal - curUsed);
+      const requiredDays = details.dates?.length || 1;
+
+      if (curRemaining < requiredDays) {
+        alert(`Cannot book leave: Insufficient ${leaveNames[lType] || lType.toUpperCase()} quota (only ${curRemaining} remaining, but ${requiredDays} required).`);
+        return;
+      }
+
+      await addLeave(details.startDate, details.leaveType || 'pl', details.note || 'Leave', null, 1, currentUser?.id);
+      await loadLeaves();
+      setAiModalOpen(false);
+    } else if (action === 'log_wfh') {
+      await addLeave(details.startDate, 'wfh', 'Work From Home', null, 1, currentUser?.id);
+      await loadLeaves();
+      setAiModalOpen(false);
+    } else if (action === 'cancel_leave' || action === 'delete_leave') {
+      const datesToCancel = details.dates || (details.startDate ? [details.startDate] : []);
+      for (const d of datesToCancel) {
+        await removeLeave(d, currentUser?.id);
+      }
+      if (details.planId) {
+        await deleteLeavePlan(details.planId, currentUser?.id);
+      } else if (details.planName) {
+        const foundPlan = leavePlans.find(p => p.name?.toLowerCase() === details.planName?.toLowerCase());
+        if (foundPlan) {
+          await deleteLeavePlan(foundPlan.id, currentUser?.id);
+        }
+      }
+      await loadLeaves();
+      setAiModalOpen(false);
+    }
+
+    // Clear AI preview & focused highlight from calendar so it returns to normal state
+    setPreviewDates([]);
+    setIsAiPreview(false);
+    setSuggestedPlanName(null);
+    setHoveredSuggestion(null);
+    setSelectionStart(null);
   };
 
 
@@ -668,11 +769,17 @@ function App() {
     const elUsed = datesArray.filter(d => d.type === 'el').reduce((sum, d) => sum + (d.duration || 1), 0);
     const rhUsed = datesArray.filter(d => d.type === 'rh').reduce((sum, d) => sum + (d.duration || 1), 0);
 
+    const targetMonthKey = getTodayStr().substring(0, 7);
+    const wfhUsed = datesArray
+      .filter(d => d.type === 'wfh' && typeof d.date === 'string' && d.date.startsWith(targetMonthKey))
+      .reduce((sum, d) => sum + (d.duration || 1), 0);
+
     setLeaves(prev => ({
       ...prev,
       pl: { ...prev.pl, used: plUsed },
       el: { ...prev.el, used: elUsed },
-      rh: { ...prev.rh, used: rhUsed }
+      rh: { ...prev.rh, used: rhUsed },
+      wfh: { ...prev.wfh, used: wfhUsed, total: prev.wfh?.total || parseInt(localStorage.getItem('quota_wfh') || '10', 10) }
     }));
   };
 
@@ -806,6 +913,14 @@ function App() {
         color: updatedColors.rh,
         bg: getLeaveColor(updatedColors.rh).bg,
         badge: getLeaveColor(updatedColors.rh).badge
+      },
+      wfh: { 
+        ...prev.wfh, 
+        total: quotas ? quotas.wfh : (prev.wfh?.total || 10), 
+        label: updatedNames.wfh || prev.wfh?.label || 'Work From Home', 
+        color: updatedColors.wfh || prev.wfh?.color || 'cyan',
+        bg: getLeaveColor(updatedColors.wfh || prev.wfh?.color || 'cyan').bg,
+        badge: getLeaveColor(updatedColors.wfh || prev.wfh?.color || 'cyan').badge
       }
     }));
   };
@@ -864,12 +979,50 @@ function App() {
     }
   };
 
-  const handlePreviewRange = (datesArray, holidayName = null) => {
+  const handlePreviewRange = (datesArray, holidayName = null, options = {}) => {
     setActiveTab('calendar');
     setSuggestedPlanName(holidayName || null);
-    setPreviewDates(datesArray);
+    setPreviewDates(datesArray || []);
+    
+    if (datesArray && datesArray.length > 0) {
+      const firstDate = new Date(datesArray[0]);
+      if (!isNaN(firstDate.getTime())) {
+        setCalendarFocusedMonth(firstDate.getMonth());
+        setCalendarViewMode('monthly');
+      }
+    }
+
+    if (options && options.isAiChat) {
+      setIsAiPreview(true);
+    } else {
+      setIsAiPreview(false);
+    }
     scrollToTop();
   };
+
+  const handleClearAiPreview = () => {
+    setIsAiPreview(false);
+    setPreviewDates([]);
+    setSuggestedPlanName(null);
+    setHoveredSuggestion(null);
+  };
+
+  // Remove AI preview focus if clicking anywhere outside the chatbox window
+  useEffect(() => {
+    if (!isAiPreview && previewDates.length === 0) return;
+
+    const handleOutsideChatClick = (e) => {
+      const isInsideChat = e.target.closest?.('.ai-chat-panel, .ai-assistant-modal, [data-ai-chat]');
+      if (!isInsideChat) {
+        handleClearAiPreview();
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsideChatClick);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsideChatClick);
+    };
+  }, [isAiPreview, previewDates.length]);
 
   useEffect(() => {
     if (previewDates.length > 0) {
@@ -1114,27 +1267,6 @@ function App() {
                 </div>
               );
             })}
-            {(() => {
-              const curMonthKey = new Date().toISOString().substring(0, 7);
-              const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
-              const remainingWfh = Math.max(0, 10 - wfhUsedThisMonth);
-              const pctWfh = (wfhUsedThisMonth / 10) * 100;
-              return (
-                <div className="flex flex-col w-28 border-l border-border/60 pl-5 flex-shrink-0">
-                  <div className="flex justify-between items-end mb-0.5">
-                    <span className="text-[10px] font-bold font-mono text-cyan-500 uppercase">WFH <span className="ml-1 text-[8px] font-sans lowercase px-1 rounded bg-cyan-500/10 text-cyan-400">max 10/mo</span></span>
-                  </div>
-                  <div className="flex items-baseline gap-1 mb-0.5">
-                    <span className="text-xl font-bold font-mono text-cyan-400">{wfhUsedThisMonth}</span>
-                    <span className="text-xs font-mono text-muted-foreground">/ 10</span>
-                  </div>
-                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-300 bg-cyan-400" style={{ width: `${pctWfh}%` }} />
-                  </div>
-                  <span className="text-[9px] font-mono text-muted-foreground mt-0.5">{remainingWfh} left this mo</span>
-                </div>
-              );
-            })()}
           </div>
 
           <div className="flex items-center gap-3 border-l border-border/80 pl-4 flex-shrink-0 relative z-[60]">
@@ -1205,10 +1337,15 @@ function App() {
             <OptimizerPanel 
               onPreviewRange={handlePreviewRange} 
               onHoverSuggestion={setHoveredSuggestion}
-              bookedDates={bookedDates.map(d=>d.date)}
+              bookedDates={bookedDates}
               viewMode={calendarViewMode}
               setFocusedMonth={setCalendarFocusedMonth}
               leaves={leaves}
+              leaveNames={leaveNames}
+              leavePlans={leavePlans}
+              onOpenAiModal={() => setAiModalOpen(true)}
+              onOpenSettings={(tab = 'profile') => { setSettingsInitialTab(tab); setSettingsModalOpen(true); }}
+              onExecuteAction={handleExecuteAiAction}
             />
             {/* Bottom Gradient Fade */}
             <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent z-20" />
@@ -1270,6 +1407,7 @@ function App() {
                     setViewingLeave={setViewingLeave}
                     leaveColors={leaveColors}
                     leaveNames={leaveNames}
+                    onClearAiPreview={handleClearAiPreview}
                   />
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.div 
@@ -1283,11 +1421,16 @@ function App() {
                       <OptimizerPanel 
                         onPreviewRange={handlePreviewRange} 
                         onHoverSuggestion={setHoveredSuggestion}
-                        bookedDates={bookedDates.map(d=>d.date)}
+                        bookedDates={bookedDates}
                         viewMode={calendarViewMode}
                         setFocusedMonth={setCalendarFocusedMonth}
                         inlineOnMobile={true}
                         leaves={leaves}
+                        leaveNames={leaveNames}
+                        leavePlans={leavePlans}
+                        onOpenAiModal={() => setAiModalOpen(true)}
+                        onOpenSettings={(tab = 'profile') => { setSettingsInitialTab(tab); setSettingsModalOpen(true); }}
+                        onExecuteAction={handleExecuteAiAction}
                       />
                     </motion.div>
                   </AnimatePresence>
@@ -1332,9 +1475,9 @@ function App() {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 via-background/70 to-transparent" />
       </div>
 
-      {/* Backdrop when mobile menu, confirmation modal, or viewing leave open */}
+      {/* Backdrop when mobile menu, confirmation modal, viewing leave, or AI assistant open */}
       <AnimatePresence>
-        {(isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null) && (
+        {(isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null || isMobileAiOpen) && (
           <motion.div
             key="mobile-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1343,6 +1486,7 @@ function App() {
               setIsMobileMenuOpen(false);
               setMobileConfirmOpen(false);
               setViewingLeave(null);
+              setIsMobileAiOpen(false);
             }}
           />
         )}
@@ -1354,7 +1498,7 @@ function App() {
           layout
           transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
           className={`pointer-events-auto overflow-hidden border border-border/80 backdrop-blur-2xl transition-[border-radius,background-color,box-shadow,width,max-width] duration-200 shadow-[0_12px_40px_-5px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] ${
-            isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null
+            isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null || isMobileAiOpen
               ? 'w-full rounded-[28px] bg-card/95 dark:bg-card/95'
               : (selectionStart !== null || previewDates.length > 0)
                 ? 'w-full rounded-[28px] bg-slate-900 dark:bg-slate-950 text-white border border-slate-800 shadow-2xl'
@@ -2257,7 +2401,7 @@ function App() {
           )}
 
           {/* ── SELECTION STATE (date selected, not yet confirmed) ── */}
-          {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && (selectionStart !== null || previewDates.length > 0) && (
+          {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && !isAiPreview && (selectionStart !== null || previewDates.length > 0) && (
             <motion.div key="selection"
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: "easeInOut" }}
@@ -2301,7 +2445,46 @@ function App() {
               )}
             </motion.div>
           )}
-          {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && selectionStart === null && previewDates.length === 0 && (
+
+          {/* ── AI ASSISTANT MORPHING DOCK STATE ── */}
+          {isMobileAiOpen && !isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && (
+            <motion.div
+              key="mobile-ai-dock"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeInOut" }}
+              className="max-h-[85vh] flex flex-col overflow-hidden bg-card rounded-[28px]"
+            >
+              {/* Handle */}
+              <div className="flex justify-center pt-3 pb-1 bg-card">
+                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+              </div>
+              <AiAssistantChatContent
+                onClose={() => setIsMobileAiOpen(false)}
+                context={{
+                  leaves,
+                  leaveNames,
+                  bookedDates,
+                  leavePlans,
+                  todayStr: getTodayStr()
+                }}
+                onExecuteAction={handleExecuteAiAction}
+                onPreviewRange={(start, end) => {
+                  const sDate = new Date(start);
+                  const eDate = new Date(end);
+                  const range = [];
+                  for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+                    range.push(`${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+                  }
+                  handlePreviewRange(range, `Vacation (${start} → ${end})`);
+                }}
+                isMorphedDock={true}
+              />
+            </motion.div>
+          )}
+
+          {!isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && !isMobileAiOpen && selectionStart === null && previewDates.length === 0 && (
             <motion.div key="nav"
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: "easeInOut" }}
@@ -2356,17 +2539,17 @@ function App() {
                 </button>
 
                 <button 
-                  disabled 
-                  className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground/40 opacity-40 cursor-not-allowed relative select-none"
-                  title="Trip Planner is coming soon"
+                  onClick={() => setIsMobileAiOpen(true)} 
+                  className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer relative"
+                  title="Gemini AI Vacation & Leave Assistant"
                 >
                   <div className="relative">
-                    <MapPin size={20} className="mb-1"/>
-                    <span className="absolute -top-1.5 -right-3 bg-muted-foreground/20 text-muted-foreground text-[8px] font-mono font-bold px-1 rounded border border-border/40">
-                      SOON
+                    <Sparkles size={20} className="mb-1 text-blue-500 animate-pulse"/>
+                    <span className="absolute -top-1.5 -right-3 bg-blue-500 text-white text-[7px] font-mono font-bold px-1 rounded-full shadow-xs">
+                      AI
                     </span>
                   </div>
-                  <span className="text-[9px] font-bold tracking-wide">Trips</span>
+                  <span className="text-[9px] font-bold tracking-wide text-blue-500">AI Chat</span>
                 </button>
 
                 <button 
@@ -2423,7 +2606,7 @@ function App() {
 
       {/* Selection Modal — Lifted for layering (desktop & mobile) */}
       <div className="block">
-        {((selectionStart || previewDates.length > 0)) && (
+        {!isAiPreview && (selectionStart || previewDates.length > 0) && (
           <LeaveSelectionBar 
             selectionStart={selectionStart}
             previewDates={previewDates}
@@ -2523,12 +2706,36 @@ function App() {
         onInstalled={() => setIsStandaloneApp(true)}
       />
 
+      {/* Gemini AI Assistant & Vacation Planner Modal */}
+      <AiAssistantModal
+        isOpen={aiModalOpen && !isTutorialActive && !onboardingOpen && !showSplash}
+        onClose={() => setAiModalOpen(false)}
+        context={{
+          leaves,
+          leaveNames,
+          bookedDates,
+          leavePlans,
+          todayStr: getTodayStr()
+        }}
+        onExecuteAction={handleExecuteAiAction}
+        onPreviewRange={(start, end) => {
+          const sDate = new Date(start);
+          const eDate = new Date(end);
+          const range = [];
+          for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+            range.push(`${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+          }
+          handlePreviewRange(range, `Vacation (${start} → ${end})`);
+        }}
+      />
+
       {/* Unified Settings & Account Hub Modal */}
       <AnimatePresence>
         {settingsModalOpen && (
           <SettingsModal
             isOpen={settingsModalOpen}
             onClose={() => setSettingsModalOpen(false)}
+            initialTab={settingsInitialTab}
             userName={userName}
             companyName={companyName}
             avatarUrl={avatarUrl}
