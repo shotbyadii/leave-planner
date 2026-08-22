@@ -22,6 +22,7 @@ const SettingsModal = ({
   quotas = { pl: 15, el: 10, rh: 1, wfh: 10 },
   leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Extra Leave', wfh: 'Work From Home' },
   leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
+  wfhPromptHour: propWfhPromptHour = '12',
   onSaveSettings,
   currentUser = null,
   onOpenAuthModal,
@@ -36,7 +37,7 @@ const SettingsModal = ({
   const [name, setName] = useState(userName);
   const [companyName, setCompanyName] = useState(propCompanyName);
   const [avatarUrl, setAvatarUrl] = useState(propAvatarUrl);
-  const [wfhPromptHour, setWfhPromptHour] = useState(localStorage.getItem('wfh_prompt_hour') || '12');
+  const [wfhPromptHour, setWfhPromptHour] = useState(propWfhPromptHour || localStorage.getItem('wfh_prompt_hour') || '12');
 
   const [currentQuotas, setCurrentQuotas] = useState({ ...quotas });
   const [currentNames, setCurrentNames] = useState({ ...leaveNames });
@@ -55,6 +56,7 @@ const SettingsModal = ({
     name.trim() !== (userName || '').trim() ||
     companyName.trim() !== (propCompanyName || '').trim() ||
     avatarUrl !== propAvatarUrl ||
+    String(wfhPromptHour) !== String(propWfhPromptHour || '12') ||
     JSON.stringify(currentQuotas) !== JSON.stringify(quotas) ||
     JSON.stringify(currentNames) !== JSON.stringify(leaveNames) ||
     JSON.stringify(currentColors) !== JSON.stringify(leaveColors)
@@ -64,6 +66,7 @@ const SettingsModal = ({
     setName(userName || '');
     setCompanyName(propCompanyName || '');
     setAvatarUrl(propAvatarUrl || '');
+    setWfhPromptHour(propWfhPromptHour || '12');
     setCurrentQuotas({ ...quotas });
     setCurrentNames({ ...leaveNames });
     setCurrentColors({ ...leaveColors });
@@ -94,6 +97,7 @@ const SettingsModal = ({
       setName(userName);
       setCompanyName(propCompanyName);
       setAvatarUrl(propAvatarUrl);
+      setWfhPromptHour(propWfhPromptHour || localStorage.getItem('wfh_prompt_hour') || '12');
       setCurrentQuotas({ ...quotas });
       setCurrentNames({ ...leaveNames });
       setCurrentColors({ ...leaveColors });
@@ -101,7 +105,7 @@ const SettingsModal = ({
       setShowResetConfirm(false);
       setBackupStatusMsg(null);
     }
-  }, [isOpen, userName, propCompanyName, propAvatarUrl, JSON.stringify(quotas), JSON.stringify(leaveNames), JSON.stringify(leaveColors)]);
+  }, [isOpen, userName, propCompanyName, propAvatarUrl, propWfhPromptHour, JSON.stringify(quotas), JSON.stringify(leaveNames), JSON.stringify(leaveColors)]);
 
   if (!isOpen) return null;
 
@@ -134,7 +138,8 @@ const SettingsModal = ({
         avatarUrl: avatarUrl,
         quotas: currentQuotas,
         names: currentNames,
-        colors: currentColors
+        colors: currentColors,
+        wfhPromptHour: String(wfhPromptHour)
       });
     }
     setSavedSuccess(true);

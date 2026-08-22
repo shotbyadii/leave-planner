@@ -64,6 +64,28 @@
     --status-weekend: #1f2937;
     --status-bridge: #854d0e;
   }
+
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
 }
 
 @layer base {
@@ -76,15 +98,29 @@
   }
   body {
     min-height: 100dvh;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
     @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 select-none;
   }
   input, textarea {
     user-select: text !important;
     -webkit-user-select: text !important;
     cursor: text !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  /* Prevent browser autofill white background flash */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #1c1c1c inset !important;
+    -webkit-text-fill-color: #ffffff !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+    caret-color: #ffffff !important;
   }
   button, a, [role="button"] {
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent !important;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-mono tracking-tight;
@@ -211,7 +247,7 @@ input[data-tutorial-target="true"],
 }
 
 /* Non-target element dimming when tutorial is active */
-body[data-tutorial-active="true"] .bg-card:not(#tutorial-step-calendar *):not(.z-\[9990\] *):not([data-tutorial-target="true"]):not(#tutorial-hint-card),
+body[data-tutorial-active="true"] .bg-card:not(#tutorial-step-calendar *):not(.z-\[9990\] *):not([data-tutorial-target="true"]):not(#tutorial-hint-card):not(#sandbox-demo-banner):not(#sandbox-demo-banner *),
 body[data-tutorial-active="true"] .grid > [id^="month-card-"]:not([data-tutorial-target="true"]) {
   opacity: 0.35 !important;
   transition: opacity 0.3s ease !important;
@@ -220,6 +256,8 @@ body[data-tutorial-active="true"] .grid > [id^="month-card-"]:not([data-tutorial
 body[data-tutorial-active="true"] #tutorial-step-calendar,
 body[data-tutorial-active="true"] .z-\[9990\],
 body[data-tutorial-active="true"] .z-\[9990\] *,
+body[data-tutorial-active="true"] #sandbox-demo-banner,
+body[data-tutorial-active="true"] #sandbox-demo-banner *,
 body[data-tutorial-active="true"] [data-tutorial-target="true"] {
   opacity: 1 !important;
   filter: none !important;
@@ -232,7 +270,7 @@ body[data-tutorial-active="true"] .bg-black\/60 {
 }
 
 /* Disable pointer events on non-target elements when tutorial is active */
-body[data-tutorial-active="true"] button:not([data-tutorial-target="true"]):not([data-tutorial-target="true"] *):not(#tutorial-hint-card *),
+body[data-tutorial-active="true"] button:not([data-tutorial-target="true"]):not([data-tutorial-target="true"] *):not(#tutorial-hint-card *):not(#sandbox-demo-banner *),
 body[data-tutorial-active="true"] [id^="date-cell-"]:not([data-tutorial-target="true"]),
 body[data-tutorial-active="true"] [id^="month-card-"]:not([data-tutorial-target="true"]) {
   pointer-events: none !important;
@@ -241,6 +279,8 @@ body[data-tutorial-active="true"] [id^="month-card-"]:not([data-tutorial-target=
 body[data-tutorial-active="true"] [data-tutorial-target="true"],
 body[data-tutorial-active="true"] [data-tutorial-target="true"] *,
 body[data-tutorial-active="true"] #tutorial-hint-card,
-body[data-tutorial-active="true"] #tutorial-hint-card * {
+body[data-tutorial-active="true"] #tutorial-hint-card *,
+body[data-tutorial-active="true"] #sandbox-demo-banner,
+body[data-tutorial-active="true"] #sandbox-demo-banner * {
   pointer-events: auto !important;
 }

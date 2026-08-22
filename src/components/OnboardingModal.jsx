@@ -9,15 +9,28 @@ import CompanyInput from './CompanyInput';
 import HolidayManager from './HolidayManager';
 import { getStoredHolidays, saveStoredHolidays } from '../data/holidays';
 
-const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
+const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
   const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName && initialName !== 'User' ? initialName : (typeof window !== 'undefined' ? localStorage.getItem('user_name') || '' : ''));
   const [companyName, setCompanyName] = useState('');
   const [wfhPromptHour, setWfhPromptHour] = useState('12');
   const [notifGranted, setNotifGranted] = useState(
     typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
   );
   const [holidays, setHolidays] = useState(() => getStoredHolidays());
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialName && initialName !== 'User') {
+        setName(initialName);
+      } else {
+        const saved = localStorage.getItem('user_name');
+        if (saved && saved !== 'User') setName(saved);
+      }
+    }
+  }, [isOpen, initialName]);
+
+  const [isCompanySearching, setIsCompanySearching] = useState(false);
 
   // Quotas, Names & Colors State
   const [quotas, setQuotas] = useState({
@@ -87,9 +100,9 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
       title: 'Welcome to Leave Vault',
       subtitle: 'Your intelligent annual leave planner & attendance tracker.',
       highlights: [
-        { icon: CalendarDays, title: 'Smart Leave Optimizer', desc: 'Auto-finds long weekend bridges with minimal leave cost.' },
-        { icon: MapPin, title: 'Trip Range Planner', desc: 'Group & label multi-day vacations effortlessly.' },
-        { icon: Home, title: 'Daily WFH Attendance Tracker', desc: 'Track your monthly remote days with daily check-ins.' }
+        { icon: CalendarDays, title: 'Smart Leave Optimizer', desc: 'Auto-finds long weekend bridges to maximize time off with minimal leaves.' },
+        { icon: MapPin, title: 'Vacation & Trip Planner', desc: 'Organize, label, and track multi-day vacations effortlessly.' },
+        { icon: Home, title: 'WFH & Hybrid Attendance', desc: 'Track monthly remote quotas with automated daily check-in reminders.' }
       ]
     }
   ];
@@ -103,7 +116,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
       <div className="relative bg-card w-full max-w-4xl mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
         
         {/* Step Progress Header */}
-        <div className="px-6 py-4 border-b border-border bg-muted/30 flex justify-between items-center">
+        <div className="px-6 py-4 border-b border-border bg-muted/30 flex justify-between items-center relative z-30">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span className="text-xs font-black uppercase tracking-widest text-muted-foreground font-mono">
@@ -122,8 +135,11 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
           </div>
         </div>
 
+        {/* Soft Gradient Fade under Top Bar for graceful content transition */}
+        <div className="absolute top-[57px] inset-x-0 h-6 bg-gradient-to-b from-card via-card/80 to-transparent pointer-events-none z-20" />
+
         {/* Scrollable Step Content */}
-        <div className="p-6 overflow-y-auto flex-1 no-scrollbar">
+        <div className="p-6 overflow-y-auto flex-1 no-scrollbar flex flex-col justify-center min-h-[440px]">
           <AnimatePresence mode="wait">
             
             {/* STEP 1: Feature Showcase */}
@@ -134,7 +150,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-6 max-w-xl mx-auto"
+                className="flex flex-col gap-6 max-w-xl mx-auto w-full my-auto"
               >
                 <div className="text-center flex flex-col items-center">
                   <div className="w-16 h-16 rounded-3xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-3 shadow-inner">
@@ -171,18 +187,34 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-6 max-w-md mx-auto py-4"
+                className="flex flex-col max-w-md mx-auto w-full my-auto py-2"
               >
-                <div className="text-center flex flex-col items-center">
+                {/* Top Icon & Title Header - Gracefully shifts up and fades under top bar when searching company */}
+                <motion.div 
+                  animate={{ 
+                    y: isCompanySearching ? -95 : 0, 
+                    opacity: isCompanySearching ? 0 : 1,
+                    scale: isCompanySearching ? 0.85 : 1
+                  }}
+                  transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                  className="text-center flex flex-col items-center mb-6"
+                >
                   <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-3 shadow-inner">
                     <User size={32} />
                   </div>
                   <h2 className="text-2xl font-black text-foreground tracking-tight">User & Company Profile</h2>
                   <p className="text-xs text-muted-foreground mt-1 font-medium">Set your display name and company brand.</p>
-                </div>
+                </motion.div>
 
-                <div className="flex flex-col gap-4">
-                  <div>
+                <div className="flex flex-col gap-5">
+                  {/* Name Field - Dims and shifts well above company box when searching company */}
+                  <motion.div
+                    animate={{ 
+                      y: isCompanySearching ? -105 : 0, 
+                      opacity: isCompanySearching ? 0.15 : 1 
+                    }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                  >
                     <label className="text-xs font-bold text-foreground mb-1.5 block text-left">Your Full Name</label>
                     <input
                       type="text"
@@ -192,21 +224,35 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                       className="w-full bg-muted/50 border border-border rounded-2xl px-4 py-3 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-inner"
                       autoFocus
                     />
-                  </div>
+                  </motion.div>
 
-                  <div>
+                  {/* Company Field - Smoothly shifts up to center the dropdown with huge clearance */}
+                  <motion.div
+                    animate={{ 
+                      y: isCompanySearching ? -115 : 0 
+                    }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                  >
                     <label className="text-xs font-bold text-foreground mb-1.5 block text-left flex items-center gap-1.5">
                       <Building2 size={14} className="text-primary" /> Company Name & Logo
                     </label>
                     <CompanyInput
                       value={companyName}
                       onChange={(val) => setCompanyName(val)}
+                      onOpenChange={(isOpen) => setIsCompanySearching(isOpen)}
                       placeholder="Search company (e.g. Google, Microsoft...)"
                     />
-                    <p className="text-[11px] text-muted-foreground text-left mt-1">
+                    <motion.p 
+                      animate={{ 
+                        opacity: isCompanySearching ? 0 : 1,
+                        height: isCompanySearching ? 0 : 'auto'
+                      }}
+                      transition={{ duration: 0.2 }}
+                      className="text-[11px] text-muted-foreground text-left mt-1 overflow-hidden"
+                    >
                       Auto-detects and displays your official company logo in the header.
-                    </p>
-                  </div>
+                    </motion.p>
+                  </motion.div>
                 </div>
               </motion.div>
             )}
@@ -352,7 +398,11 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <ShieldCheck size={18} className={notifGranted ? "text-emerald-500" : "text-primary"} />
-                      <span className="text-xs font-bold text-foreground">Browser Reminders</span>
+                      <span className="text-xs font-bold text-foreground">
+                        {typeof window !== 'undefined' && (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+                          ? 'Daily Attendance Reminders'
+                          : 'Desktop & Browser Reminders'}
+                      </span>
                     </div>
                     {notifGranted && (
                       <span className="text-[10px] font-black uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
@@ -361,7 +411,9 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                     )}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Receive desktop check-in reminders so you never miss logging your WFH workdays.
+                    {typeof window !== 'undefined' && (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+                      ? 'Receive mobile check-in reminders so you never miss logging your WFH workdays.'
+                      : 'Receive desktop check-in reminders so you never miss logging your WFH workdays.'}
                   </p>
                   {!notifGranted ? (
                     <button
@@ -369,7 +421,9 @@ const OnboardingModal = ({ isOpen, onClose, onComplete }) => {
                       onClick={handleRequestNotif}
                       className="py-2.5 px-4 bg-primary text-primary-foreground text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-md shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                     >
-                      <Bell size={14} /> Enable Desktop Notifications
+                      <Bell size={14} /> {typeof window !== 'undefined' && (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+                        ? 'Enable Reminders'
+                        : 'Enable Desktop Notifications'}
                     </button>
                   ) : (
                     <div className="text-xs font-bold text-emerald-500 flex items-center gap-1.5">

@@ -13,6 +13,18 @@ export const getLeaveColor = (colorId = 'blue') => {
   return COLOR_PALETTE.find(c => c.id === colorId) || COLOR_PALETTE[0];
 };
 
+export const getLeaveTheme = (colorId = 'blue') => {
+  const c = COLOR_PALETTE.find(p => p.id === colorId) || COLOR_PALETTE[0];
+  return {
+    ...c,
+    activeBoxBorder: c.border,
+    activeBoxBg: `${c.bg}/10`,
+    activeText: c.text,
+    activeBadge: c.badge,
+    activeHex: c.hex
+  };
+};
+
 export const getShortform = (name, fallbackCode = '') => {
   if (!name || typeof name !== 'string') return fallbackCode.toUpperCase();
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -22,3 +34,4 @@ export const getShortform = (name, fallbackCode = '') => {
   }
   return words.map(w => w[0]).join('').substring(0, 4).toUpperCase();
 };
+

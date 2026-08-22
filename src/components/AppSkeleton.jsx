@@ -13,7 +13,7 @@ const AppSkeleton = () => {
     >
       
       {/* ─── STICKY TOP HEADER SKELETON ─── */}
-      <div className="sticky top-0 z-40 bg-background border-b border-border shadow-[0_1px_0_0_hsl(var(--border)),0_4px_24px_-4px_hsl(var(--foreground)/0.06)]">
+      <div className="sticky top-0 z-40 bg-background border-b border-border shadow-[0_1px_0_0_hsl(var(--border)),0_4px_24px_-4px_hsl(var(--foreground)/0.06)] pt-safe">
         
         {/* Mobile Header Skeleton */}
         <header className="md:hidden flex flex-col bg-background/95 backdrop-blur-md border-b border-border/80">

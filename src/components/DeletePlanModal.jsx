@@ -18,7 +18,7 @@ const DeletePlanModal = ({ plan, leaveCount, onClose, onConfirm }) => {
               <div>
                 <h3 className="text-lg font-bold text-foreground mb-1">Delete Leave Plan?</h3>
                 <p className="text-sm text-muted-foreground">
-                  This will permanently cancel <span className="font-bold text-red-600">{leaveCount}</span> {leaveCount === 1 ? 'leaf' : 'leaves'} in 
+                  This will permanently cancel <span className="font-bold text-red-600">{leaveCount}</span> {leaveCount === 1 ? 'leave' : 'leaves'} in 
                   <span className="font-bold text-foreground"> "{plan.name}"</span>.
                 </p>
               </div>

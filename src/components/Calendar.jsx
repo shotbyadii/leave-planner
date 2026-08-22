@@ -5,8 +5,9 @@ import LeaveSelectionBar from './LeaveSelectionBar';
 import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial, leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }, leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' } }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -286,14 +287,13 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
         } else if (isHovered) {
           baseClasses += "bg-yellow-400/30 text-yellow-500 font-black border border-yellow-300 scale-105 z-10";
         } else if (bookedLeave) {
-          if (bookedLeave.type === 'pl') {
-            baseClasses += "bg-blue-500/15 border border-blue-500/40 text-blue-500 font-black cursor-pointer shadow-sm";
-          } else if (bookedLeave.type === 'el') {
-            baseClasses += "bg-orange-500/15 border border-orange-500/40 text-orange-500 font-black cursor-pointer shadow-sm";
-          } else if (bookedLeave.type === 'rh') {
-            baseClasses += "bg-emerald-500/15 border border-emerald-500/40 text-emerald-500 font-black cursor-pointer shadow-sm";
-          } else if (bookedLeave.type === 'wfh') {
-            baseClasses += "bg-cyan-500/15 border border-cyan-500/40 text-cyan-500 font-black cursor-pointer shadow-sm";
+          const type = bookedLeave.type;
+          if (['pl', 'el', 'rh', 'wfh'].includes(type)) {
+            const colorId = leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'cyan');
+            const theme = getLeaveTheme(colorId);
+            baseClasses += `${theme.activeBoxBg} border ${theme.activeBoxBorder} ${theme.activeText} font-black cursor-pointer shadow-sm`;
+          } else if (type === 'office') {
+            baseClasses += "bg-slate-500/15 border border-slate-500/40 text-slate-400 font-black cursor-pointer shadow-sm";
           } else {
             baseClasses += "bg-muted/40 border border-border/60 hover:bg-muted cursor-pointer text-foreground font-bold";
           }
@@ -332,13 +332,14 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
               : "bg-yellow-300 text-yellow-900 font-bold ring-2 ring-yellow-400 scale-105 z-10 shadow-sm";
           }
         } else if (bookedLeave) {
-          const typeInfo = leaves ? leaves[bookedLeave.type] : null;
-          const colorBg = typeInfo?.bg || (bookedLeave.type === 'pl' ? 'bg-blue-500' : bookedLeave.type === 'el' ? 'bg-orange-500' : 'bg-green-500');
-          if (['pl', 'el', 'rh'].includes(bookedLeave.type)) {
-            baseClasses += `${colorBg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
-          } else if (bookedLeave.type === 'wfh') {
+          const type = bookedLeave.type;
+          if (['pl', 'el', 'rh'].includes(type)) {
+            const colorId = leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : 'green');
+            const theme = getLeaveTheme(colorId);
+            baseClasses += `${theme.bg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
+          } else if (type === 'wfh') {
             baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
-          } else if (bookedLeave.type === 'office') {
+          } else if (type === 'office') {
             baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
           }
         } else if (holidayInfo) {
@@ -355,9 +356,9 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       const isWfh = bookedLeave?.type === 'wfh';
 
       days.push(
-        <div key={`d-${i}`} id={`date-cell-${year}-${monthIndex}-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? 'Work From Home' : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
+        <div key={`d-${i}`} id={`date-cell-${year}-${monthIndex}-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? (leaveNames.wfh || 'Work From Home') : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
           {!isCapsule && isWfh && (
-            <span className={isMini ? "absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none ring-1 ring-background/40" : "absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-sm shadow-cyan-400/90 z-20 pointer-events-none"} />
+            <span className={isMini ? `absolute top-0.5 right-0.5 w-1.5 h-1.5 ${getLeaveColor(leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none ring-1 ring-background/40` : `absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 ${getLeaveColor(leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none`} />
           )}
           <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
         </div>
@@ -433,8 +434,8 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
   return (
     <>
-      <div id="tutorial-step-calendar" className="flex flex-col gap-6 relative z-10 h-full">
-        <div className="flex justify-between items-center w-full">
+      <div id="tutorial-step-calendar" className={`flex flex-col gap-6 relative z-10 ${viewMode === 'monthly' ? 'h-full min-h-0' : 'h-full'}`}>
+        <div className="flex justify-between items-center w-full flex-shrink-0">
           <h2 className="text-lg font-bold text-foreground">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
           <div className="flex bg-muted p-1 rounded-xl w-fit ml-auto shadow-inner">
             <button onClick={() => setViewMode('monthly')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'monthly' ? 'bg-background shadow-apple-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} title="Focused View">
@@ -470,7 +471,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             </AnimatePresence>
           </div>
         ) : (
-          <div className="w-full overflow-visible">
+          <div className={`w-full ${viewMode === 'monthly' ? 'flex-1 min-h-0' : 'overflow-visible'}`}>
             {viewMode === 'yearly' ? (
               <motion.div 
                 initial={{ opacity: 0.9, scale: 0.99 }}
@@ -481,61 +482,65 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1)).map(m => renderMonth(m, false, false, isMonthPast(m), "cursor-pointer hover:opacity-90", () => { setFocusedMonth(m); setViewMode('monthly'); if (onAdvanceTutorial) onAdvanceTutorial(); }))}
               </motion.div>
             ) : (
-              <div className="flex flex-col md:flex-row gap-6 items-start h-auto md:h-[calc(100vh-280px)] p-1 overflow-visible">
+              <div className="flex flex-col md:flex-row gap-6 items-start h-full min-h-0 p-1 overflow-hidden">
                 {/* Main Focused Month Card */}
                 <motion.div 
                   key={`main-focused-${focusedMonth}`}
                   initial={{ opacity: 0.85, scale: 0.98, y: 8 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex-1 flex justify-start w-full relative z-10 overflow-visible"
+                  className="flex-1 flex justify-start w-full relative z-10 overflow-visible flex-shrink-0"
                 >
                   <div className="w-full">{renderMonth(focusedMonth, true)}</div>
                 </motion.div>
 
                 {/* Right Side Vertical Stack of Mini Cards */}
-                <motion.div 
-                  key={`mini-stack-${focusedMonth}`}
-                  initial="hidden"
-                  animate="visible"
-                  variants={{
-                    hidden: { opacity: 1 },
-                    visible: {
-                      opacity: 1,
-                      transition: {
-                        staggerChildren: 0.05,
-                        delayChildren: 0.02
+                <div className="hidden md:flex w-80 flex-shrink-0 relative h-full min-h-0">
+                  <motion.div 
+                    key={`mini-stack-${focusedMonth}`}
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: { opacity: 1 },
+                      visible: {
+                        opacity: 1,
+                        transition: {
+                          staggerChildren: 0.05,
+                          delayChildren: 0.02
+                        }
                       }
-                    }
-                  }}
-                  className="hidden md:flex w-80 flex-shrink-0 flex-col gap-4 overflow-y-auto overflow-x-visible h-full p-2 pb-24 no-scrollbar relative z-10"
-                >
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    .filter(m => m !== focusedMonth)
-                    .sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1))
-                    .map((m) => (
-                      <motion.div
-                        key={`mini-month-card-${m}`}
-                        variants={{
-                          hidden: { opacity: 0, y: 24, scale: 0.96 },
-                          visible: {
-                            opacity: 1,
-                            y: 0,
-                            scale: 1,
-                            transition: {
-                              type: 'spring',
-                              stiffness: 240,
-                              damping: 24,
-                              mass: 0.7
+                    }}
+                    className="w-full flex flex-col gap-4 overflow-y-auto overflow-x-hidden h-full max-h-full p-2 pb-20 no-scrollbar relative z-10"
+                  >
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+                      .filter(m => m !== focusedMonth)
+                      .sort((a,b) => isMonthPast(a) === isMonthPast(b) ? a-b : (isMonthPast(a) ? 1 : -1))
+                      .map((m) => (
+                        <motion.div
+                          key={`mini-month-card-${m}`}
+                          variants={{
+                            hidden: { opacity: 0, y: 24, scale: 0.96 },
+                            visible: {
+                              opacity: 1,
+                              y: 0,
+                              scale: 1,
+                              transition: {
+                                type: 'spring',
+                                stiffness: 240,
+                                damping: 24,
+                                mass: 0.7
+                              }
                             }
-                          }
-                        }}
-                        className="w-full flex-shrink-0"
-                      >
-                        {renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => setFocusedMonth(m))}
-                      </motion.div>
-                    ))}
-                </motion.div>
+                          }}
+                          className="w-full flex-shrink-0"
+                        >
+                          {renderMonth(m, false, false, isMonthPast(m), `cursor-pointer transition-all w-full flex-shrink-0 !h-auto ${isMonthPast(m) ? 'opacity-50 hover:opacity-90' : 'opacity-100'}`, () => setFocusedMonth(m))}
+                        </motion.div>
+                      ))}
+                  </motion.div>
+                  {/* Bottom Gradient Fade */}
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-card via-card/70 to-transparent z-20" />
+                </div>
               </div>
             )}
           </div>
@@ -553,6 +558,10 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             onConvertToWfh={handleConvertToWfh}
             onConvertToLeave={handleConvertToLeave}
             leaves={leaves}
+            leaveColors={leaveColors}
+            leaveNames={leaveNames}
+            bookedDates={bookedDates}
+            maxWfh={10}
             calendarStyle={calendarStyle}
           />
         )}

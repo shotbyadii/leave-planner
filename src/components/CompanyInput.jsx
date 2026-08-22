@@ -7,6 +7,7 @@ const CompanyInput = ({
   value = '', 
   onChange, 
   onSelectCompany, 
+  onOpenChange,
   placeholder = 'Select or type company name...',
   className = '' 
 }) => {
@@ -18,20 +19,31 @@ const CompanyInput = ({
   const currentLogo = value ? getCompanyLogoUrl(value) : null;
   const initials = getCompanyInitials(value);
 
+  const updateIsOpen = (val) => {
+    setIsOpen(val);
+    if (onOpenChange) {
+      onOpenChange(val);
+    }
+  };
+
   // Reset img error on value change
   useEffect(() => {
     setImgError(false);
   }, [value]);
 
-  // Click outside to close
+  // Click outside to close (supporting mouse and touch)
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
+        updateIsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   const handleSelect = (company) => {
@@ -39,7 +51,7 @@ const CompanyInput = ({
     if (onSelectCompany) {
       onSelectCompany(company);
     }
-    setIsOpen(false);
+    updateIsOpen(false);
   };
 
   return (
@@ -70,9 +82,9 @@ const CompanyInput = ({
           value={value}
           onChange={(e) => {
             onChange(e.target.value);
-            setIsOpen(true);
+            updateIsOpen(true);
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => updateIsOpen(true)}
           placeholder={placeholder}
           className="w-full bg-card border border-border rounded-2xl pl-10 pr-9 py-2.5 text-xs font-bold text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm transition-all"
         />
@@ -80,7 +92,7 @@ const CompanyInput = ({
         {/* Right Dropdown Toggle Chevron */}
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => updateIsOpen(!isOpen)}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
         >
           <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
@@ -95,7 +107,7 @@ const CompanyInput = ({
             animate={{ opacity: 1, y: 4, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-full left-0 right-0 z-[120] bg-card border border-border rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 max-h-64 overflow-y-auto no-scrollbar mt-1"
+            className="absolute left-0 right-0 top-full mt-1.5 z-[150] bg-card border border-border rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-0.5 max-h-56 overflow-y-auto no-scrollbar"
           >
             <div className="px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center justify-between border-b border-border/60 mb-0.5">
               <span>{value ? 'Matching Companies' : 'Popular Workspaces'}</span>

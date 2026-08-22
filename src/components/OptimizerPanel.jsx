@@ -86,7 +86,13 @@ const OptimizerPanel = ({ onPreviewRange, onHoverSuggestion, bookedDates = [], v
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     
-    onPreviewRange(range);
+    const startMonthStr = new Date(s.startDate).toLocaleString('default', { month: 'short' });
+    const startDay = new Date(s.startDate).getDate();
+    const endMonthStr = new Date(s.endDate).toLocaleString('default', { month: 'short' });
+    const endDay = new Date(s.endDate).getDate();
+    const displayTitle = s.holidayName ? s.holidayName : `${startMonthStr} ${startDay} – ${endMonthStr} ${endDay}`;
+    
+    onPreviewRange(range, displayTitle);
 
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
