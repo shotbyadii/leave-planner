@@ -45,6 +45,9 @@ const AppleWheelPicker = ({
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
+    if (scrollRef.current.scrollLeft !== 0) {
+      scrollRef.current.scrollLeft = 0;
+    }
     isScrollingRef.current = true;
 
     const scrollTop = scrollRef.current.scrollTop;
@@ -150,7 +153,8 @@ const AppleWheelPicker = ({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar relative z-10 py-[38px] overscroll-contain"
+          style={{ touchAction: 'pan-y', overscrollBehaviorX: 'none' }}
+          className="h-full w-full overflow-y-scroll overflow-x-hidden snap-y snap-mandatory no-scrollbar relative z-10 py-[38px] overscroll-contain touch-pan-y"
         >
           {numbers.map((num) => {
             const isSelected = num === internalValue;
@@ -158,7 +162,7 @@ const AppleWheelPicker = ({
               <div
                 key={num}
                 onClick={() => selectNumber(num)}
-                className={`h-[36px] snap-center flex items-center justify-center gap-1 transition-transform duration-100 cursor-pointer ${
+                className={`h-[36px] w-full max-w-full snap-center flex items-center justify-center gap-1 transition-transform duration-100 cursor-pointer select-none ${
                   isSelected 
                     ? `text-xl font-black ${currentColor.text} font-mono scale-110` 
                     : 'text-xs font-bold text-muted-foreground/40 font-mono opacity-50 hover:opacity-80'

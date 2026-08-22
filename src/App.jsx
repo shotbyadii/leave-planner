@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock, FileSpreadsheet } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend, getStoredHolidays, loadHolidaysFromSupabase } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
@@ -12,6 +12,7 @@ import { TimePicker } from './components/TimePicker';
 import LeaveSelectionBar from './components/LeaveSelectionBar';
 import WfhCheckinModal from './components/WfhCheckinModal';
 import NotificationPromptModal from './components/NotificationPromptModal';
+import InstallPromptModal, { isRunningStandalone } from './components/InstallPromptModal';
 import BackupModal from './components/BackupModal';
 import OnboardingModal from './components/OnboardingModal';
 import SettingsModal from './components/SettingsModal';
@@ -24,6 +25,7 @@ import CompanyInput from './components/CompanyInput';
 import ThemeSelector from './components/ThemeSelector';
 import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
+import AppleBalanceTicker from './components/AppleBalanceTicker';
 import { getLeaveColor, getShortform, COLOR_PALETTE } from './utils/colorUtils';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
@@ -31,9 +33,19 @@ import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } fro
 import { getCompanyLogoUrl, getCompanyInitials } from './utils/companyLogoUtils';
 import TutorialOverlay from './components/TutorialOverlay';
 import { isTutorialCompleted, markTutorialCompleted, resetTutorialStatus } from './services/tutorialService';
+import DemoBanner from './components/DemoBanner';
+import {
+  getDemoUser,
+  signOutDemoUser,
+  fetchDemoProfile,
+  upsertDemoProfile,
+  clearDemoSession
+} from './services/demoService';
+import { isDemoModeActive } from './services/leaveService';
 import './index.css';
 
 function App() {
+  const isDemoMode = isDemoModeActive();
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const isInitialAuthDone = useRef(false);
   const [showSplash, setShowSplash] = useState(false);
@@ -41,6 +53,9 @@ function App() {
   const [wfhModalOpen, setWfhModalOpen] = useState(false);
   const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
   const [notifModalOpen, setNotifModalOpen] = useState(false);
+  const [installModalOpen, setInstallModalOpen] = useState(false);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+  const [isStandaloneApp, setIsStandaloneApp] = useState(false);
   const [backupModalOpen, setBackupModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -82,6 +97,7 @@ function App() {
   const [bookedDates, setBookedDates] = useState([]);
   const [leavePlans, setLeavePlans] = useState([]);
   const [previewDates, setPreviewDates] = useState([]);
+  const [suggestedPlanName, setSuggestedPlanName] = useState(null);
 
   // Reactive Custom Company Public Holidays State
   const [currentHolidays, setCurrentHolidays] = useState(() => getStoredHolidays());
@@ -145,6 +161,7 @@ function App() {
   const [mobileNote, setMobileNote] = useState('');
   const [mobileFromHour, setMobileFromHour] = useState(9);
   const [mobileToHour, setMobileToHour] = useState(18);
+  const [mobileTickerData, setMobileTickerData] = useState(null);
   const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [devModalOpen, setDevModalOpen] = useState(false);
@@ -214,7 +231,12 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Do not allow initial auth state changes to disrupt initial skeleton window
       if (!isInitialAuthDone.current) return;
-      if (session?.user) {
+      if (isDemoMode) return;
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (session?.user) setCurrentUser(session.user);
+        return;
+      }
+      if (session?.user && event === 'SIGNED_IN') {
         handleAuthSuccess(session.user);
       }
     });
@@ -223,6 +245,51 @@ function App() {
       subscription?.unsubscribe();
     };
   }, []);
+
+  // PWA Standalone Detection & Global Listeners
+  useEffect(() => {
+    const isStandalone = isRunningStandalone();
+    setIsStandaloneApp(isStandalone);
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setIsStandaloneApp(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  // Auto-prompt Install Modal for logged-in users on new session (only if onboarding & tutorial are completed)
+  useEffect(() => {
+    if (isAuthChecking || !currentUser || onboardingOpen || isTutorialActive) return;
+
+    try {
+      const isStandalone = isRunningStandalone();
+      const dismissedPermanent = localStorage.getItem('pwa_prompt_dismissed_permanent') === 'true';
+      const sessionPrompted = sessionStorage.getItem('pwa_session_prompted') === 'true';
+      const onboardingCompleted = localStorage.getItem('onboarding_completed') === 'true';
+      const tutorialDone = isTutorialCompleted();
+
+      if (!isStandalone && !dismissedPermanent && !sessionPrompted && onboardingCompleted && tutorialDone) {
+        sessionStorage.setItem('pwa_session_prompted', 'true');
+        const timer = setTimeout(() => {
+          setInstallModalOpen(true);
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {}
+  }, [isAuthChecking, currentUser, onboardingOpen, isTutorialActive]);
 
   useEffect(() => {
     if (!isMobileMenuOpen) {
@@ -323,6 +390,30 @@ function App() {
       }
     };
 
+    if (isDemoMode) {
+      const demoUser = getDemoUser();
+      if (demoUser) {
+        setCurrentUser(demoUser);
+        const demoProfile = await fetchDemoProfile(demoUser.id);
+        if (demoProfile) {
+          syncProfileToState(demoProfile, demoUser);
+        }
+        await loadLeaves(demoUser);
+        await waitRemaining(400);
+        isInitialAuthDone.current = true;
+        setIsAuthChecking(false);
+        setShowSplash(false);
+      } else {
+        await loadLeaves(null);
+        await waitRemaining(400);
+        isInitialAuthDone.current = true;
+        setIsAuthChecking(false);
+        setShowSplash(true);
+        setAuthModalOpen(false);
+      }
+      return;
+    }
+
     try {
       // 1. Instant check for cached session from local storage
       const session = await getCurrentSession();
@@ -389,6 +480,20 @@ function App() {
 
     if (user) {
       const nameToUse = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || userName;
+      setUserName(nameToUse);
+      localStorage.setItem('user_name', nameToUse);
+
+      if (isDemoMode) {
+        const demoProfile = await fetchDemoProfile(user.id);
+        if (demoProfile) syncProfileToState(demoProfile, user);
+        const demoDone = sessionStorage.getItem('demo_onboarding_completed') === 'true' || isTutorialCompleted();
+        if (!demoDone) {
+          setOnboardingOpen(true);
+        }
+        await loadLeaves(user);
+        return;
+      }
+
       const profile = await fetchUserProfile(user.id);
       if (!profile) {
         // Fresh brand-new account: create default clean profile in Supabase
@@ -415,6 +520,16 @@ function App() {
   };
 
   const handleDeleteAccount = async () => {
+    if (isDemoMode) {
+      clearDemoSession();
+      setCurrentUser(null);
+      setBookedDates([]);
+      setLeavePlans([]);
+      setShowSplash(true);
+      setAuthModalOpen(false);
+      return;
+    }
+
     if (currentUser?.id) {
       await deleteUserAccount(currentUser.id);
     }
@@ -424,15 +539,39 @@ function App() {
   };
 
   const handleSignOut = async () => {
+    if (isDemoMode) {
+      await signOutDemoUser();
+      setCurrentUser(null);
+      setShowSplash(true);
+      setAuthModalOpen(false);
+      return;
+    }
+
     await signOutUser();
     setCurrentUser(null);
     setIsAuthChecking(false);
     setShowSplash(true);
   };
 
+  const handleRestartDemo = async () => {
+    clearDemoSession();
+    setCurrentUser(null);
+    setBookedDates([]);
+    setLeavePlans([]);
+    setUserName('Demo User');
+    setCompanyName('Acme Corp');
+    await loadLeaves(null);
+    setShowSplash(true);
+    setAuthModalOpen(false);
+  };
+
+  const handleExitDemo = () => {
+    window.location.href = '/';
+  };
+
   // Persistent Notification Permission Prompt (Until "Not Needed" is clicked)
   useEffect(() => {
-    if (!isLeavesLoaded) return;
+    if (!isLeavesLoaded || onboardingOpen || isTutorialActive || installModalOpen || wfhModalOpen || showSplash) return;
     const isDismissed = localStorage.getItem('notif_prompt_dismissed') === 'true';
     if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
       try {
@@ -440,34 +579,20 @@ function App() {
           setNotifModalOpen(true);
         }
       } catch (e) {
-        console.warn('Notification permission read failed:', e);
+        console.warn('Could not query Notification permission state:', e);
       }
     }
-  }, [isLeavesLoaded]);
+  }, [isLeavesLoaded, onboardingOpen, isTutorialActive, installModalOpen, wfhModalOpen, showSplash]);
 
   const handleEnableNotif = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window && Boolean(window.Notification)) {
       try {
-        let perm;
-        if (typeof Notification.requestPermission === 'function') {
-          perm = await Notification.requestPermission();
-        }
+        const perm = await Notification.requestPermission();
         if (perm === 'granted') {
           setNotifModalOpen(false);
-          try {
-            new Notification('Attendance Reminders Enabled', {
-              body: 'You will receive daily 12 PM check-in reminders on working days.',
-              icon: '/favicon.ico'
-            });
-          } catch (e) {
-            console.warn('Notification constructor error:', e);
-          }
-        } else {
-          setNotifModalOpen(false);
         }
-      } catch (err) {
-        console.warn('Notification permission request error:', err);
-        setNotifModalOpen(false);
+      } catch (e) {
+        console.warn('Error requesting notification permission:', e);
       }
     } else {
       setNotifModalOpen(false);
@@ -487,7 +612,8 @@ function App() {
     const promptHourNum = parseInt(wfhPromptHour || '12', 10);
     const isAfterPromptHour = devDateStr ? true : now.getHours() >= promptHourNum;
 
-    if (isWorkday && !hasStatusRecorded && isAfterPromptHour && !hasPromptedWfh) {
+    // Only prompt attendance if onboarding, tutorial, splash, and install modal are not active
+    if (isWorkday && !hasStatusRecorded && isAfterPromptHour && !hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
       setWfhModalOpen(true);
       setHasPromptedWfh(true);
 
@@ -506,7 +632,7 @@ function App() {
         }
       }
     }
-  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour]);
+  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, onboardingOpen, isTutorialActive, installModalOpen]);
 
   const handleWfhStatusSelect = async (statusType) => {
     const todayStr = getTodayStr();
@@ -575,6 +701,9 @@ function App() {
     if (newPromptHour !== undefined) {
       setWfhPromptHour(String(newPromptHour));
       localStorage.setItem('wfh_prompt_hour', String(newPromptHour));
+      if (!isTutorialActive && !onboardingOpen) {
+        setHasPromptedWfh(false);
+      }
     }
     if (quotas) {
       localStorage.setItem('quota_pl', quotas.pl);
@@ -614,24 +743,40 @@ function App() {
       });
     }
 
-    const activeUser = currentUser || await getCurrentUser();
-    if (activeUser?.id) {
-      await upsertUserProfile(activeUser.id, {
+    if (isDemoMode) {
+      upsertDemoProfile(currentUser?.id || 'demo-user', {
         name: name || userName,
-        email: activeUser.email,
-        companyName: companyName !== undefined ? companyName : companyName,
-        companyLogoUrl: companyLogoUrl !== undefined ? companyLogoUrl : companyLogoUrl,
-        avatarUrl: avatarUrl !== undefined ? avatarUrl : avatarUrl,
-        quotas: quotas || {
-          pl: leaves.pl.total,
-          el: leaves.el.total,
-          rh: leaves.rh.total,
-          wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
-        },
-        names: names || leaveNames,
-        colors: colors || leaveColors,
-        wfhPromptHour: newPromptHour !== undefined ? newPromptHour : (wfhPromptHour || '12')
+        company_name: companyName !== undefined ? companyName : companyName,
+        company_logo_url: companyLogoUrl !== undefined ? companyLogoUrl : companyLogoUrl,
+        avatar_url: avatarUrl !== undefined ? avatarUrl : avatarUrl,
+        quota_pl: quotas ? quotas.pl : leaves.pl.total,
+        quota_el: quotas ? quotas.el : leaves.el.total,
+        quota_rh: quotas ? quotas.rh : leaves.rh.total,
+        quota_wfh: quotas ? quotas.wfh : parseInt(localStorage.getItem('quota_wfh') || '10', 10),
+        leave_names: names || leaveNames,
+        leave_colors: colors || leaveColors,
+        wfh_prompt_hour: newPromptHour !== undefined ? newPromptHour : (wfhPromptHour || '12')
       });
+    } else {
+      const activeUser = currentUser || await getCurrentUser();
+      if (activeUser?.id) {
+        await upsertUserProfile(activeUser.id, {
+          name: name || userName,
+          email: activeUser.email,
+          companyName: companyName !== undefined ? companyName : companyName,
+          companyLogoUrl: companyLogoUrl !== undefined ? companyLogoUrl : companyLogoUrl,
+          avatarUrl: avatarUrl !== undefined ? avatarUrl : avatarUrl,
+          quotas: quotas || {
+            pl: leaves.pl.total,
+            el: leaves.el.total,
+            rh: leaves.rh.total,
+            wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10)
+          },
+          names: names || leaveNames,
+          colors: colors || leaveColors,
+          wfhPromptHour: newPromptHour !== undefined ? newPromptHour : (wfhPromptHour || '12')
+        });
+      }
     }
 
     const updatedColors = colors || leaveColors;
@@ -663,6 +808,19 @@ function App() {
         badge: getLeaveColor(updatedColors.rh).badge
       }
     }));
+  };
+
+  const triggerInstallPromptAfterFlow = () => {
+    try {
+      const isStandalone = isRunningStandalone();
+      const dismissedPermanent = localStorage.getItem('pwa_prompt_dismissed_permanent') === 'true';
+      if (!isStandalone && !dismissedPermanent && !isTutorialActive) {
+        sessionStorage.setItem('pwa_session_prompted', 'true');
+        setTimeout(() => {
+          setInstallModalOpen(true);
+        }, 600);
+      }
+    } catch (e) {}
   };
 
   const handleOnboardingComplete = (data) => {
@@ -706,22 +864,28 @@ function App() {
     }
   };
 
-  const handlePreviewRange = (datesArray) => {
+  const handlePreviewRange = (datesArray, holidayName = null) => {
     setActiveTab('calendar');
+    setSuggestedPlanName(holidayName || null);
     setPreviewDates(datesArray);
     scrollToTop();
   };
 
   useEffect(() => {
     if (previewDates.length > 0) {
+      const holidayInWindow = previewDates.map(d => publicHolidays.find(h => h.date === d)).find(Boolean);
+      const holidayTitle = suggestedPlanName || (holidayInWindow ? holidayInWindow.name : null);
+
       const first = new Date(previewDates[0]);
       const last = new Date(previewDates[previewDates.length - 1]);
-      const name = previewDates.length > 1
-        ? `${first.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-        : first.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      const name = holidayTitle
+        ? holidayTitle
+        : (previewDates.length > 1
+            ? `${first.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${last.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+            : first.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }));
       setMobilePlanName(name);
     }
-  }, [previewDates.length]);
+  }, [previewDates.length, suggestedPlanName, previewDates[0]]);
 
   const handleMobileApply = async () => {
     if (isTutorialActive) {
@@ -737,17 +901,58 @@ function App() {
       return;
     }
     const dates = previewDates;
+    const actualLeaves = dates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
     const elDiffHours = mobileToHour > mobileFromHour ? mobileToHour - mobileFromHour : 0;
     const isHalfDay = mobileLeaveType === 'el' && dates.length === 1 && elDiffHours > 0 && elDiffHours < 4.5;
     const durationPerDay = isHalfDay ? 0.5 : 1;
+    const leavesNeeded = isHalfDay ? 0.5 : actualLeaves;
+
+    const type = (mobileLeaveType || 'pl').toLowerCase();
+    const maxWfh = 10;
+    let curBalance = 0;
+    let total = 15;
+
+    if (type === 'wfh') {
+      const targetMonthKey = (dates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
+      const wfhUsedThisMonth = Array.isArray(bookedDates)
+        ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).length
+        : 0;
+      total = maxWfh;
+      curBalance = Math.max(0, maxWfh - wfhUsedThisMonth);
+    } else {
+      total = leaves[type]?.total || (type === 'el' ? 10 : type === 'rh' ? 1 : 15);
+      const used = leaves[type]?.used || 0;
+      curBalance = Math.max(0, total - used);
+    }
+    const targetBalance = Math.max(0, curBalance - leavesNeeded);
+    const chosenColor = (leaveColors && leaveColors[type]) || (type === 'el' ? 'orange' : type === 'rh' ? 'green' : type === 'wfh' ? 'cyan' : 'blue');
+
+    setMobileTickerData({
+      initialValue: curBalance,
+      targetValue: targetBalance,
+      totalQuota: total,
+      leaveType: type,
+      leaveLabel: leaveNames[type] || type.toUpperCase(),
+      leaveColor: chosenColor,
+      deductedCount: leavesNeeded,
+      dates: [...dates],
+      note: mobileNote,
+      planName: mobilePlanName,
+      durationPerDay
+    });
+  };
+
+  const handleMobileTickerComplete = async () => {
+    if (!mobileTickerData) return;
+    const { dates, note, planName, durationPerDay, leaveType } = mobileTickerData;
     let planId = null;
     if (dates.length > 1) {
-      const plan = await createLeavePlan(mobilePlanName || 'Untitled Plan', dates[0], dates[dates.length - 1], currentUser?.id);
+      const plan = await createLeavePlan(planName || 'Untitled Plan', dates[0], dates[dates.length - 1], currentUser?.id);
       planId = plan?.id || null;
     }
     for (const dateStr of dates) {
       if (!isHoliday(dateStr) && !isWeekend(dateStr)) {
-        await addLeave(dateStr, mobileLeaveType, mobileNote, planId, durationPerDay, currentUser?.id);
+        await addLeave(dateStr, leaveType, note, planId, durationPerDay, currentUser?.id);
       }
     }
     await loadLeaves();
@@ -756,6 +961,7 @@ function App() {
     setMobileConfirmOpen(false);
     setMobileNote('');
     setMobileLeaveType('pl');
+    setMobileTickerData(null);
   };
 
   const getTimeOfDayGreeting = (name) => {
@@ -772,12 +978,22 @@ function App() {
   const userInitials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'LV';
 
   if (isAuthChecking) {
-    return <AppSkeleton />;
+    return (
+      <>
+        {isDemoMode && <DemoBanner onRestartDemo={handleRestartDemo} onExitDemo={handleExitDemo} />}
+        <AppSkeleton />
+      </>
+    );
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col font-sans text-foreground overflow-hidden">
-      <div className="sticky top-0 z-40 bg-background border-b border-border shadow-[0_1px_0_0_hsl(var(--border)),0_4px_24px_-4px_hsl(var(--foreground)/0.06)]">
+    <div className={`h-screen bg-background flex flex-col font-sans text-foreground overflow-hidden ${isDemoMode ? 'pt-10' : ''}`}>
+      {/* Interactive Sandbox Demo Banner (Fixed Top z-[300]) */}
+      {isDemoMode && (
+        <DemoBanner onRestartDemo={handleRestartDemo} onExitDemo={handleExitDemo} />
+      )}
+
+      <div className="sticky top-0 z-40 bg-background border-b border-border shadow-[0_1px_0_0_hsl(var(--border)),0_4px_24px_-4px_hsl(var(--foreground)/0.06)] pt-safe">
         
         {/* Mobile Welcome Header (Mobile Calendar Page & Top Bar) */}
         <header className="md:hidden flex px-4 py-3 justify-between items-center bg-background/95 backdrop-blur-md border-b border-border/80">
@@ -985,7 +1201,7 @@ function App() {
 
         {/* Desktop Optimizer Panel */}
         {activeTab === 'calendar' && (
-          <div className="hidden md:flex w-80 flex-shrink-0 flex-col bg-card rounded-2xl border border-border shadow-apple-sm overflow-hidden h-full relative z-10">
+          <div className="hidden md:flex w-80 flex-shrink-0 flex-col bg-card rounded-t-2xl rounded-b-none border-t border-x border-b-0 border-border shadow-apple-sm overflow-hidden h-full relative z-10">
             <OptimizerPanel 
               onPreviewRange={handlePreviewRange} 
               onHoverSuggestion={setHoveredSuggestion}
@@ -994,23 +1210,28 @@ function App() {
               setFocusedMonth={setCalendarFocusedMonth}
               leaves={leaves}
             />
+            {/* Bottom Gradient Fade */}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent z-20" />
           </div>
         )}
 
-        <div className={`flex-1 flex flex-col bg-background md:bg-card md:rounded-2xl md:border border-border md:shadow-apple-sm overflow-hidden h-full relative ${activeTab === 'calendar' ? 'z-30' : 'z-10'}`}>
+        <div className={`flex-1 flex flex-col bg-background md:bg-card md:rounded-t-2xl md:rounded-b-none md:border-t md:border-x md:border-b-0 border-border md:shadow-apple-sm overflow-hidden h-full relative ${activeTab === 'calendar' ? 'z-30' : 'z-10'}`}>
           {activeTab === 'calendar' && (
             <div className="hidden md:flex p-4 border-b border-border gap-6 items-center bg-muted/30 overflow-x-auto whitespace-nowrap hide-scrollbar">
               <span className="text-sm font-medium text-muted-foreground">Legend:</span>
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-muted border border-border"></div> Weekend</div>
               <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-purple-200"></div> Holiday</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-blue-300"></div> {getShortform(leaveNames.pl, 'PL')}</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-orange-300"></div> {getShortform(leaveNames.el, 'EL')}</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-green-300"></div> {getShortform(leaveNames.rh, 'RH')}</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-2 h-2 rounded-full bg-cyan-400"></div> {getShortform(leaveNames.wfh, 'WFH')}</div>
+              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-3 h-3 rounded-full ${getLeaveColor(leaveColors.pl || 'blue').bg}`}></div> {getShortform(leaveNames.pl, 'PL')}</div>
+              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-3 h-3 rounded-full ${getLeaveColor(leaveColors.el || 'orange').bg}`}></div> {getShortform(leaveNames.el, 'EL')}</div>
+              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-3 h-3 rounded-full ${getLeaveColor(leaveColors.rh || 'green').bg}`}></div> {getShortform(leaveNames.rh, 'RH')}</div>
+              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-2 h-2 rounded-full ${getLeaveColor(leaveColors.wfh || 'cyan').bg}`}></div> {getShortform(leaveNames.wfh, 'WFH')}</div>
             </div>
           )}
           
-          <div ref={mainScrollContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-32 md:pb-6 relative">
+          <div 
+            ref={mainScrollContainerRef} 
+            className={`flex-1 ${activeTab === 'calendar' && calendarViewMode === 'monthly' ? 'md:overflow-hidden' : 'overflow-y-auto'} p-4 md:p-6 pb-32 md:pb-0 relative flex flex-col`}
+          >
             <AnimatePresence mode="wait">
               {activeTab === 'calendar' && (
                 <motion.div 
@@ -1019,7 +1240,7 @@ function App() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  className="flex flex-col gap-6"
+                  className="flex flex-col gap-4 md:gap-6 h-full"
                 >
                   <Calendar 
                     holidays={currentHolidays} 
@@ -1047,6 +1268,8 @@ function App() {
                     theme={theme}
                     viewingLeave={viewingLeave}
                     setViewingLeave={setViewingLeave}
+                    leaveColors={leaveColors}
+                    leaveNames={leaveNames}
                   />
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.div 
@@ -1086,6 +1309,9 @@ function App() {
                     leaves={leaves} 
                     leavePlans={leavePlans}
                     calendarStyle={calendarStyle}
+                    leaveColors={leaveColors}
+                    leaveNames={leaveNames}
+                    maxWfh={parseInt(localStorage.getItem('quota_wfh') || '10', 10)}
                   />
                 </motion.div>
               )}
@@ -1181,6 +1407,10 @@ function App() {
                     setMobileConfirmOpen(true);
                   }}
                   leaves={leaves}
+                  leaveColors={leaveColors}
+                  leaveNames={leaveNames}
+                  bookedDates={bookedDates}
+                  maxWfh={10}
                   calendarStyle={calendarStyle}
                 />
               </motion.div>
@@ -1291,19 +1521,19 @@ function App() {
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Quotas</span>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="p-2.5 bg-card border border-border rounded-xl flex justify-between items-center">
-                        <span className="text-xs font-bold text-blue-500 font-mono">PL</span>
+                        <span className={`text-xs font-bold font-mono ${getLeaveColor(leaveColors.pl || 'blue').text}`}>{getShortform(leaveNames.pl, 'PL')}</span>
                         <span className="text-sm font-black font-mono">{leaves.pl.total} d</span>
                       </div>
                       <div className="p-2.5 bg-card border border-border rounded-xl flex justify-between items-center">
-                        <span className="text-xs font-bold text-orange-500 font-mono">EL</span>
+                        <span className={`text-xs font-bold font-mono ${getLeaveColor(leaveColors.el || 'orange').text}`}>{getShortform(leaveNames.el, 'EL')}</span>
                         <span className="text-sm font-black font-mono">{leaves.el.total} d</span>
                       </div>
                       <div className="p-2.5 bg-card border border-border rounded-xl flex justify-between items-center">
-                        <span className="text-xs font-bold text-green-500 font-mono">RH</span>
+                        <span className={`text-xs font-bold font-mono ${getLeaveColor(leaveColors.rh || 'green').text}`}>{getShortform(leaveNames.rh, 'RH')}</span>
                         <span className="text-sm font-black font-mono">{leaves.rh.total} d</span>
                       </div>
                       <div className="p-2.5 bg-card border border-border rounded-xl flex justify-between items-center">
-                        <span className="text-xs font-bold text-cyan-500 font-mono">WFH</span>
+                        <span className={`text-xs font-bold font-mono ${getLeaveColor(leaveColors.wfh || 'cyan').text}`}>{getShortform(leaveNames.wfh, 'WFH')}</span>
                         <span className="text-sm font-black font-mono">{parseInt(localStorage.getItem('quota_wfh')||'10', 10)} /mo</span>
                       </div>
                     </div>
@@ -1718,37 +1948,72 @@ function App() {
                     </button>
                   </div>
 
-                  {/* Mobile Profile & Settings Quick Action Buttons */}
-                  <div className="p-3 grid grid-cols-2 gap-2 border-b border-border/60 bg-muted/10">
-                    <button 
-                      onClick={() => { setMobileSubView('profile'); }}
-                      className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
-                    >
-                      {effectiveAvatar ? (
-                        <img src={effectiveAvatar} alt={userName} className="w-8 h-8 rounded-xl object-cover border border-primary/20 flex-shrink-0 shadow-sm" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
-                          {userInitials}
+                  {/* Mobile Profile & Settings Quick Action Buttons + Install App CTA */}
+                  <div className="p-3 bg-muted/10 border-b border-border/60 flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        onClick={() => { setMobileSubView('profile'); }}
+                        className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+                      >
+                        {effectiveAvatar ? (
+                          <img src={effectiveAvatar} alt={userName} className="w-8 h-8 rounded-xl object-cover border border-primary/20 flex-shrink-0 shadow-sm" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            {userInitials}
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold text-foreground truncate">My Profile</span>
+                          <span className="text-[9px] text-muted-foreground truncate">{currentUser ? 'Account Sync' : 'View Profile'}</span>
                         </div>
-                      )}
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-bold text-foreground truncate">My Profile</span>
-                        <span className="text-[9px] text-muted-foreground truncate">{currentUser ? 'Account Sync' : 'View Profile'}</span>
-                      </div>
-                    </button>
+                      </button>
 
-                    <button 
-                      onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('quotas'); }}
-                      className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0">
-                        <Settings size={16} />
+                      <button 
+                        onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('quotas'); }}
+                        className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center flex-shrink-0">
+                          <Settings size={16} />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold text-foreground truncate">Settings</span>
+                          <span className="text-[9px] text-muted-foreground truncate">Quotas & Colors</span>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Install Web App CTA in Mobile Menu */}
+                    {!isStandaloneApp ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          setInstallModalOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between p-2.5 bg-gradient-to-r from-primary/10 via-purple-500/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 border border-primary/20 rounded-2xl transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 shadow-md shadow-primary/20">
+                            <Download size={15} />
+                          </div>
+                          <div className="flex flex-col text-left min-w-0">
+                            <span className="text-xs font-black text-foreground tracking-tight flex items-center gap-1.5">
+                              Install Web App
+                              <span className="text-[9px] px-1.5 py-0.2 bg-primary/20 text-primary rounded-full font-mono font-bold">Native</span>
+                            </span>
+                            <span className="text-[10px] text-muted-foreground truncate">Add to home screen for fullscreen mode</span>
+                          </div>
+                        </div>
+                        <ChevronRight size={16} className="text-muted-foreground flex-shrink-0 mr-1" />
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-between p-2 px-3 bg-card/60 border border-border/70 rounded-2xl text-[11px] font-mono">
+                        <span className="flex items-center gap-1.5 text-emerald-500 font-bold">
+                          <CheckCircle2 size={13} /> App Installed
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Running as Native App</span>
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-bold text-foreground truncate">Settings</span>
-                        <span className="text-[9px] text-muted-foreground truncate">Quotas & Colors</span>
-                      </div>
-                    </button>
+                    )}
                   </div>
 
                   {/* Balances */}
@@ -1761,7 +2026,9 @@ function App() {
                       return (
                         <div key={key}>
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold font-mono text-foreground">{data.label} <span className="text-muted-foreground">({key})</span></span>
+                            <span className="text-xs font-bold font-mono text-foreground">
+                              {data.label} <span className="text-muted-foreground">({getShortform(data.label, key)})</span>
+                            </span>
                             <span className="text-sm font-bold font-mono">{remFmt}<span className="text-muted-foreground font-normal text-xs"> / {data.total}</span></span>
                           </div>
                           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
@@ -1783,7 +2050,9 @@ function App() {
                       return (
                         <div>
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold font-mono text-foreground">Work-From-Home <span className="text-muted-foreground">(wfh)</span></span>
+                            <span className="text-xs font-bold font-mono text-foreground">
+                              {leaveNames.wfh || 'Work-From-Home'} <span className="text-muted-foreground">({getShortform(leaveNames.wfh, 'WFH')})</span>
+                            </span>
                             <span className="text-sm font-bold font-mono">{wfhRemaining}<span className="text-muted-foreground font-normal text-xs"> / {maxWfh}</span></span>
                           </div>
                           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
@@ -1824,132 +2093,167 @@ function App() {
               </div>
               <div className="px-5 py-4 border-b border-border bg-muted/30 flex justify-between items-center">
                 <h2 className="font-bold font-mono text-sm uppercase tracking-tight">Confirm Leave</h2>
-                <button onClick={() => setMobileConfirmOpen(false)} className="p-1 text-muted-foreground">
-                  <X size={18} />
-                </button>
+                {!mobileTickerData && (
+                  <button onClick={() => setMobileConfirmOpen(false)} className="p-1 text-muted-foreground cursor-pointer">
+                    <X size={18} />
+                  </button>
+                )}
               </div>
 
-              <div className="p-5 flex flex-col gap-5 pb-8">
-                <div>
-                  <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Plan Name</label>
-                  <input
-                    id="tutorial-step-plan-name-mobile"
-                    type="text"
-                    value={mobilePlanName}
-                    onChange={(e) => setMobilePlanName(e.target.value)}
-                    className="w-full bg-muted/50 border border-border rounded-xl p-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="Plan Name"
-                  />
-                </div>
-
-                {(() => {
-                  const actualLeaves = previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
-                  return (
-                    <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border/50">
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Leaves needed</span>
-                        <span className="text-sm font-bold text-foreground leading-none">{actualLeaves}</span>
-                      </div>
-                      <div className="w-px h-6 bg-border/50" />
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Total days</span>
-                        <span className="text-sm font-bold text-foreground leading-none">{previewDates.length}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div>
-                  <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-2 block">Leave Type</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { key: 'pl', label: 'PL', left: `${leaves.pl.total - leaves.pl.used} left` },
-                      { key: 'el', label: 'EL', left: `${leaves.el.total - leaves.el.used} left` },
-                      { key: 'rh', label: 'RH', left: `${leaves.rh.total - leaves.rh.used} left` },
-                      { key: 'wfh', label: 'WFH', left: 'Max 10/mo' }
-                    ].map(item => {
-                      const isActive = mobileLeaveType === item.key;
-                      const colors = {
-                        pl: { border: 'border-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', shadow: 'shadow-blue-500/20' },
-                        el: { border: 'border-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-700 dark:text-orange-400', shadow: 'shadow-orange-500/20' },
-                        rh: { border: 'border-green-500', bg: 'bg-green-50 dark:bg-green-500/10', text: 'text-green-700 dark:text-green-400', shadow: 'shadow-green-500/20' },
-                        wfh: { border: 'border-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-500/10', text: 'text-cyan-700 dark:text-cyan-400', shadow: 'shadow-cyan-500/20' }
-                      };
-                      const colorStyle = colors[item.key] || { border: 'border-border', bg: 'bg-card', text: 'text-muted-foreground', shadow: '' };
-                      return (
-                        <button
-                          key={item.key}
-                          id={item.key === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
-                          type="button"
-                          onClick={() => {
-                            setMobileLeaveType(item.key);
-                            if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
-                          }}
-                          className={`py-3 px-1 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
-                            isActive ? `${colorStyle.border} ${colorStyle.bg} ${colorStyle.text} shadow-sm ${colorStyle.shadow} ring-1 ring-inset ring-black/5` : 'border-border bg-card text-muted-foreground opacity-60'
-                          }`}
-                        >
-                          <span className="text-[11px] font-black uppercase tracking-widest leading-none">{item.label}</span>
-                          <span className="text-[8px] font-bold opacity-80 leading-none truncate">{item.left}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* EL Warning synced with desktop */}
-                {mobileLeaveType === 'el' && checkSequentialELWarning(previewDates.filter(d => !isHoliday(d) && !isWeekend(d)), bookedDates) && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                    <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-                    <div className="text-xs text-red-800">
-                      <span className="font-black block mb-1 uppercase tracking-wider text-[10px]">Medical Certificate Required</span>
-                      You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
-                    </div>
-                  </div>
-                )}
-
-                {mobileLeaveType === 'el' && previewDates.length === 1 && (
-                  <div className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-xl flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <AlertTriangle size={14} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Partial Day Selection</span>
-                    </div>
-                    <TimePicker
-                      fromHour={mobileFromHour}
-                      toHour={mobileToHour}
-                      onChange={(f, t) => { setMobileFromHour(f); setMobileToHour(t); }}
+              <AnimatePresence mode="wait" initial={false}>
+                {mobileTickerData ? (
+                  <motion.div
+                    key="mobile-ticker"
+                    initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -10 }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                    className="p-6 flex flex-col items-center justify-center"
+                  >
+                    <AppleBalanceTicker
+                      initialValue={mobileTickerData.initialValue}
+                      targetValue={mobileTickerData.targetValue}
+                      totalQuota={mobileTickerData.totalQuota}
+                      leaveType={mobileTickerData.leaveType}
+                      leaveLabel={mobileTickerData.leaveLabel}
+                      leaveColor={mobileTickerData.leaveColor}
+                      deductedCount={mobileTickerData.deductedCount}
+                      actionType={mobileTickerData.leaveType === 'wfh' ? 'wfh' : 'leave'}
+                      onComplete={handleMobileTickerComplete}
+                      autoDismissMs={1600}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="mobile-form"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.18 }}
+                    className="p-5 flex flex-col gap-5 pb-8"
+                  >
+                  <div>
+                    <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Plan Name</label>
+                    <input
+                      id="tutorial-step-plan-name-mobile"
+                      type="text"
+                      value={mobilePlanName}
+                      onChange={(e) => setMobilePlanName(e.target.value)}
+                      className="w-full bg-muted/50 border border-border rounded-xl p-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      placeholder="Plan Name"
                     />
                   </div>
-                )}
 
-                <div>
-                  <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Note (Optional)</label>
-                  <input
-                    type="text"
-                    value={mobileNote}
-                    onChange={(e) => setMobileNote(e.target.value)}
-                    className="w-full bg-muted/50 border border-border rounded-xl p-3 text-sm font-bold focus:outline-none"
-                    placeholder="Why are you taking leave?"
-                  />
-                </div>
+                  {(() => {
+                    const actualLeaves = previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
+                    return (
+                      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border/50">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Leaves needed</span>
+                          <span className="text-sm font-bold text-foreground leading-none">{actualLeaves}</span>
+                        </div>
+                        <div className="w-px h-6 bg-border/50" />
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Total days</span>
+                          <span className="text-sm font-bold text-foreground leading-none">{previewDates.length}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                <div className="flex gap-3 mt-2">
-                  <button onClick={() => setMobileConfirmOpen(false)} className="flex-1 py-3 bg-muted border border-border text-foreground rounded-xl text-xs font-bold shadow-sm">
-                    Back
-                  </button>
-                  <button 
-                    id="tutorial-step-modal-apply-btn-mobile"
-                    onClick={() => {
-                      handleMobileApply();
-                      if (isTutorialActive && tutorialStepIndex === 5) setTutorialStepIndex(6);
-                    }} 
-                    className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2"
-                  >
-                    Confirm & Apply <Check size={14} strokeWidth={3} />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+                  <div>
+                    <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-2 block">Leave Type</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { key: 'pl', label: 'PL', left: `${leaves.pl.total - leaves.pl.used} left` },
+                        { key: 'el', label: 'EL', left: `${leaves.el.total - leaves.el.used} left` },
+                        { key: 'rh', label: 'RH', left: `${leaves.rh.total - leaves.rh.used} left` },
+                        { key: 'wfh', label: 'WFH', left: 'Max 10/mo' }
+                      ].map(item => {
+                        const isActive = mobileLeaveType === item.key;
+                        const colors = {
+                          pl: { border: 'border-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', shadow: 'shadow-blue-500/20' },
+                          el: { border: 'border-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-700 dark:text-orange-400', shadow: 'shadow-orange-500/20' },
+                          rh: { border: 'border-green-500', bg: 'bg-green-50 dark:bg-green-500/10', text: 'text-green-700 dark:text-green-400', shadow: 'shadow-green-500/20' },
+                          wfh: { border: 'border-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-500/10', text: 'text-cyan-700 dark:text-cyan-400', shadow: 'shadow-cyan-500/20' }
+                        };
+                        const colorStyle = colors[item.key] || { border: 'border-border', bg: 'bg-card', text: 'text-muted-foreground', shadow: '' };
+                        return (
+                          <button
+                            key={item.key}
+                            id={item.key === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
+                            type="button"
+                            onClick={() => {
+                              setMobileLeaveType(item.key);
+                              if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
+                            }}
+                            className={`py-3 px-1 rounded-xl border-2 transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                              isActive ? `${colorStyle.border} ${colorStyle.bg} ${colorStyle.text} shadow-sm ${colorStyle.shadow} ring-1 ring-inset ring-black/5` : 'border-border bg-card text-muted-foreground opacity-60'
+                            }`}
+                          >
+                            <span className="text-[11px] font-black uppercase tracking-widest leading-none">{item.label}</span>
+                            <span className="text-[8px] font-bold opacity-80 leading-none truncate">{item.left}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* EL Warning synced with desktop */}
+                  {mobileLeaveType === 'el' && checkSequentialELWarning(previewDates.filter(d => !isHoliday(d) && !isWeekend(d)), bookedDates) && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                      <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
+                      <div className="text-xs text-red-800">
+                        <span className="font-black block mb-1 uppercase tracking-wider text-[10px]">Medical Certificate Required</span>
+                        You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
+                      </div>
+                    </div>
+                  )}
+
+                  {mobileLeaveType === 'el' && previewDates.length === 1 && (
+                    <div className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-xl flex flex-col gap-3">
+                      <div className="flex items-center gap-2 text-orange-600">
+                        <AlertTriangle size={14} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Partial Day Selection</span>
+                      </div>
+                      <TimePicker
+                        fromHour={mobileFromHour}
+                        toHour={mobileToHour}
+                        onChange={(f, t) => { setMobileFromHour(f); setMobileToHour(t); }}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Note (Optional)</label>
+                    <input
+                      type="text"
+                      value={mobileNote}
+                      onChange={(e) => setMobileNote(e.target.value)}
+                      className="w-full bg-muted/50 border border-border rounded-xl p-3 text-sm font-bold focus:outline-none"
+                      placeholder="Why are you taking leave?"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 mt-2">
+                    <button onClick={() => setMobileConfirmOpen(false)} className="flex-1 py-3 bg-muted border border-border text-foreground rounded-xl text-xs font-bold shadow-sm cursor-pointer">
+                      Back
+                    </button>
+                    <button 
+                      id="tutorial-step-modal-apply-btn-mobile"
+                      onClick={() => {
+                        handleMobileApply();
+                        if (isTutorialActive && tutorialStepIndex === 5) setTutorialStepIndex(6);
+                      }} 
+                      className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      Confirm & Apply <Check size={14} strokeWidth={3} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
           )}
 
           {/* ── SELECTION STATE (date selected, not yet confirmed) ── */}
@@ -2125,10 +2429,12 @@ function App() {
             previewDates={previewDates}
             bookedDates={bookedDates}
             leaveNames={leaveNames}
+            leaveColors={leaveColors}
+            suggestedPlanName={suggestedPlanName}
             onAdvanceTutorial={isTutorialActive ? () => setTutorialStepIndex(prev => prev + 1) : undefined}
             forceExpandModal={isTutorialActive && (tutorialStepIndex === 4 || tutorialStepIndex === 5)}
             tutorialStepIndex={tutorialStepIndex}
-            onCancel={() => { setSelectionStart(null); setPreviewDates([]); }}
+            onCancel={() => { setSelectionStart(null); setPreviewDates([]); setSuggestedPlanName(null); }}
             onApply={async (dates, type, note, planName, duration) => {
               if (isTutorialActive) {
                 const finalName = planName || 'Sep Getaway (Walkthrough Demo)';
@@ -2148,6 +2454,7 @@ function App() {
                 ]);
                 setPreviewDates([]);
                 setSelectionStart(null);
+                setSuggestedPlanName(null);
                 return;
               }
               if (planName) setTutorialCustomName(planName);
@@ -2165,17 +2472,20 @@ function App() {
               await loadLeaves();
               setPreviewDates([]);
               setSelectionStart(null);
+              setSuggestedPlanName(null);
             }}
             balances={{
               pl: leaves.pl.total - leaves.pl.used,
               el: leaves.el.total - leaves.el.used,
               rh: leaves.rh.total - leaves.rh.used
             }}
+            leaves={leaves}
+            maxWfh={10}
           />
         )}
       </div>
 
-      {/* 12 PM Daily Attendance Check-in Modal */}
+      {/* Daily Attendance Check-in Modal */}
       {(() => {
         const effectiveToday = getTodayDate();
         const curMonthKey = `${effectiveToday.getFullYear()}-${String(effectiveToday.getMonth() + 1).padStart(2, '0')}`;
@@ -2183,7 +2493,7 @@ function App() {
         const todayStr = getTodayStr();
         return (
           <WfhCheckinModal
-            isOpen={wfhModalOpen}
+            isOpen={wfhModalOpen && !isTutorialActive && !onboardingOpen && !showSplash}
             onClose={() => setWfhModalOpen(false)}
             onSelectStatus={handleWfhStatusSelect}
             onMarkLeave={handleWfhMarkLeave}
@@ -2192,15 +2502,25 @@ function App() {
             todayStr={todayStr}
             bookedDates={bookedDates}
             leaveNames={leaveNames}
+            leaveColors={leaveColors}
+            wfhPromptHour={wfhPromptHour}
           />
         );
       })()}
 
       {/* Notification Permission Modal */}
       <NotificationPromptModal
-        isOpen={notifModalOpen}
+        isOpen={notifModalOpen && !isTutorialActive && !onboardingOpen && !showSplash}
         onClose={() => setNotifModalOpen(false)}
         onEnable={handleEnableNotif}
+      />
+
+      {/* PWA / Web App Installation Prompt Modal */}
+      <InstallPromptModal
+        isOpen={installModalOpen && !isTutorialActive && !onboardingOpen && !showSplash}
+        onClose={() => setInstallModalOpen(false)}
+        deferredPrompt={deferredInstallPrompt}
+        onInstalled={() => setIsStandaloneApp(true)}
       />
 
       {/* Unified Settings & Account Hub Modal */}
@@ -2220,6 +2540,7 @@ function App() {
             }}
             leaveNames={leaveNames}
             leaveColors={leaveColors}
+            wfhPromptHour={wfhPromptHour}
             onSaveSettings={handleSaveSettings}
             currentUser={currentUser}
             onOpenAuthModal={() => setAuthModalOpen(true)}
@@ -2250,6 +2571,7 @@ function App() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+        isDemoMode={isDemoMode}
         currentProfile={{
           name: userName,
           quotas: {
@@ -2270,6 +2592,7 @@ function App() {
             isOpen={showSplash}
             onClose={() => {}}
             onAuthSuccess={handleAuthSuccess}
+            isDemoMode={isDemoMode}
             currentProfile={{
               name: userName,
               quotas: {
@@ -2288,13 +2611,17 @@ function App() {
       {/* Onboarding Flow Modal */}
       <OnboardingModal
         isOpen={onboardingOpen}
+        initialName={userName}
         onClose={() => setOnboardingOpen(false)}
         onComplete={async (data) => {
-          await handleSaveSettings(data);
-          localStorage.setItem('onboarding_completed', 'true');
+          setWfhModalOpen(false);
+          setHasPromptedWfh(true);
           setOnboardingOpen(false);
           setTutorialStepIndex(0);
           setIsTutorialActive(true);
+          await handleSaveSettings(data);
+          sessionStorage.setItem('demo_onboarding_completed', 'true');
+          localStorage.setItem('onboarding_completed', 'true');
         }}
       />
 
@@ -2385,6 +2712,12 @@ function App() {
             setActiveTab('calendar');
             setCalendarViewMode('yearly');
             setLeavePlans(prev => prev.filter(p => p.id !== 'tutorial-demo-plan-temp'));
+            if (isDemoMode) {
+              setHasPromptedWfh(false);
+              setWfhModalOpen(true);
+            } else {
+              triggerInstallPromptAfterFlow();
+            }
           }}
           onSkip={() => {
             markTutorialCompleted();
@@ -2398,6 +2731,12 @@ function App() {
             setActiveTab('calendar');
             setCalendarViewMode('yearly');
             setLeavePlans(prev => prev.filter(p => p.id !== 'tutorial-demo-plan-temp'));
+            if (isDemoMode) {
+              setHasPromptedWfh(false);
+              setWfhModalOpen(true);
+            } else {
+              triggerInstallPromptAfterFlow();
+            }
           }}
         />
       )}

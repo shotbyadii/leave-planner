@@ -3,8 +3,20 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown, Home } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
+import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 
-const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leaves, leavePlans, calendarStyle = 'classic' }) => {
+const LeaveTracker = ({ 
+  bookedDates, 
+  onDelete, 
+  onDeletePlan, 
+  onUpdatePlan, 
+  leaves, 
+  leavePlans, 
+  calendarStyle = 'classic',
+  leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
+  leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' },
+  maxWfh = 10
+}) => {
   const plUsed = leaves.pl.used;
   const elUsed = leaves.el.used;
   const rhUsed = leaves.rh.used;
@@ -173,25 +185,25 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
               <path className="text-white/10" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
               
               <path 
-                className="text-blue-400 transition-all duration-1000 ease-out" 
+                className="transition-all duration-1000 ease-out" 
                 strokeDasharray={`${(plUsed/totalLeaves)*100}, 100`} 
-                strokeWidth="3.5" stroke="currentColor" fill="none" 
+                strokeWidth="3.5" stroke={getLeaveTheme(leaveColors.pl || 'blue').hex} fill="none" 
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
               />
               
               <path 
-                className="text-orange-400 transition-all duration-1000 ease-out" 
+                className="transition-all duration-1000 ease-out" 
                 strokeDasharray={`${(elUsed/totalLeaves)*100}, 100`} 
                 strokeDashoffset={`-${(plUsed/totalLeaves)*100}`}
-                strokeWidth="3.5" stroke="currentColor" fill="none" 
+                strokeWidth="3.5" stroke={getLeaveTheme(leaveColors.el || 'orange').hex} fill="none" 
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
               />
 
               <path 
-                className="text-green-400 transition-all duration-1000 ease-out" 
+                className="transition-all duration-1000 ease-out" 
                 strokeDasharray={`${(rhUsed/totalLeaves)*100}, 100`} 
                 strokeDashoffset={`-${((plUsed + elUsed)/totalLeaves)*100}`}
-                strokeWidth="3.5" stroke="currentColor" fill="none" 
+                strokeWidth="3.5" stroke={getLeaveTheme(leaveColors.rh || 'green').hex} fill="none" 
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
               />
             </svg>
@@ -204,22 +216,22 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
           <div className="flex flex-col gap-3">
              <div className="flex justify-between items-center text-sm">
                <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                 <span className="text-white/60 font-medium">Privileged (PL)</span>
+                 <div className={`w-2 h-2 rounded-full ${getLeaveColor(leaveColors.pl || 'blue').bg}`}></div>
+                 <span className="text-white/80 font-medium">{leaveNames.pl || 'Planned Leave'} ({getShortform(leaveNames.pl, 'PL')})</span>
                </div>
                <span className="font-semibold font-mono text-white">{Number.isInteger(plUsed) ? plUsed : plUsed.toFixed(1)} <span className="text-white/40 font-normal">/ {leaves.pl.total}</span></span>
              </div>
              <div className="flex justify-between items-center text-sm">
                <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-orange-400"></div>
-                 <span className="text-white/60 font-medium">Emergency (EL)</span>
+                 <div className={`w-2 h-2 rounded-full ${getLeaveColor(leaveColors.el || 'orange').bg}`}></div>
+                 <span className="text-white/80 font-medium">{leaveNames.el || 'Emergency Leave'} ({getShortform(leaveNames.el, 'EL')})</span>
                </div>
                <span className="font-semibold font-mono text-white">{Number.isInteger(elUsed) ? elUsed : elUsed.toFixed(1)} <span className="text-white/40 font-normal">/ {leaves.el.total}</span></span>
              </div>
              <div className="flex justify-between items-center text-sm">
                <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-green-400"></div>
-                 <span className="text-white/60 font-medium">Restricted (RH)</span>
+                 <div className={`w-2 h-2 rounded-full ${getLeaveColor(leaveColors.rh || 'green').bg}`}></div>
+                 <span className="text-white/80 font-medium">{leaveNames.rh || 'Restricted Leave'} ({getShortform(leaveNames.rh, 'RH')})</span>
                </div>
                <span className="font-semibold font-mono text-white">{Number.isInteger(rhUsed) ? rhUsed : rhUsed.toFixed(1)} <span className="text-white/40 font-normal">/ {leaves.rh.total}</span></span>
              </div>
@@ -230,10 +242,12 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
         {(() => {
           const curMonthKey = new Date().toISOString().substring(0, 7);
           const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
-          const isWfhOverQuota = wfhUsedThisMonth >= 10;
-          const wfhOverAmount = wfhUsedThisMonth - 10;
-          const wfhRemaining = Math.max(0, 10 - wfhUsedThisMonth);
+          const quotaWfh = maxWfh || 10;
+          const isWfhOverQuota = wfhUsedThisMonth >= quotaWfh;
+          const wfhOverAmount = wfhUsedThisMonth - quotaWfh;
+          const wfhRemaining = Math.max(0, quotaWfh - wfhUsedThisMonth);
           const isWfhWarning = !isWfhOverQuota && wfhRemaining <= 2;
+          const wfhTheme = getLeaveTheme(leaveColors.wfh || 'cyan');
 
           const cardStyle = isWfhOverQuota
             ? 'bg-gradient-to-br from-red-950/80 to-red-900/40 border-red-500/30'
@@ -245,21 +259,21 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
             ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30'
             : isWfhWarning 
             ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' 
-            : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30';
+            : `${wfhTheme.activeBadge}`;
 
           const badgeText = isWfhOverQuota ? 'Over Quota' : (isWfhWarning ? 'Low Balance' : 'Normal');
 
           const subtitleText = isWfhOverQuota
             ? `+${wfhOverAmount} day${wfhOverAmount === 1 ? '' : 's'} over monthly quota`
-            : `${wfhRemaining} WFH day${wfhRemaining === 1 ? '' : 's'} remaining this month`;
+            : `${wfhRemaining} ${getShortform(leaveNames.wfh, 'WFH')} day${wfhRemaining === 1 ? '' : 's'} remaining this month`;
 
           const strokeColor = isWfhOverQuota ? 'stroke-red-500' : (isWfhWarning ? 'stroke-amber-500' : 'stroke-cyan-400');
 
           return (
             <div className={`rounded-2xl border shadow-apple-sm p-5 transition-all ${cardStyle}`}>
               <div className="flex justify-between items-center mb-3">
-                <span className="font-semibold text-xs uppercase tracking-widest text-cyan-500 font-mono flex items-center gap-1.5">
-                  <Home size={14} /> WFH Monthly Quota
+                <span className={`font-semibold text-xs uppercase tracking-widest ${wfhTheme.activeText} font-mono flex items-center gap-1.5`}>
+                  <Home size={14} /> {leaveNames.wfh || 'Work From Home'}
                 </span>
                 <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${badgeStyle}`}>
                   {badgeText}
@@ -269,7 +283,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
               <div className="flex items-center justify-between gap-4">
                 <div className="flex flex-col">
                   <span className="text-3xl font-black font-mono text-foreground">
-                    {wfhUsedThisMonth}<span className="text-sm font-bold text-muted-foreground">/10</span>
+                    {wfhUsedThisMonth}<span className="text-sm font-bold text-muted-foreground">/{quotaWfh}</span>
                   </span>
                   <span className="text-xs font-semibold text-muted-foreground mt-0.5">
                     {subtitleText}
@@ -284,13 +298,13 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                       className={`transition-all duration-1000 ease-out ${strokeColor}`}
                       strokeWidth="4" 
                       strokeDasharray={125.6}
-                      strokeDashoffset={125.6 - Math.min(1, wfhUsedThisMonth / 10) * 125.6}
+                      strokeDashoffset={125.6 - Math.min(1, wfhUsedThisMonth / quotaWfh) * 125.6}
                       strokeLinecap="round"
                       fill="transparent" 
                     />
                   </svg>
                   <span className="absolute text-[10px] font-black font-mono text-foreground">
-                    {Math.round((wfhUsedThisMonth / 10) * 100)}%
+                    {Math.round((wfhUsedThisMonth / quotaWfh) * 100)}%
                   </span>
                 </div>
               </div>
@@ -380,7 +394,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                                   {plan.name}
                                 </h4>
                                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 sm:hidden">
-                                  {leavesCount} {leavesCount === 1 ? 'Leaf' : 'Leaves'}
+                                  {leavesCount} {leavesCount === 1 ? 'Leave' : 'Leaves'}
                                 </span>
                               </div>
                             )}
@@ -421,12 +435,17 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                         {/* Stat Cards & Mini Calendar - Always visible on desktop, morph animated on mobile */}
                         <div className="hidden sm:flex flex-row items-center gap-5 pt-2">
                           <div className="grid grid-cols-2 gap-2.5 w-56 sm:w-64 flex-shrink-0">
-                            <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-3 py-2.5 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
-                              <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
-                                {leavesCount === 1 ? 'Leaf' : 'Leaves'}
-                              </span>
-                              <span className="text-xl font-black text-blue-600 leading-none">{leavesCount}</span>
-                            </div>
+                            {(() => {
+                              const planTheme = getLeaveTheme(leaveColors?.[plan.type || 'pl'] || 'blue');
+                              return (
+                                <div className={`flex flex-col ${planTheme.activeBoxBg} px-3 py-2.5 rounded-2xl border ${planTheme.activeBoxBorder} shadow-sm overflow-hidden`}>
+                                  <span className={`text-[9px] font-extrabold ${planTheme.activeText} uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap`}>
+                                    {leavesCount === 1 ? 'Leave' : 'Leaves'}
+                                  </span>
+                                  <span className={`text-xl font-black ${planTheme.activeText} leading-none`}>{leavesCount}</span>
+                                </div>
+                              );
+                            })()}
                             <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-3 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
                               <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
                                 {weekendsCount === 1 ? 'Weekend' : 'Weekends'}
@@ -461,12 +480,17 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                                 className="overflow-hidden flex flex-col gap-3 pt-3 border-t border-border/40 mt-1"
                               >
                                 <div className="grid grid-cols-2 gap-2">
-                                  <div className="flex flex-col bg-blue-50/50 dark:bg-blue-500/10 px-2.5 py-2 rounded-2xl border border-blue-100 dark:border-blue-500/20 shadow-sm overflow-hidden">
-                                    <span className="text-[9px] font-extrabold text-blue-600/70 dark:text-blue-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
-                                      {leavesCount === 1 ? 'Leaf' : 'Leaves'}
-                                    </span>
-                                    <span className="text-lg font-black text-blue-600 leading-none">{leavesCount}</span>
-                                  </div>
+                                  {(() => {
+                                    const planTheme = getLeaveTheme(leaveColors?.[plan.type || 'pl'] || 'blue');
+                                    return (
+                                      <div className={`flex flex-col ${planTheme.activeBoxBg} px-2.5 py-2 rounded-2xl border ${planTheme.activeBoxBorder} shadow-sm overflow-hidden`}>
+                                        <span className={`text-[9px] font-extrabold ${planTheme.activeText} uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap`}>
+                                          {leavesCount === 1 ? 'Leave' : 'Leaves'}
+                                        </span>
+                                        <span className={`text-lg font-black ${planTheme.activeText} leading-none`}>{leavesCount}</span>
+                                      </div>
+                                    );
+                                  })()}
                                   <div className="flex flex-col bg-slate-50/50 dark:bg-slate-400/10 px-2.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700/30 shadow-sm overflow-hidden">
                                     <span className="text-[9px] font-extrabold text-slate-500/70 dark:text-slate-400 uppercase tracking-tight leading-none mb-1.5 whitespace-nowrap">
                                       {weekendsCount === 1 ? 'Weekend' : 'Weekends'}
@@ -554,14 +578,12 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                   {sortedBookedDates.map((leave, idx) => {
                     const dateObj = new Date(leave.date);
                     const isHalfDay = leave.duration === 0.5;
-                    const typeColors = {
-                      pl: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
-                      el: 'bg-orange-500/10 text-orange-500 border-orange-500/30',
-                      rh: 'bg-green-500/10 text-green-500 border-green-500/30',
-                      wfh: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/30',
-                      office: 'bg-muted text-foreground border-border'
-                    };
-                    const cls = typeColors[leave.type] || 'bg-muted border-border text-foreground';
+                    const isOffice = leave.type === 'office';
+                    const theme = getLeaveTheme(leaveColors?.[leave.type] || (leave.type === 'pl' ? 'blue' : leave.type === 'el' ? 'orange' : leave.type === 'rh' ? 'green' : 'cyan'));
+                    const cls = isOffice 
+                      ? 'bg-muted text-foreground border-border' 
+                      : theme.activeBadge;
+                    const typeLabel = isOffice ? 'OFFICE' : getShortform(leaveNames?.[leave.type] || leave.type.toUpperCase(), leave.type.toUpperCase());
 
                     return (
                       <tr key={idx} className="hover:bg-muted/20 transition-colors group select-none">
@@ -572,7 +594,7 @@ const LeaveTracker = ({ bookedDates, onDelete, onDeletePlan, onUpdatePlan, leave
                         </td>
                         <td className="px-2 sm:px-6 py-3 sm:py-4 text-center sm:text-left">
                           <span className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black uppercase tracking-wider inline-flex items-center justify-center ${cls}`}>
-                            {leave.type.toUpperCase()}{isHalfDay && ' ½'}
+                            {typeLabel}{isHalfDay && ' ½'}
                           </span>
                         </td>
                         <td className="hidden sm:table-cell px-6 py-4">

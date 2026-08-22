@@ -2,6 +2,25 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.1] - 2026-08-22
+### Added
+- **PWA & Standalone App Support**: Added web app manifest, custom service worker caching, and an ambient installation prompt modal (`InstallPromptModal.jsx`).
+- **Interactive Sandbox & Demo Mode**: Added demo dataset generator (`demoService.js`) and sticky non-intrusive demo banner (`DemoBanner.jsx`) to explore all features safely.
+- **Apple-Style Quota Balance Ticker**: Integrated a tactile, spring-animated numeric ticker (`AppleBalanceTicker.jsx`) for live quota counter updates.
+- **Slate Design System Documentation & Skill**: Codified typography, color tokens, and motion guidelines in `DESIGN_SYSTEM.md` and project agent skill.
+
+### Changed
+- **Refined Modal & Surface Polish**: Upgraded `LeaveSelectionBar`, `ExistingLeaveModal`, `WfhCheckinModal`, `AuthModal`, `OnboardingModal`, and `SplashScreen` with seamless spring morphing, tactile touch scaling, and improved contrast.
+- **Leave Service Resilience**: Hardened Supabase and local data synchronization in `leaveService.js` with fallback query handling and offline safety.
+
+---
+
+## [v0.8.0] - 2026-08-17
+### Added
+- **Skeleton Loader**: Full-screen skeleton preview for lightning-fast perceived loading times (`AppSkeleton.jsx`).
+- **Seamless Calendar Switching**: Fluid transitions when navigating between month and annual views.
+- **Unified Mobile Modal Morphing**: Refactored sheet and modal transitions using shared layout tags.
+
 ---
 
 ## [v0.7.1] - 2026-08-16

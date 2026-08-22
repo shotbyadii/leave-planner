@@ -89,10 +89,10 @@ export const importUserDataFromJson = async (jsonFile, userId = null) => {
         }
 
         // Import leaves (including WFH and Office records, scoped to userId)
-        for (const leaf of backupData.leaves) {
-          if (!leaf.date || !leaf.type) continue;
-          const mappedPlanId = leaf.plan_id ? (planIdMap[leaf.plan_id] || null) : null;
-          await addLeave(leaf.date, leaf.type, leaf.note || '', mappedPlanId, leaf.duration || 1, userId);
+        for (const leaveItem of backupData.leaves) {
+          if (!leaveItem.date || !leaveItem.type) continue;
+          const mappedPlanId = leaveItem.plan_id ? (planIdMap[leaveItem.plan_id] || null) : null;
+          await addLeave(leaveItem.date, leaveItem.type, leaveItem.note || '', mappedPlanId, leaveItem.duration || 1, userId);
           importedLeavesCount++;
         }
 

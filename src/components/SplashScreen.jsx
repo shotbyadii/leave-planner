@@ -6,9 +6,10 @@ import {
   CheckCircle2, XCircle, ChevronRight, Globe
 } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, isSupabaseConfigured } from '../services/authService';
+import { signUpDemoUser } from '../services/demoService';
 
-const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) => {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isDemoMode = false }) => {
+  const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,25 +22,36 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyEmailSent, setVerifyEmailSent] = useState(false);
 
+  React.useEffect(() => {
+    if (isDemoMode) {
+      setMode('signup');
+    }
+  }, [isDemoMode]);
+
   if (!isOpen) return null;
 
   // Password Strength Criteria
-  const hasMinLength = password.length >= 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  const hasMinLength = isDemoMode ? password.length >= 4 : password.length >= 8;
+  const hasUppercase = isDemoMode ? true : /[A-Z]/.test(password);
+  const hasNumber = isDemoMode ? true : /[0-9]/.test(password);
+  const hasSpecial = isDemoMode ? true : /[^A-Za-z0-9]/.test(password);
   const isStrongPassword = hasMinLength && hasUppercase && hasNumber && hasSpecial;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!email || !password) {
-      setErrorMsg('Please enter both email and password.');
+    if (!email) {
+      setErrorMsg('Please enter an email address.');
       return;
     }
 
-    if (mode === 'signup') {
+    if (!isDemoMode && !password) {
+      setErrorMsg('Please enter a password.');
+      return;
+    }
+
+    if (!isDemoMode && mode === 'signup') {
       if (!hasMinLength) {
         setErrorMsg('Password must be at least 8 characters long.');
         return;
@@ -56,6 +68,17 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
 
     setLoading(true);
     try {
+      if (isDemoMode) {
+        const { user } = await signUpDemoUser({
+          name: name.trim() || 'Demo User',
+          email: email.trim() || 'demo@example.com',
+          password: password || 'password'
+        });
+        if (onAuthSuccess) onAuthSuccess(user);
+        onClose();
+        return;
+      }
+
       if (mode === 'login') {
         const { data, error } = await signInWithEmail(email, password, rememberMe);
         if (error) throw error;
@@ -103,7 +126,9 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.02 }}
       transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[200] bg-background flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto select-none"
+      className={`fixed inset-0 z-[200] bg-background flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto select-none ${
+        isDemoMode ? 'pt-14 sm:pt-16' : ''
+      }`}
     >
       {/* Ambient Background Glow Orbs */}
       <div className="absolute top-1/4 left-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
@@ -134,7 +159,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3 font-medium max-w-lg leading-relaxed">
-              Auto-find long weekend bridges, plan multi-day vacations, and track your monthly 10-day WFH limits effortlessly.
+              Auto-find long weekend bridges, organize multi-day vacations, and track your hybrid work balance effortlessly.
             </p>
           </div>
 
@@ -144,7 +169,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
               { 
                 icon: CalendarDays, 
                 title: 'Smart Optimizer', 
-                desc: 'Find long weekends with 1 leaf day', 
+                desc: 'Bridge holidays for maximum time off', 
                 cardBg: 'bg-blue-50/90 dark:bg-blue-950/30 border-blue-200/90 dark:border-blue-500/30 shadow-sm',
                 iconBox: 'bg-blue-600 text-white shadow-md shadow-blue-500/25',
                 titleColor: 'text-blue-950 dark:text-blue-100',
@@ -153,7 +178,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
               { 
                 icon: MapPin, 
                 title: 'Trip Planner', 
-                desc: 'Organize vacations into DB plans', 
+                desc: 'Plan and group multi-day vacations', 
                 cardBg: 'bg-purple-50/90 dark:bg-purple-950/30 border-purple-200/90 dark:border-purple-500/30 shadow-sm',
                 iconBox: 'bg-purple-600 text-white shadow-md shadow-purple-500/25',
                 titleColor: 'text-purple-950 dark:text-purple-100',
@@ -161,8 +186,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
               },
               { 
                 icon: Home, 
-                title: 'WFH Tracker', 
-                desc: '12 PM daily check-ins & quota limits', 
+                title: 'WFH & Attendance', 
+                desc: 'Track monthly quotas & check-ins', 
                 cardBg: 'bg-cyan-50/90 dark:bg-cyan-950/30 border-cyan-200/90 dark:border-cyan-500/30 shadow-sm',
                 iconBox: 'bg-cyan-600 text-white shadow-md shadow-cyan-500/25',
                 titleColor: 'text-cyan-950 dark:text-cyan-100',
@@ -195,9 +220,9 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
             {/* Header / Tabs */}
             <div className="p-4 sm:p-5 border-b border-zinc-800 bg-[#161616] flex justify-between items-center">
               <span className="text-xs font-black uppercase tracking-wider text-zinc-400 font-mono">
-                {verifyEmailSent ? 'Email Verification' : mode === 'login' ? 'Welcome Back' : 'Create Account'}
+                {verifyEmailSent ? 'Email Verification' : isDemoMode ? 'Create Demo Account' : (mode === 'login' ? 'Welcome Back' : 'Create Account')}
               </span>
-              {!verifyEmailSent && (
+              {!verifyEmailSent && !isDemoMode && (
                 <div className="flex bg-[#1a1a1a] p-1 rounded-xl border border-zinc-800">
                   <button
                     type="button"
@@ -264,10 +289,17 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                   className="p-5 sm:p-6 flex flex-col gap-3.5 sm:gap-4"
                 >
                   
-                  {!isSupabaseConfigured && (
+                  {!isDemoMode && !isSupabaseConfigured && (
                     <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-[11px] font-medium text-amber-400 flex items-start gap-2">
                       <ShieldCheck size={16} className="flex-shrink-0 mt-0.5 text-amber-400" />
                       <span>Supabase credentials missing. Add keys to `.env` to activate live authentication.</span>
+                    </div>
+                  )}
+
+                  {isDemoMode && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs font-medium text-amber-300 flex items-start gap-2">
+                      <Sparkles size={16} className="flex-shrink-0 mt-0.5 text-amber-400" />
+                      <span><strong>Sandbox Demo:</strong> Create a test profile to explore the leave planner and onboarding wizard. Zero verification needed.</span>
                     </div>
                   )}
 
@@ -277,28 +309,32 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                     </div>
                   )}
 
-                  {/* Google OAuth Button */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    className="w-full py-3 sm:py-3.5 bg-[#1c1c1c] hover:bg-[#262626] border border-zinc-800 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                    </svg>
-                    <span>Continue with Google</span>
-                  </button>
+                  {/* Google OAuth Button (Live Mode Only) */}
+                  {!isDemoMode && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        disabled={loading}
+                        className="w-full py-3 sm:py-3.5 bg-[#1c1c1c] hover:bg-[#262626] border border-zinc-800 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                        </svg>
+                        <span>Continue with Google</span>
+                      </button>
 
-                  {/* Divider */}
-                  <div className="flex items-center gap-3 my-0.5">
-                    <div className="h-px flex-1 bg-zinc-800" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 font-mono">or email</span>
-                    <div className="h-px flex-1 bg-zinc-800" />
-                  </div>
+                      {/* Divider */}
+                      <div className="flex items-center gap-3 my-0.5">
+                        <div className="h-px flex-1 bg-zinc-800" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 font-mono">or email</span>
+                        <div className="h-px flex-1 bg-zinc-800" />
+                      </div>
+                    </>
+                  )}
 
                   {/* Form */}
                   <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -310,16 +346,17 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                           animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
                           exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                           transition={{ duration: 0.25, ease: 'easeInOut' }}
-                          className="overflow-hidden"
+                          className="p-1 -m-1"
                         >
-                          <div className="relative pt-0.5">
+                          <div className="relative">
                             <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                             <input
                               type="text"
                               value={name}
                               onChange={(e) => setName(e.target.value)}
                               placeholder="Full Display Name"
-                              className="w-full bg-[#1c1c1c] border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600"
+                              autoComplete="off"
+                              className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                             />
                           </div>
                         </motion.div>
@@ -334,7 +371,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="Email Address"
                         required
-                        className="w-full bg-[#1c1c1c] border border-zinc-800 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600"
+                        autoComplete="email"
+                        className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                       />
                     </div>
 
@@ -346,7 +384,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Password"
                         required
-                        className="w-full bg-[#1c1c1c] border border-zinc-800 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600"
+                        autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                        className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                       />
                       <button
                         type="button"
@@ -365,7 +404,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                           animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
                           exit={{ opacity: 0, height: 0, marginTop: 0 }}
                           transition={{ duration: 0.25, ease: 'easeInOut' }}
-                          className="overflow-hidden flex flex-col gap-3"
+                          className="p-1 -m-1 flex flex-col gap-3"
                         >
                           <div className="relative">
                             <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -375,7 +414,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                               onChange={(e) => setConfirmPassword(e.target.value)}
                               placeholder="Confirm Password"
                               required={mode === 'signup'}
-                              className="w-full bg-[#1c1c1c] border border-zinc-800 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600"
+                              autoComplete="new-password"
+                              className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                             />
                             <button
                               type="button"
@@ -411,16 +451,18 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                       )}
                     </AnimatePresence>
 
-                    {/* Remember Me Checkbox */}
-                    <label className="flex items-center gap-2 cursor-pointer my-1 text-xs text-zinc-300 hover:text-white">
-                      <input
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="w-4 h-4 rounded border-zinc-700 text-white focus:ring-zinc-600 accent-white"
-                      />
-                      <span className="font-medium">Remember login on this device</span>
-                    </label>
+                    {/* Remember Me Checkbox (Live Mode Only) */}
+                    {!isDemoMode && (
+                      <label className="flex items-center gap-2 cursor-pointer my-1 text-xs text-zinc-300 hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="w-4 h-4 rounded border-zinc-700 text-white focus:ring-zinc-600 accent-white"
+                        />
+                        <span className="font-medium">Remember login on this device</span>
+                      </label>
+                    )}
 
                     <button
                       type="submit"
@@ -431,7 +473,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {} }) =
                         <span>Processing...</span>
                       ) : (
                         <>
-                          <span>{mode === 'login' ? 'Sign In to Vault' : 'Create Account'}</span>
+                          <span>{isDemoMode ? 'Launch Sandbox Planner' : (mode === 'login' ? 'Sign In to Vault' : 'Create Account')}</span>
                           <ArrowRight size={14} />
                         </>
                       )}
