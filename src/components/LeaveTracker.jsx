@@ -5,6 +5,25 @@ import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
 import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 
+export const getAllDatesInRange = (startDateStr, endDateStr) => {
+  if (!startDateStr || !endDateStr) return [];
+  const partsS = String(startDateStr).split('-').map(Number);
+  const partsE = String(endDateStr).split('-').map(Number);
+  if (partsS.length !== 3 || partsE.length !== 3) return [];
+
+  const start = new Date(partsS[0], partsS[1] - 1, partsS[2]);
+  const end = new Date(partsE[0], partsE[1] - 1, partsE[2]);
+  const dates = [];
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    dates.push(`${y}-${m}-${day}`);
+  }
+  return dates;
+};
+
 const LeaveTracker = ({ 
   bookedDates, 
   onDelete, 
@@ -38,22 +57,22 @@ const LeaveTracker = ({
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   const renderMiniCalendar = (plan) => {
-    const start = new Date(plan.start_date);
-    const end = new Date(plan.end_date);
-    const year = 2026;
+    const sStr = plan.start_date || plan.startDate;
+    const eStr = plan.end_date || plan.endDate;
+    const allDateStrs = getAllDatesInRange(sStr, eStr);
     
-    const allDates = [];
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateStr = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      allDates.push({
+    const allDates = allDateStrs.map(dateStr => {
+      const parts = dateStr.split('-').map(Number);
+      const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+      return {
         dateStr,
-        dayOfWeek: new Date(dateStr).getDay(),
-        day: new Date(dateStr).getDate(),
+        dayOfWeek: dObj.getDay(),
+        day: dObj.getDate(),
         isLeave: bookedDates.some(b => b.date === dateStr && b.plan_id === plan.id) || (plan.id === 'tutorial-demo-plan-temp' && !isWeekend(dateStr) && !isHoliday(dateStr)),
         isWeekend: isWeekend(dateStr),
         isHoliday: !!isHoliday(dateStr)
-      });
-    }
+      };
+    });
 
     const startDow = allDates[0]?.dayOfWeek || 0;
     const padBefore = [];
@@ -336,17 +355,17 @@ const LeaveTracker = ({
             <div id="tutorial-step-leave-plans" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {leavePlans.map((plan) => {
                 const planLeaves = getLeavesForPlan(plan.id);
-                const start = new Date(plan.start_date);
-                const end = new Date(plan.end_date);
+                const sStr = plan.start_date || plan.startDate;
+                const eStr = plan.end_date || plan.endDate;
+                const allDatesInRange = getAllDatesInRange(sStr, eStr);
+                const partsStart = (sStr || '').split('-').map(Number);
+                const partsEnd = (eStr || '').split('-').map(Number);
+                const start = partsStart.length === 3 ? new Date(partsStart[0], partsStart[1] - 1, partsStart[2]) : new Date();
+                const end = partsEnd.length === 3 ? new Date(partsEnd[0], partsEnd[1] - 1, partsEnd[2]) : new Date();
 
-                const allDatesInRange = [];
-                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                  const ds = `${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                  allDatesInRange.push(ds);
-                }
                 const weekendsCount = allDatesInRange.filter(d => isWeekend(d)).length;
                 const holidaysCount = allDatesInRange.filter(d => isHoliday(d) && !isWeekend(d)).length;
-                const leavesCount = planLeaves.reduce((sum, l) => sum + (l.duration || 1), 0);
+                const leavesCount = (planLeaves || []).reduce((sum, l) => sum + (l?.duration || 1), 0);
                 
                 const isEditing = editingPlanId === plan.id;
                 const isExpanded = expandedPlans[plan.id] || false;
