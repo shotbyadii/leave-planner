@@ -8,7 +8,7 @@ import {
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, isSupabaseConfigured } from '../services/authService';
 import { signUpDemoUser } from '../services/demoService';
 
-const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isDemoMode = false }) => {
+const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, currentProfile = {}, isDemoMode = false }) => {
   const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,7 +41,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isD
     e.preventDefault();
     setErrorMsg('');
 
-    if (!email) {
+    if (!isDemoMode && !email) {
       setErrorMsg('Please enter an email address.');
       return;
     }
@@ -369,8 +369,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isD
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email Address"
-                        required
+                        placeholder={isDemoMode ? "Email Address (optional for demo)" : "Email Address"}
+                        required={!isDemoMode}
                         autoComplete="email"
                         className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                       />
@@ -382,8 +382,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isD
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password"
-                        required
+                        placeholder={isDemoMode ? "Password (optional for demo)" : "Password"}
+                        required={!isDemoMode}
                         autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                         className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                       />
@@ -397,7 +397,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isD
                     </div>
 
                     <AnimatePresence initial={false}>
-                      {mode === 'signup' && (
+                      {mode === 'signup' && !isDemoMode && (
                         <motion.div
                           key="field-confirm"
                           initial={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -413,7 +413,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isD
                               value={confirmPassword}
                               onChange={(e) => setConfirmPassword(e.target.value)}
                               placeholder="Confirm Password"
-                              required={mode === 'signup'}
+                              required={mode === 'signup' && !isDemoMode}
                               autoComplete="new-password"
                               className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
                             />

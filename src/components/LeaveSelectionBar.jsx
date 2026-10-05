@@ -511,7 +511,11 @@ const LeaveSelectionBar = ({
               {previewDates.length > 0 && (
                 <button 
                   id="tutorial-step-confirm-plan-btn"
-                  onClick={() => { setIsExpanded(true); if (onAdvanceTutorial) onAdvanceTutorial(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(true);
+                    if (onAdvanceTutorial) onAdvanceTutorial();
+                  }}
                   className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap"
                 >
                   Confirm Plan <Check size={14} strokeWidth={3} />

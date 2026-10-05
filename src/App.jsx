@@ -32,14 +32,21 @@ import { supabase } from './lib/supabase';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
 import { getCompanyLogoUrl, getCompanyInitials } from './utils/companyLogoUtils';
 import TutorialOverlay from './components/TutorialOverlay';
-import { isTutorialCompleted, markTutorialCompleted, resetTutorialStatus } from './services/tutorialService';
+import {
+  isTutorialCompleted,
+  markTutorialCompleted,
+  resetTutorialStatus,
+  getTutorialMonthIndex,
+  SHORT_MONTH_NAMES
+} from './services/tutorialService';
 import DemoBanner from './components/DemoBanner';
 import {
   getDemoUser,
   signOutDemoUser,
   fetchDemoProfile,
   upsertDemoProfile,
-  clearDemoSession
+  clearDemoSession,
+  enableDemoMode
 } from './services/demoService';
 import { isDemoModeActive } from './services/leaveService';
 import { showAppNotification, requestNotificationPermission, isNotificationSupported, isNotificationGranted } from './utils/notificationService';
@@ -47,7 +54,20 @@ import AiAssistantModal, { AiAssistantChatContent } from './components/AiAssista
 import './index.css';
 
 function App() {
-  const isDemoMode = isDemoModeActive();
+  const [isDemoMode, setIsDemoMode] = useState(() => isDemoModeActive());
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setIsDemoMode(isDemoModeActive());
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const isInitialAuthDone = useRef(false);
   const [showSplash, setShowSplash] = useState(false);
@@ -74,7 +94,21 @@ function App() {
   const [avatarUrl, setAvatarUrl] = useState(localStorage.getItem('avatar_url') || '');
   const [isTutorialActive, setIsTutorialActive] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
-  const [tutorialCustomName, setTutorialCustomName] = useState('Sep Getaway (Walkthrough Demo)');
+  const tutorialMonthIdx = getTutorialMonthIndex();
+  const tutorialMonthStr = String(tutorialMonthIdx + 1).padStart(2, '0');
+  const tutorialShortMonth = SHORT_MONTH_NAMES[tutorialMonthIdx] || 'Current Month';
+  const tutorialStartDate = `2026-${tutorialMonthStr}-10`;
+  const tutorialEndDate = `2026-${tutorialMonthStr}-15`;
+  const tutorialDateRange = [
+    `2026-${tutorialMonthStr}-10`,
+    `2026-${tutorialMonthStr}-11`,
+    `2026-${tutorialMonthStr}-12`,
+    `2026-${tutorialMonthStr}-13`,
+    `2026-${tutorialMonthStr}-14`,
+    `2026-${tutorialMonthStr}-15`,
+  ];
+  const defaultTutorialPlanName = `${tutorialShortMonth} Getaway (Walkthrough Demo)`;
+  const [tutorialCustomName, setTutorialCustomName] = useState(defaultTutorialPlanName);
   
   const [leaveNames, setLeaveNames] = useState(() => {
     try {
@@ -406,25 +440,33 @@ function App() {
     };
 
     if (isDemoMode) {
-      const demoUser = getDemoUser();
-      if (demoUser) {
-        setCurrentUser(demoUser);
-        const demoProfile = await fetchDemoProfile(demoUser.id);
-        if (demoProfile) {
-          syncProfileToState(demoProfile, demoUser);
+      try {
+        const demoUser = getDemoUser();
+        const demoOnboardingDone = sessionStorage.getItem('demo_onboarding_completed') === 'true';
+        if (demoUser && demoOnboardingDone) {
+          setCurrentUser(demoUser);
+          const demoProfile = await fetchDemoProfile(demoUser.id);
+          if (demoProfile) {
+            syncProfileToState(demoProfile, demoUser);
+          }
+          await loadLeaves(demoUser);
+          await waitRemaining(300);
+          isInitialAuthDone.current = true;
+          setIsAuthChecking(false);
+          setShowSplash(false);
+        } else {
+          // Show the Demo Sign-Up screen so it follows the full onboarding flow!
+          await waitRemaining(300);
+          isInitialAuthDone.current = true;
+          setIsAuthChecking(false);
+          setShowSplash(true);
+          setAuthModalOpen(false);
         }
-        await loadLeaves(demoUser);
-        await waitRemaining(400);
-        isInitialAuthDone.current = true;
-        setIsAuthChecking(false);
-        setShowSplash(false);
-      } else {
-        await loadLeaves(null);
-        await waitRemaining(400);
+      } catch (err) {
+        console.warn('Demo auth check error:', err);
         isInitialAuthDone.current = true;
         setIsAuthChecking(false);
         setShowSplash(true);
-        setAuthModalOpen(false);
       }
       return;
     }
@@ -570,18 +612,48 @@ function App() {
 
   const handleRestartDemo = async () => {
     clearDemoSession();
-    setCurrentUser(null);
+    enableDemoMode();
+    setIsDemoMode(true);
+    const { user } = await signUpDemoUser({
+      name: 'Demo User',
+      email: 'demo@example.com'
+    });
+    setCurrentUser(user);
     setBookedDates([]);
     setLeavePlans([]);
     setUserName('Demo User');
     setCompanyName('Acme Corp');
-    await loadLeaves(null);
-    setShowSplash(true);
+    await loadLeaves(user);
+    setShowSplash(false);
     setAuthModalOpen(false);
+    setOnboardingOpen(true);
   };
 
   const handleExitDemo = () => {
+    clearDemoSession();
+    setIsDemoMode(false);
+    setCurrentUser(null);
+    setBookedDates([]);
+    setLeavePlans([]);
+    if (window.location.hash.includes('demo') || window.location.pathname.startsWith('/demo')) {
+      window.history.replaceState(null, '', '/');
+    }
     window.location.href = '/';
+  };
+
+  const handleEnterDemoMode = async () => {
+    enableDemoMode();
+    setIsDemoMode(true);
+    if (!window.location.pathname.startsWith('/demo') && !window.location.hash.includes('demo')) {
+      window.history.replaceState(null, '', '#/demo');
+    }
+    const { user } = await signUpDemoUser({
+      name: 'Demo User',
+      email: 'demo@example.com'
+    });
+    await handleAuthSuccess(user);
+    setShowSplash(false);
+    setAuthModalOpen(false);
   };
 
   // Persistent Notification Permission Prompt (Until "Not Needed" is clicked)
@@ -1009,7 +1081,7 @@ function App() {
 
   // Remove AI preview focus if clicking anywhere outside the chatbox window
   useEffect(() => {
-    if (!isAiPreview && previewDates.length === 0) return;
+    if (!isAiPreview) return;
 
     const handleOutsideChatClick = (e) => {
       const isInsideChat = e.target.closest?.('.ai-chat-panel, .ai-assistant-modal, [data-ai-chat]');
@@ -1022,7 +1094,7 @@ function App() {
     return () => {
       document.removeEventListener('pointerdown', handleOutsideChatClick);
     };
-  }, [isAiPreview, previewDates.length]);
+  }, [isAiPreview]);
 
   useEffect(() => {
     if (previewDates.length > 0) {
@@ -1043,7 +1115,7 @@ function App() {
   const handleMobileApply = async () => {
     if (isTutorialActive) {
       // Sandboxed demo plan for tutorial mode: do NOT write to real database
-      const chosenName = mobilePlanName || 'Sep Getaway (Walkthrough Demo)';
+      const chosenName = mobilePlanName || defaultTutorialPlanName;
       setTutorialCustomName(chosenName);
       setPreviewDates([]);
       setSelectionStart(null);
@@ -2620,16 +2692,16 @@ function App() {
             onCancel={() => { setSelectionStart(null); setPreviewDates([]); setSuggestedPlanName(null); }}
             onApply={async (dates, type, note, planName, duration) => {
               if (isTutorialActive) {
-                const finalName = planName || 'Sep Getaway (Walkthrough Demo)';
+                const finalName = planName || defaultTutorialPlanName;
                 setTutorialCustomName(finalName);
                 setLeavePlans(prev => [
                   {
                     id: 'tutorial-demo-plan-temp',
                     name: finalName,
-                    start_date: '2026-09-10',
-                    end_date: '2026-09-15',
-                    startDate: '2026-09-10',
-                    endDate: '2026-09-15',
+                    start_date: tutorialStartDate,
+                    end_date: tutorialEndDate,
+                    startDate: tutorialStartDate,
+                    endDate: tutorialEndDate,
                     type: 'pl',
                     is_demo: true
                   },
@@ -2778,6 +2850,8 @@ function App() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+        onEnterDemo={handleEnterDemoMode}
+        onExitDemo={handleExitDemo}
         isDemoMode={isDemoMode}
         currentProfile={{
           name: userName,
@@ -2799,6 +2873,8 @@ function App() {
             isOpen={showSplash}
             onClose={() => {}}
             onAuthSuccess={handleAuthSuccess}
+            onEnterDemo={handleEnterDemoMode}
+            onExitDemo={handleExitDemo}
             isDemoMode={isDemoMode}
             currentProfile={{
               name: userName,
@@ -2848,34 +2924,34 @@ function App() {
               case 'select-start-date':
                 setActiveTab('calendar');
                 setCalendarViewMode('monthly');
-                setCalendarFocusedMonth(8); // September
-                setSelectionStart(null); // Wait for user to click Sept 10
+                setCalendarFocusedMonth(tutorialMonthIdx);
+                setSelectionStart(null);
                 setPreviewDates([]);
                 break;
               case 'select-end-range':
                 setActiveTab('calendar');
                 setCalendarViewMode('monthly');
-                setCalendarFocusedMonth(8);
-                setSelectionStart('2026-09-10'); // Sept 10 active
-                setPreviewDates([]); // Wait for user to click Sept 15
+                setCalendarFocusedMonth(tutorialMonthIdx);
+                setSelectionStart(tutorialStartDate);
+                setPreviewDates([]);
                 break;
               case 'prompt-confirm-plan':
                 setActiveTab('calendar');
                 setCalendarViewMode('monthly');
-                setCalendarFocusedMonth(8);
-                setSelectionStart('2026-09-10');
-                setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                setCalendarFocusedMonth(tutorialMonthIdx);
+                setSelectionStart(tutorialStartDate);
+                setPreviewDates(tutorialDateRange);
                 break;
               case 'select-modal-category':
                 setActiveTab('calendar');
-                setSelectionStart('2026-09-10');
-                setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                setSelectionStart(tutorialStartDate);
+                setPreviewDates(tutorialDateRange);
                 setMobileConfirmOpen(true);
                 break;
               case 'apply-modal-leave':
                 setActiveTab('calendar');
-                setSelectionStart('2026-09-10');
-                setPreviewDates(['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14', '2026-09-15']);
+                setSelectionStart(tutorialStartDate);
+                setPreviewDates(tutorialDateRange);
                 setMobileConfirmOpen(true);
                 break;
               case 'review-created-plan':
@@ -2891,11 +2967,11 @@ function App() {
                   return [
                     {
                       id: 'tutorial-demo-plan-temp',
-                      name: tutorialCustomName || 'Sep Getaway (Walkthrough Demo)',
-                      start_date: '2026-09-10',
-                      end_date: '2026-09-15',
-                      startDate: '2026-09-10',
-                      endDate: '2026-09-15',
+                      name: tutorialCustomName || defaultTutorialPlanName,
+                      start_date: tutorialStartDate,
+                      end_date: tutorialEndDate,
+                      startDate: tutorialStartDate,
+                      endDate: tutorialEndDate,
                       type: 'pl',
                       is_demo: true
                     },

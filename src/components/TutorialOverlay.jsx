@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronLeft, X, Sparkles, ShieldAlert, Play, MousePointerClick } from 'lucide-react';
-import { TUTORIAL_STEPS } from '../services/tutorialService';
+import { getTutorialSteps } from '../services/tutorialService';
 
 const TutorialOverlay = ({ 
   currentStepIndex, 
@@ -11,6 +11,7 @@ const TutorialOverlay = ({
   onSkip,
   onExecuteStepAction
 }) => {
+  const TUTORIAL_STEPS = React.useMemo(() => getTutorialSteps(), []);
   const currentStep = TUTORIAL_STEPS[currentStepIndex];
 
   // Enable body data attribute for non-target dimming
@@ -155,10 +156,12 @@ const TutorialOverlay = ({
     };
   }, [currentStepIndex]);
 
-  // Dynamic mobile positioning:
-  // - Steps 1-4: Place at BOTTOM (bottom-24) above navbar & selection bar
-  // - Steps 5-6: Placed dynamically right above the confirmation modal
-  // - Step 7: Place at TOP (top-3) on Tracker page
+  // Dynamic mobile & desktop positioning:
+  // - Desktop Step 1: Place at TOP-RIGHT (top-24 right-8) so it never covers month cards in bottom rows
+  // - Desktop Steps 2-7: Place at BOTTOM-RIGHT (bottom-8 right-8)
+  // - Mobile Steps 1-4: Place at BOTTOM (bottom-24) above navbar & selection bar
+  // - Mobile Steps 5-6: Placed dynamically right above the confirmation modal
+  // - Mobile Step 7: Place at TOP (top-3) on Tracker page
   const isBottomStep = currentStepIndex <= 3;
   const isModalStep = currentStepIndex === 4 || currentStepIndex === 5;
 
@@ -169,6 +172,11 @@ const TutorialOverlay = ({
     mobilePositionClass = "left-3 right-3";
   }
 
+  // Desktop positioning: Step 1 docks top-right to keep yearly grid months 100% visible
+  const desktopPositionClass = currentStepIndex === 0
+    ? "md:top-24 md:bottom-auto md:right-8 md:left-auto"
+    : "md:top-auto md:bottom-8 md:right-8 md:left-auto";
+
   const dynamicStyle = (isModalStep && mobileModalBottomOffset !== null) 
     ? { bottom: `${mobileModalBottomOffset}px` } 
     : {};
@@ -177,9 +185,9 @@ const TutorialOverlay = ({
     <AnimatePresence mode="wait">
       <div 
         id="tutorial-hint-card"
-        key={`hint-pos-${isModalStep ? 'modal-dock' : isBottomStep ? 'bottom' : 'top'}`}
+        key={`hint-pos-${isModalStep ? 'modal-dock' : isBottomStep ? 'bottom' : 'top'}-${currentStepIndex === 0 ? 'top-dock' : 'standard'}`}
         style={dynamicStyle}
-        className={`fixed ${mobilePositionClass} md:top-auto md:bottom-8 md:right-8 md:left-auto md:!bottom-8 z-[99999] pointer-events-auto max-w-md w-[calc(100vw-24px)] md:w-96 mx-auto transition-[bottom] duration-150`}
+        className={`fixed ${mobilePositionClass} ${desktopPositionClass} z-[99999] pointer-events-auto max-w-md w-[calc(100vw-24px)] md:w-96 mx-auto transition-[bottom,top] duration-150`}
       >
         <motion.div
           key={`step-card-${currentStepIndex}`}

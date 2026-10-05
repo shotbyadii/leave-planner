@@ -4,7 +4,7 @@ import { LogIn, UserPlus, Mail, Lock, User, ArrowRight, ShieldCheck, X, AlertCir
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, isSupabaseConfigured } from '../services/authService';
 import { signUpDemoUser } from '../services/demoService';
 
-const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isDemoMode = false }) => {
+const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, currentProfile = {}, isDemoMode = false }) => {
   const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,7 +61,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isDemo
     e.preventDefault();
     setErrorMsg('');
     
-    if (!email) {
+    if (!isDemoMode && !email) {
       setErrorMsg('Please enter an email address.');
       return;
     }
@@ -324,8 +324,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isDemo
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email Address"
-                    required
+                    placeholder={isDemoMode ? "Email Address (optional for demo)" : "Email Address"}
+                    required={!isDemoMode}
                     autoComplete={mode === 'signup' ? 'off' : 'username'}
                     className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-150"
                   />
@@ -338,8 +338,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, currentProfile = {}, isDemo
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
-                    required
+                    placeholder={isDemoMode ? "Password (optional for demo)" : "Password"}
+                    required={!isDemoMode}
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-150"
                   />

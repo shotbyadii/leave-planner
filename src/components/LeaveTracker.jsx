@@ -113,12 +113,15 @@ const LeaveTracker = ({
 
   const getLeavesForPlan = (planId) => {
     if (planId === 'tutorial-demo-plan-temp') {
-      return [
-        { date: '2026-09-10', type: 'pl', duration: 1 },
-        { date: '2026-09-11', type: 'pl', duration: 1 },
-        { date: '2026-09-14', type: 'pl', duration: 1 },
-        { date: '2026-09-15', type: 'pl', duration: 1 }
-      ];
+      const plan = (leavePlans || []).find(p => p.id === 'tutorial-demo-plan-temp');
+      if (plan && (plan.start_date || plan.startDate) && (plan.end_date || plan.endDate)) {
+        const s = plan.start_date || plan.startDate;
+        const e = plan.end_date || plan.endDate;
+        return getAllDatesInRange(s, e)
+          .filter(d => !isWeekend(d) && !isHoliday(d))
+          .map(d => ({ date: d, type: 'pl', duration: 1 }));
+      }
+      return bookedDates.filter(d => d.plan_id === planId);
     }
     return bookedDates.filter(d => d.plan_id === planId);
   };
@@ -351,7 +354,7 @@ const LeaveTracker = ({
                 return (
                   <div 
                     key={plan.id} 
-                    id={(plan.id === 'tutorial-demo-plan-temp' || plan.is_demo || (plan.start_date === '2026-09-10' && plan.end_date === '2026-09-15')) ? 'tutorial-demo-plan-card' : undefined}
+                    id={(plan.id === 'tutorial-demo-plan-temp' || plan.is_demo) ? 'tutorial-demo-plan-card' : undefined}
                     className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm p-4 sm:p-7 hover:border-foreground/10 hover:shadow-apple transition-all group flex flex-col xl:flex-row gap-4 sm:gap-6 relative overflow-hidden"
                   >
                     <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />

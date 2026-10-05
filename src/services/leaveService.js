@@ -21,8 +21,17 @@ export const isDemoModeActive = () => {
   const path = window.location.pathname.toLowerCase();
   const hash = window.location.hash.toLowerCase();
   const search = new URLSearchParams(window.location.search);
-  return path.startsWith('/demo') || hash.startsWith('#/demo') || search.get('mode') === 'demo';
+  return (
+    path.startsWith('/demo') ||
+    hash.startsWith('#/demo') ||
+    hash.startsWith('#demo') ||
+    search.get('mode') === 'demo' ||
+    search.get('demo') === 'true' ||
+    search.has('demo') ||
+    sessionStorage.getItem('is_demo_mode') === 'true'
+  );
 };
+
 
 // ─── Leave Plans ───────────────────────────────────────────
 

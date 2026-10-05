@@ -201,10 +201,25 @@ export const resetDemoLeaves = async () => {
   } catch (e) {}
 };
 
+export const enableDemoMode = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem('is_demo_mode', 'true');
+  } catch (e) {}
+};
+
+export const disableDemoMode = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem('is_demo_mode');
+  } catch (e) {}
+};
+
 export const clearDemoSession = () => {
   if (typeof window === 'undefined') return;
   try {
     Object.values(STORAGE_KEYS).forEach(key => sessionStorage.removeItem(key));
+    sessionStorage.removeItem('is_demo_mode');
     sessionStorage.removeItem('onboarding_completed');
     sessionStorage.removeItem('demo_onboarding_completed');
     sessionStorage.removeItem('pwa_session_prompted');
@@ -212,3 +227,4 @@ export const clearDemoSession = () => {
     localStorage.removeItem('leave_planner_tutorial_completed_v1');
   } catch (e) {}
 };
+
