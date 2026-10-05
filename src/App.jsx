@@ -614,19 +614,31 @@ function App() {
     clearDemoSession();
     enableDemoMode();
     setIsDemoMode(true);
-    const { user } = await signUpDemoUser({
-      name: 'Demo User',
-      email: 'demo@example.com'
-    });
-    setCurrentUser(user);
-    setBookedDates([]);
+    resetTutorialStatus();
+    sessionStorage.removeItem('demo_onboarding_completed');
+    localStorage.removeItem('onboarding_completed');
+    setIsTutorialActive(false);
+    setTutorialStepIndex(0);
+    setSelectionStart(null);
+    setPreviewDates([]);
+    setHoveredSuggestion(null);
+    setMobileConfirmOpen(false);
+    setIsMobileMenuOpen(false);
+    setMobileSubView(null);
+    setActiveTab('calendar');
+    setCalendarViewMode(window.innerWidth < 768 ? 'monthly' : 'yearly');
     setLeavePlans([]);
+    setBookedDates([]);
+    setCurrentUser(null);
     setUserName('Demo User');
     setCompanyName('Acme Corp');
-    await loadLeaves(user);
-    setShowSplash(false);
+    setWfhModalOpen(false);
+    setSettingsModalOpen(false);
+    setAiModalOpen(false);
     setAuthModalOpen(false);
-    setOnboardingOpen(true);
+    setOnboardingOpen(false);
+    setShowSplash(true);
+    await loadLeaves(null);
   };
 
   const handleExitDemo = () => {

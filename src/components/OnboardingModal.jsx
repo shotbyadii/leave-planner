@@ -22,6 +22,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
 
   React.useEffect(() => {
     if (isOpen) {
+      setStep(1);
       if (initialName && initialName !== 'User') {
         setName(initialName);
       } else {

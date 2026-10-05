@@ -23,10 +23,14 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
   const [verifyEmailSent, setVerifyEmailSent] = useState(false);
 
   React.useEffect(() => {
-    if (isDemoMode) {
-      setMode('signup');
+    if (isOpen) {
+      setErrorMsg('');
+      setLoading(false);
+      if (isDemoMode) {
+        setMode('signup');
+      }
     }
-  }, [isDemoMode]);
+  }, [isOpen, isDemoMode]);
 
   if (!isOpen) return null;
 
