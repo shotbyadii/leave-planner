@@ -360,7 +360,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
                 transition={{ duration: 0.2 }}
                 className="flex flex-col gap-6 max-w-md mx-auto py-2 text-center"
               >
-                <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+                <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-inner">
                   <Bell size={32} />
                 </div>
                 <div>

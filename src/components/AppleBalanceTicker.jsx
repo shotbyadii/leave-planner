@@ -58,10 +58,10 @@ const COLOR_CONFIG = {
     glow: 'from-cyan-500/25 to-blue-500/10'
   },
   amber: {
-    text: 'text-amber-500 dark:text-amber-400',
+    text: 'text-amber-600 dark:text-amber-400',
     bg: 'bg-amber-500/10',
     border: 'border-amber-500/30',
-    badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+    badge: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
     bar: 'bg-amber-500',
     glow: 'from-amber-500/25 to-yellow-500/10'
   },
@@ -179,10 +179,10 @@ const AppleBalanceTicker = ({
     // Depleted: Common Alert Red
     if (isDepleted) {
       return {
-        text: 'text-red-500 dark:text-red-400',
+        text: 'text-red-600 dark:text-red-400',
         bg: 'bg-red-500/10',
         border: 'border-red-500/30',
-        badge: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30',
+        badge: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
         bar: 'bg-red-500',
         glow: 'from-red-500/25 to-orange-500/10'
       };
@@ -190,10 +190,10 @@ const AppleBalanceTicker = ({
     // Low: Common Warning Amber / Orange
     if (isLow) {
       return {
-        text: 'text-amber-500 dark:text-amber-400',
+        text: 'text-amber-600 dark:text-amber-400',
         bg: 'bg-amber-500/10',
         border: 'border-amber-500/30',
-        badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+        badge: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
         bar: 'bg-amber-500',
         glow: 'from-amber-500/25 to-yellow-500/10'
       };

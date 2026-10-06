@@ -291,22 +291,22 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
             <div className="p-6 flex flex-col gap-4 max-h-[75vh] overflow-y-auto no-scrollbar">
               
               {!isDemoMode && !isSupabaseConfigured && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-start gap-2">
-                  <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" />
+                <div className="p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 rounded-2xl text-[11px] font-semibold text-amber-950 dark:text-amber-200 flex items-start gap-2">
+                  <ShieldCheck size={16} className="flex-shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
                   <span>Supabase credentials missing. Add keys to `.env` to activate live authentication.</span>
                 </div>
               )}
 
               {isDemoMode && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs font-medium text-amber-700 dark:text-amber-300 flex items-start gap-2">
-                  <Sparkles size={16} className="flex-shrink-0 mt-0.5 text-amber-500" />
-                  <span><strong>Sandbox Mode:</strong> Try any name/email/password. All data is saved in session and disappears on tab close.</span>
+                <div className="p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 rounded-2xl text-xs font-medium text-amber-950 dark:text-amber-200 flex items-start gap-2">
+                  <Sparkles size={16} className="flex-shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
+                  <span><strong className="font-black text-amber-950 dark:text-amber-100">Sandbox Mode:</strong> Try any name/email/password. All data is saved in session and disappears on tab close.</span>
                 </div>
               )}
 
               {errorMsg && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-2 animate-in fade-in duration-200">
-                  <AlertCircle size={15} className="flex-shrink-0" /> {errorMsg}
+                <div className="p-3 bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 rounded-2xl text-xs font-bold text-red-700 dark:text-red-300 flex items-center gap-2 animate-in fade-in duration-200">
+                  <AlertCircle size={15} className="flex-shrink-0 text-red-700 dark:text-red-400" /> {errorMsg}
                 </div>
               )}
 

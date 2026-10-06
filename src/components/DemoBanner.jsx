@@ -16,7 +16,7 @@ export const DemoBanner = ({ onRestartDemo, onExitDemo }) => {
           <span className="text-xs font-black font-mono tracking-tight text-foreground whitespace-nowrap">
             Sandbox Demo
           </span>
-          <span className="hidden sm:inline-flex text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
+          <span className="hidden sm:inline-flex text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-950 dark:text-amber-200 border border-amber-500/30 whitespace-nowrap">
             Session-Only
           </span>
           <span className="text-[11px] text-muted-foreground hidden lg:inline font-medium ml-1">
