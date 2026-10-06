@@ -4,29 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Confirm Your Leave Planner Account</title>
+  <!-- Official Web Fonts: Geist & Geist Mono (Vercel) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    /* Reset & Base Fonts */
-    body, p, h1, h2, h3, div, a, span {
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600;700;800&display=swap');
+
+    body, p, h1, h2, h3, div, a, span, table, td {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Geist Sans', Helvetica, Arial, sans-serif;
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     body {
       background-color: #09090b;
       color: #fafafa;
       -webkit-font-smoothing: antialiased;
       line-height: 1.5;
-      padding: 32px 16px;
+      padding: 40px 16px;
     }
     .wrapper {
       max-width: 540px;
       margin: 0 auto;
       background-color: #121214;
       border: 1px solid #27272a;
-      border-radius: 24px;
+      border-radius: 28px;
       overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.9);
     }
     /* Brand Accent Top Line */
     .top-accent {
@@ -35,61 +40,66 @@
       width: 100%;
     }
     .content {
-      padding: 36px 32px;
+      padding: 38px 36px 32px 36px;
     }
     /* Header Brand */
-    .brand-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .brand-table {
+      width: 100%;
       margin-bottom: 28px;
     }
-    .brand-icon {
-      display: inline-block;
-      width: 34px;
-      height: 34px;
+    .brand-icon-box {
+      width: 40px;
+      height: 40px;
       background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      border-radius: 10px;
+      border-radius: 12px;
       text-align: center;
-      line-height: 34px;
-      font-size: 16px;
-      color: #ffffff;
-      font-weight: 900;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+      vertical-align: middle;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
     }
     .brand-title {
       font-size: 13px;
       font-weight: 800;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: #e4e4e7;
-      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      font-family: 'Geist Mono', ui-monospace, monospace;
     }
     .brand-badge {
       display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
-      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      font-size: 9px;
+      font-weight: 800;
+      font-family: 'Geist Mono', ui-monospace, monospace;
       color: #38bdf8;
-      background-color: rgba(56, 189, 248, 0.1);
-      border: 1px solid rgba(56, 189, 248, 0.25);
+      background-color: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.28);
       border-radius: 6px;
       padding: 2px 7px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
+      margin-left: 6px;
+    }
+    /* Hero Illustration Badge */
+    .hero-badge-wrap {
+      text-align: center;
+      margin: 10px 0 24px 0;
+    }
+    .hero-badge-container {
+      display: inline-block;
+      position: relative;
     }
     /* Hero Title */
     .title {
-      font-size: 24px;
+      font-size: 25px;
       font-weight: 900;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
       color: #ffffff;
       margin-bottom: 12px;
+      line-height: 1.25;
     }
     .subtitle {
       font-size: 14px;
       color: #a1a1aa;
-      line-height: 1.6;
+      line-height: 1.65;
       margin-bottom: 28px;
     }
     /* Action Button */
@@ -104,41 +114,41 @@
       text-decoration: none;
       font-size: 13px;
       font-weight: 800;
-      padding: 14px 28px;
-      border-radius: 14px;
+      padding: 15px 32px;
+      border-radius: 16px;
       letter-spacing: -0.01em;
-      box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 20px rgba(255, 255, 255, 0.18);
       text-align: center;
     }
     /* Security Box */
     .info-box {
       background-color: #18181b;
       border: 1px solid #27272a;
-      border-radius: 16px;
-      padding: 16px;
+      border-radius: 18px;
+      padding: 18px;
       margin: 24px 0 20px 0;
     }
     .info-title {
       font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       color: #71717a;
-      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      font-family: 'Geist Mono', ui-monospace, monospace;
       margin-bottom: 6px;
     }
     .info-text {
       font-size: 12px;
       color: #a1a1aa;
-      line-height: 1.5;
+      line-height: 1.55;
     }
     /* Fallback Link Box */
     .fallback-box {
-      margin-top: 20px;
-      padding: 14px;
-      background-color: #141416;
+      margin-top: 22px;
+      padding: 16px;
+      background-color: #141417;
       border: 1px dashed #27272a;
-      border-radius: 12px;
+      border-radius: 14px;
     }
     .fallback-label {
       font-size: 11px;
@@ -148,15 +158,16 @@
     }
     .fallback-url {
       font-size: 11px;
-      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      font-family: 'Geist Mono', ui-monospace, monospace;
       color: #38bdf8;
       word-break: break-all;
       text-decoration: none;
+      line-height: 1.5;
     }
     /* Footer */
     .footer {
-      padding: 24px 32px;
-      background-color: #0e0e10;
+      padding: 24px 36px;
+      background-color: #0e0e11;
       border-top: 1px solid #1f1f23;
       text-align: left;
     }
@@ -175,18 +186,47 @@
   <div class="wrapper">
     <div class="top-accent"></div>
     <div class="content">
-      <!-- Header -->
-      <table style="width: 100%; margin-bottom: 24px;">
+      
+      <!-- Top Brand Bar -->
+      <table class="brand-table" cellpadding="0" cellspacing="0">
         <tr>
-          <td>
-            <div class="brand-icon">LV</div>
+          <td style="width: 44px; vertical-align: middle;">
+            <div class="brand-icon-box">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; margin: 9px auto;">
+                <rect x="3" y="4" width="18" height="18" rx="4" ry="4"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
           </td>
-          <td style="padding-left: 10px; width: 100%;">
+          <td style="padding-left: 12px; vertical-align: middle;">
             <span class="brand-title">LEAVE PLANNER</span>
-            <span class="brand-badge" style="margin-left: 6px;">VERIFICATION</span>
+            <span class="brand-badge">VERIFICATION</span>
           </td>
         </tr>
       </table>
+
+      <!-- SVG Illustration / Emblem -->
+      <div class="hero-badge-wrap">
+        <svg width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="42" cy="42" r="41" stroke="#27272a" stroke-width="1.5" />
+          <circle cx="42" cy="42" r="32" fill="url(#blue_grad_bg)" fill-opacity="0.15" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="1.5" />
+          <rect x="28" y="27" width="28" height="30" rx="7" fill="#18181b" stroke="#3b82f6" stroke-width="1.8" />
+          <line x1="35" y1="23" x2="35" y2="28" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" />
+          <line x1="49" y1="23" x2="49" y2="28" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" />
+          <line x1="28" y1="35" x2="56" y2="35" stroke="#27272a" stroke-width="1.5" />
+          <!-- Checkmark Pill -->
+          <circle cx="47" cy="48" r="9" fill="#10b981" />
+          <path d="M44 48L46.2 50.2L50.5 46" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          <defs>
+            <radialGradient id="blue_grad_bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(42 42) rotate(90) scale(32)">
+              <stop stop-color="#3b82f6" />
+              <stop offset="1" stop-color="#06b6d4" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+        </svg>
+      </div>
 
       <!-- Hero Heading -->
       <h1 class="title">Confirm your email address</h1>
@@ -194,9 +234,9 @@
         Welcome to Leave Planner! Please confirm your email address to activate your account and start scheduling leave quotas, company holidays, and smart vacation spans.
       </p>
 
-      <!-- Call To Action -->
+      <!-- Primary Action -->
       <div class="btn-container">
-        <a href="{{ .ConfirmationURL }}" class="btn" target="_blank">Confirm Email & Activate Account →</a>
+        <a href="{{ .ConfirmationURL }}" class="btn" target="_blank">Confirm Email & Activate Account &rarr;</a>
       </div>
 
       <!-- Security Notice -->
@@ -218,7 +258,7 @@
     <div class="footer">
       <p class="footer-text">
         <span class="footer-brand">Leave Planner Vault</span> &bull; Precision Attendance & Leave Management<br>
-        Automated system notification. Please do not reply directly to this email.
+        Automated security email. Please do not reply directly to this email.
       </p>
     </div>
   </div>
