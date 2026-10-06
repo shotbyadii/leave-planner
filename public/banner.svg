@@ -81,15 +81,15 @@
 
     <!-- Monospace Subtitle / Design Token Eyebrow -->
     <g transform="translate(0, 36)">
-      <rect x="-185" y="-14" width="370" height="28" rx="14" fill="#18181b" stroke="#27272a" stroke-width="1" />
+      <rect x="-210" y="-14" width="420" height="28" rx="14" fill="#18181b" stroke="#27272a" stroke-width="1" />
       <text y="5" font-family="'Geist Mono', ui-monospace, SFMono-Regular, monospace" font-size="12" font-weight="700" fill="#a1a1aa" letter-spacing="1.5">
-        SLATE DESIGN SYSTEM · PRECISION PTO ENGINE
+        SLATE DESIGN SYSTEM · BUILT IN GOOGLE ANTIGRAVITY
       </text>
     </g>
 
     <!-- Tagline Description -->
     <text y="92" font-family="-apple-system, BlinkMacSystemFont, 'Geist Sans', 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="400" fill="#71717a" letter-spacing="-0.2">
-      Multi-day calendar optimizer, holiday bridge detection, and multi-device cloud sync with zero telemetry.
+      An open-source leave tracking and holiday planning web app with multi-device cloud sync.
     </text>
 
     <!-- Mini Feature Metric Pills -->
@@ -97,17 +97,17 @@
       <!-- Pill 1 -->
       <g transform="translate(-240, 0)">
         <rect x="-70" y="-12" width="140" height="24" rx="6" fill="#121214" stroke="#27272a" stroke-width="1" />
-        <text y="4" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#e4e4e7">⚡ ZERO-WARP UI</text>
+        <text y="4" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#e4e4e7">⚡ SLATE DESIGN</text>
       </g>
       <!-- Pill 2 -->
       <g transform="translate(-80, 0)">
         <rect x="-70" y="-12" width="140" height="24" rx="6" fill="#121214" stroke="#27272a" stroke-width="1" />
-        <text y="4" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#38bdf8">🔒 SUPABASE RLS</text>
+        <text y="4" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#38bdf8">🔒 SUPABASE SYNC</text>
       </g>
       <!-- Pill 3 -->
       <g transform="translate(80, 0)">
         <rect x="-70" y="-12" width="140" height="24" rx="6" fill="#121214" stroke="#27272a" stroke-width="1" />
-        <text y="4" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#34d399">📱 OFFLINE PWA</text>
+        <text y="4" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" fill="#34d399">📱 INSTALLABLE PWA</text>
       </g>
       <!-- Pill 4 -->
       <g transform="translate(240, 0)">
