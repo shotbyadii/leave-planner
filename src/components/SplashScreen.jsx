@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail, isSupabaseConfigured } from '../services/authService';
 import { signUpDemoUser } from '../services/demoService';
+import { APP_CONFIG } from '../constants/brand';
+import HalftoneDotsBackground from './HalftoneDotsBackground';
 
 const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, currentProfile = {}, isDemoMode = false }) => {
   const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup' | 'forgot_password'
@@ -149,96 +151,48 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.02 }}
       transition={{ duration: 0.3 }}
-      className={`fixed inset-0 z-[200] bg-background flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto select-none ${
-        isDemoMode ? 'pt-14 sm:pt-16' : ''
+      className={`fixed inset-0 z-[200] overflow-y-auto lg:overflow-hidden select-none bg-background ${
+        isDemoMode ? 'top-10' : 'top-0'
       }`}
     >
-      {/* Ambient Background Glow Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none animate-pulse [animation-delay:1s]" />
-
-      <div className="relative w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 items-center z-10 py-4 sm:py-6">
+      <div className="min-h-full lg:h-full lg:max-h-full w-full flex flex-col lg:flex-row relative">
         
-        {/* Left Column: Hero Branding & Ambient Feature Cards */}
-        <div className="lg:col-span-7 flex flex-col gap-4 sm:gap-6 text-left">
-          
-          {/* Logo Badge */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-primary text-primary-foreground font-black text-lg sm:text-xl flex items-center justify-center shadow-lg shadow-primary/20 relative overflow-hidden flex-shrink-0">
-              <span>LV</span>
-              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent animate-pulse" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-black font-mono tracking-tight text-foreground leading-none sm:leading-normal">Leave Vault</span>
-              <span className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mt-0.5">Intelligent Time Off Planner</span>
-            </div>
-          </div>
-
-          <div>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-foreground tracking-tight leading-tight">
-              Plan Your Time Off <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-primary via-purple-500 to-cyan-500 bg-clip-text text-transparent">
-                With Superpowers.
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3 font-medium max-w-lg leading-relaxed">
-              Auto-find long weekend bridges, organize multi-day vacations, and track your hybrid work balance effortlessly.
-            </p>
-          </div>
-
-          {/* Feature Cards - Hidden on Mobile for clean focus, visible on desktop */}
-          <div className="hidden sm:grid grid-cols-3 gap-2.5 sm:gap-4 mt-2 sm:mt-3">
-            {[
-              { 
-                icon: CalendarDays, 
-                title: 'Smart Optimizer', 
-                desc: 'Bridge holidays for maximum time off', 
-                cardBg: 'bg-blue-50/90 dark:bg-blue-950/30 border-blue-200/90 dark:border-blue-500/30 shadow-sm',
-                iconBox: 'bg-blue-600 text-white shadow-md shadow-blue-500/25',
-                titleColor: 'text-blue-950 dark:text-blue-100',
-                descColor: 'text-blue-700/90 dark:text-blue-300/80'
-              },
-              { 
-                icon: MapPin, 
-                title: 'Trip Planner', 
-                desc: 'Plan and group multi-day vacations', 
-                cardBg: 'bg-purple-50/90 dark:bg-purple-950/30 border-purple-200/90 dark:border-purple-500/30 shadow-sm',
-                iconBox: 'bg-purple-600 text-white shadow-md shadow-purple-500/25',
-                titleColor: 'text-purple-950 dark:text-purple-100',
-                descColor: 'text-purple-700/90 dark:text-purple-300/80'
-              },
-              { 
-                icon: Home, 
-                title: 'WFH & Attendance', 
-                desc: 'Track monthly quotas & check-ins', 
-                cardBg: 'bg-cyan-50/90 dark:bg-cyan-950/30 border-cyan-200/90 dark:border-cyan-500/30 shadow-sm',
-                iconBox: 'bg-cyan-600 text-white shadow-md shadow-cyan-500/25',
-                titleColor: 'text-cyan-950 dark:text-cyan-100',
-                descColor: 'text-cyan-700/90 dark:text-cyan-300/80'
-              }
-            ].map((card, idx) => {
-              const IconComp = card.icon;
-              return (
-                <div key={idx} className={`p-3 sm:p-4 rounded-2xl border flex flex-col gap-1.5 sm:gap-2 transition-all hover:scale-[1.02] ${card.cardBg}`}>
-                  <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl ${card.iconBox} flex items-center justify-center flex-shrink-0`}>
-                    <IconComp className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-                  </div>
-                  <h4 className={`text-xs sm:text-sm font-black leading-tight ${card.titleColor}`}>{card.title}</h4>
-                  <p className={`text-[10px] sm:text-xs leading-snug font-medium ${card.descColor}`}>{card.desc}</p>
-                </div>
-              );
-            })}
-          </div>
-
+        {/* Left Side (Desktop): 100% height without any crop, aspect ratio locked */}
+        <div className="hidden lg:flex h-full max-h-full relative bg-black items-center justify-start overflow-hidden flex-shrink-0">
+          <img 
+            src={APP_CONFIG.splashArt} 
+            alt={APP_CONFIG.name}
+            className="h-full w-auto max-h-full object-contain block"
+          />
         </div>
 
-        {/* Right Column: Auth Gateway Card - Neutral Grey-Black with High Contrast White Button */}
-        <div className="lg:col-span-5 w-full mt-4 sm:mt-0">
-          <motion.div 
-            layout 
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="bg-[#121212] text-zinc-100 border border-zinc-800 rounded-[28px] sm:rounded-[32px] shadow-2xl shadow-black/90 overflow-hidden"
-          >
+        {/* Right Side (Desktop) / Centered View (Mobile): Auth Modal Gateway */}
+        <div className="w-full lg:flex-1 min-h-full lg:h-full lg:max-h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-background lg:overflow-y-auto">
+          
+          {/* Interactive Halftone Dots Canvas strictly behind modal (z-0) */}
+          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-auto">
+            <HalftoneDotsBackground className="w-full h-full" />
+          </div>
+
+          {/* Ambient Glow on Desktop right side */}
+          <div className="hidden lg:block absolute top-1/4 right-1/4 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0" />
+          
+          {/* Mobile Top Header: Logo + App Name (No other text) */}
+          <div className="flex lg:hidden items-center justify-center gap-3 mb-6 relative z-10">
+            <div className="w-10 h-10 rounded-2xl bg-card border border-border/80 p-1 flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden flex-shrink-0">
+              <img src={APP_CONFIG.logo} alt={APP_CONFIG.name} className="w-full h-full object-contain rounded-xl" />
+            </div>
+            <span className="text-xl font-black font-mono tracking-tight text-foreground">
+              {APP_CONFIG.name}
+            </span>
+          </div>
+
+          <div className="w-full max-w-md mx-auto relative z-10">
+            <motion.div 
+              layout 
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="bg-[#121212] text-zinc-100 border border-zinc-800 rounded-[28px] sm:rounded-[32px] shadow-2xl shadow-black/90 overflow-hidden"
+            >
             
             {/* Header / Tabs */}
             <div className="p-4 sm:p-5 border-b border-zinc-800 bg-[#161616] flex justify-between items-center">
@@ -617,13 +571,14 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
 
           {/* Privacy Policy & Terms of Service Links */}
           <div className="flex items-center justify-center gap-3 mt-3 text-[11px] text-zinc-500 font-medium">
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
               Privacy Policy
             </a>
             <span>&bull;</span>
-            <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
+            <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
               Terms of Service
             </a>
+          </div>
           </div>
         </div>
 

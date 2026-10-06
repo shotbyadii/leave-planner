@@ -130,7 +130,13 @@ const OptimizerPanel = ({
   const [inlineKeyInput, setInlineKeyInput] = useState('');
   const [crestDismissed, setCrestDismissed] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(false);
-  const [panelViewMode, setPanelViewMode] = useState(() => (hasGeminiApiKey() ? 'ai' : 'filters')); // 'ai' | 'filters'
+  const [panelViewMode, setPanelViewMode] = useState(() => (inlineOnMobile ? 'filters' : (hasGeminiApiKey() ? 'ai' : 'filters'))); // 'ai' | 'filters'
+
+  useEffect(() => {
+    if (inlineOnMobile) {
+      setPanelViewMode('filters');
+    }
+  }, [inlineOnMobile]);
 
   // Dynamic Vertical Resize Splitter (Percentage of panel height allocated to chat)
   const [chatSplitPercent, setChatSplitPercent] = useState(50);
@@ -715,9 +721,9 @@ const OptimizerPanel = ({
   return (
     <div id="tutorial-step-optimizer" className={`flex flex-col bg-card relative ${inlineOnMobile ? 'h-auto md:h-full' : 'h-full'} overflow-hidden`}>
       
-      {/* 1. Integrated Crest Banner (when No API Key & Not Dismissed) */}
+      {/* 1. Integrated Crest Banner (when No API Key & Not Dismissed; Hidden on mobile where AI Chat has its own tab) */}
       <AnimatePresence>
-        {!hasKey && !crestDismissed && bannerVisible && (
+        {!inlineOnMobile && !hasKey && !crestDismissed && bannerVisible && (
           <motion.div
             initial={{ height: 0, y: -38, opacity: 0 }}
             animate={{ height: 'auto', y: 0, opacity: 1 }}
@@ -798,8 +804,8 @@ const OptimizerPanel = ({
         )}
       </AnimatePresence>
 
-      {/* 2. Top Bar Navigation / Mode Toggle & Compact '+' New Chat Button */}
-      {hasKey && (
+      {/* 2. Top Bar Navigation / Mode Toggle & Compact '+' New Chat Button (Desktop only; on mobile home keep only filters and picks) */}
+      {!inlineOnMobile && hasKey && (
         <div className={`p-2.5 border-b transition-colors flex items-center justify-between gap-2 flex-shrink-0 ${
           panelViewMode === 'ai'
             ? 'bg-gradient-to-r from-blue-100/90 via-sky-50/80 to-indigo-100/80 dark:from-[#0b1325] dark:via-[#142d5b] dark:to-[#173ea5] border-blue-200/50 dark:border-blue-800/40 text-foreground dark:text-white'
@@ -853,8 +859,21 @@ const OptimizerPanel = ({
         </div>
       )}
 
+      {/* Dedicated Clean Header on Mobile Home */}
+      {inlineOnMobile && (
+        <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal size={15} className="text-primary" />
+            <span className="text-xs font-black font-mono uppercase tracking-wider text-foreground">Filters & Picks</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold text-muted-foreground">
+            {optimizerMode === 'best' ? 'Best Ratio' : `${targetLeaves} Days`}
+          </span>
+        </div>
+      )}
+
       {/* ── VIEW MODE A: RESIZABLE SPLIT (AI CHAT TOP + SUGGESTIONS BOTTOM) ── */}
-      {hasKey && panelViewMode === 'ai' ? (
+      {!inlineOnMobile && hasKey && panelViewMode === 'ai' ? (
         <div ref={splitContainerRef} className="flex-1 flex flex-col min-h-0 overflow-hidden bg-card relative select-none">
           
           {/* Top Resizable AI Assistant Section with Theme-Matching Focused Calendar Background */}

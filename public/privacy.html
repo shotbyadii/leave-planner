@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - Leave Planner</title>
+  <title>Privacy Policy - Leave Vault</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <!-- Official Web Fonts: Geist & Geist Mono (Vercel) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,7 +34,7 @@
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Geist', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.65;
       padding: 32px 16px;
       -webkit-font-smoothing: antialiased;
@@ -67,15 +67,20 @@
     .brand-icon {
       width: 38px;
       height: 38px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      background: #ffffff;
+      border: 1px solid var(--border);
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 900;
-      font-size: 16px;
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+      padding: 4px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    .brand-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     .brand-title {
       font-size: 13px;
@@ -83,7 +88,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: #e4e4e7;
-      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
     }
     .badge {
       font-size: 10px;
@@ -221,8 +226,10 @@
 
     <div class="header">
       <div class="brand-row">
-        <div class="brand-icon">LV</div>
-        <span class="brand-title">LEAVE PLANNER</span>
+        <div class="brand-icon">
+          <img src="/logo.png" alt="Leave Vault" />
+        </div>
+        <span class="brand-title">LEAVE VAULT</span>
         <span class="badge">LEGAL COMPLIANCE</span>
       </div>
       <h1>Privacy Policy</h1>
@@ -231,7 +238,7 @@
 
     <div class="content">
       <div class="intro-box">
-        <strong>Leave Planner</strong> (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the Application&rdquo;) is an employee leave scheduling and attendance vault designed to help individuals and teams plan, calculate, and visualize paid time off (PL, EL, RH, WFH). We are committed to transparency, data ownership, and protecting your personal information.
+        <strong>Leave Vault</strong> (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the Application&rdquo;) is an employee leave scheduling and attendance vault designed to help individuals and teams plan, calculate, and visualize paid time off (PL, EL, RH, WFH). We are committed to transparency, data ownership, and protecting your personal information.
       </div>
 
       <h2><span class="num">1.</span> Information We Collect</h2>

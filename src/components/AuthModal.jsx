@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, UserPlus, Mail, Lock, User, ArrowRight, ShieldCheck, X, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Sparkles, ChevronLeft } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail, isSupabaseConfigured } from '../services/authService';
 import { signUpDemoUser } from '../services/demoService';
+import { APP_CONFIG } from '../constants/brand';
 
 const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, currentProfile = {}, isDemoMode = false }) => {
   const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup' | 'forgot_password'
@@ -188,14 +189,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
         {/* Header */}
         <div className="p-6 border-b border-border dark:border-zinc-800 bg-muted/40 dark:bg-[#161616] flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm shadow-md ${
-              isDemoMode ? 'bg-amber-500 text-black text-lg' : 'bg-primary text-primary-foreground'
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm shadow-md overflow-hidden ${
+              isDemoMode ? 'bg-amber-500 text-black text-lg' : 'bg-card border border-border/80 p-1'
             }`}>
-              {isDemoMode ? '🎮' : 'LV'}
+              {isDemoMode ? '🎮' : <img src={APP_CONFIG.logo} alt={APP_CONFIG.name} className="w-full h-full object-contain rounded-xl" />}
             </div>
             <div>
               <h3 className="text-base font-black text-foreground dark:text-zinc-100">
-                {isDemoMode ? 'Create Demo Account' : 'Leave Vault Account'}
+                {isDemoMode ? 'Create Demo Account' : `${APP_CONFIG.name} Account`}
               </h3>
               <p className="text-[11px] text-muted-foreground dark:text-zinc-400 font-medium">
                 {isDemoMode ? 'Instant sandbox access • Zero verification required' : 'Sync profiles & leave plans across devices'}
@@ -548,11 +549,11 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
 
               {/* Privacy Policy & Terms of Service Links */}
               <div className="flex items-center justify-center gap-3 pt-2 text-[10px] text-muted-foreground font-medium">
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
                   Privacy Policy
                 </a>
                 <span>&bull;</span>
-                <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
                   Terms of Service
                 </a>
               </div>

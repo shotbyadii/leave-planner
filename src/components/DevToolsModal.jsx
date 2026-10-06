@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FlaskConical, X, RotateCcw, Calendar, Play, Sparkles, Check, Sliders, Palette } from 'lucide-react';
+import { FlaskConical, X, RotateCcw, Calendar, Play, Sparkles, Check, Sliders, Palette, Bell } from 'lucide-react';
+import { subscribeUserToPush, triggerTestWebPush } from '../utils/notificationService';
 
 const DevToolsModal = ({ 
   isOpen, 
@@ -19,6 +20,7 @@ const DevToolsModal = ({
 }) => {
   const [tempDateStr, setTempDateStr] = useState(devDateStr || getTodayStr());
   const [appliedToast, setAppliedToast] = useState(false);
+  const [pushStatus, setPushStatus] = useState('');
 
   useEffect(() => {
     setTempDateStr(devDateStr || getTodayStr());
@@ -217,7 +219,35 @@ const DevToolsModal = ({
                 <Sparkles size={15} /> Trigger Attendance Check-in Modal
               </button>
 
-              {/* 6. Launch Guided Walkthrough Tour */}
+              {/* 6. Test Web Push Notification */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setPushStatus('Subscribing & dispatching push...');
+                  try {
+                    await subscribeUserToPush();
+                    const res = await triggerTestWebPush();
+                    if (res && res.success) {
+                      setPushStatus('Web Push dispatched! Background/lock app to test.');
+                    } else {
+                      setPushStatus('Edge Function: ' + (res?.message || res?.error || 'Triggered'));
+                    }
+                  } catch (e) {
+                    setPushStatus('Error: ' + e.message);
+                  }
+                  setTimeout(() => setPushStatus(''), 4000);
+                }}
+                className="w-full p-3 bg-violet-500/10 border border-violet-500/30 text-violet-600 dark:text-violet-400 hover:bg-violet-500/20 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer font-mono"
+              >
+                <Bell size={15} /> Trigger Background Web Push (Supabase)
+              </button>
+              {pushStatus && (
+                <div className="text-[11px] font-mono text-center text-muted-foreground bg-muted/40 py-2 px-3 rounded-xl border border-border">
+                  {pushStatus}
+                </div>
+              )}
+
+              {/* 7. Launch Guided Walkthrough Tour */}
               <button
                 type="button"
                 onClick={() => {

@@ -4,7 +4,7 @@ import { Home, Building2, CalendarX2, Bell, AlertTriangle, X, Check, Sparkles } 
 import { isWeekend, publicHolidays } from '../data/holidays';
 import { getShortform } from '../utils/colorUtils';
 import AppleBalanceTicker from './AppleBalanceTicker';
-import { showAppNotification, requestNotificationPermission, isNotificationSupported } from '../utils/notificationService';
+import { showAppNotification, requestNotificationPermission, isNotificationSupported, subscribeUserToPush } from '../utils/notificationService';
 
 const WfhCheckinModal = ({ 
   isOpen, 
@@ -51,6 +51,15 @@ const WfhCheckinModal = ({
   const handleRequestNotif = async () => {
     if (!notificationSupported) return;
     try {
+      const pushRes = await subscribeUserToPush();
+      if (pushRes && pushRes.success) {
+        setNotifPermission('granted');
+        showAppNotification('WFH & Attendance Check-in', {
+          body: 'Web Push enabled! You will receive daily check-in reminders even when Leave Planner is closed.',
+          tag: 'wfh-checkin-confirmation'
+        });
+        return;
+      }
       const res = await requestNotificationPermission();
       if (res) setNotifPermission(res);
       if (res === 'granted') {
@@ -117,10 +126,10 @@ const WfhCheckinModal = ({
             animate={{ opacity: 1, y: 0, scale: 1 }} 
             exit={{ opacity: 0, y: 15, scale: 0.96 }} 
             transition={{ type: 'spring', damping: 26, stiffness: 340 }} 
-            className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden z-10"
+            className="relative bg-card w-full max-w-md mx-auto rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden z-10 flex flex-col max-h-[min(90dvh,calc(100dvh-2rem-env(safe-area-inset-bottom,0px)))]"
           >
             
-            <div className="p-5 border-b border-border bg-muted/40 flex justify-between items-center">
+            <div className="p-5 border-b border-border bg-muted/40 flex justify-between items-center flex-shrink-0">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500 flex items-center gap-1.5 font-mono">
                   <Sparkles size={12} /> Daily Attendance Check-in
@@ -138,7 +147,7 @@ const WfhCheckinModal = ({
               )}
             </div>
 
-            <div className="p-5 flex flex-col gap-4 items-center text-center">
+            <div className="p-5 flex flex-col gap-4 items-center text-center flex-1 min-h-0 overflow-y-auto no-scrollbar overscroll-contain pb-6">
               <AnimatePresence mode="wait" initial={false}>
                 {selectedAction ? (
                   <motion.div

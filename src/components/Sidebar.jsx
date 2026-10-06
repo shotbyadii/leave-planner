@@ -1,11 +1,12 @@
 import React from 'react';
+import { APP_CONFIG } from '../constants/brand';
 
 const Sidebar = ({ leaves }) => {
   return (
     <aside className="glass-panel sidebar">
-      <div className="logo">
-        <div className="logo-icon">✈️</div>
-        LeaveSync
+      <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <img src={APP_CONFIG.logo} alt={APP_CONFIG.name} style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+        {APP_CONFIG.name}
       </div>
       
       <div className="leave-balances">

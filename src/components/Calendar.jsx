@@ -437,7 +437,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
 
   return (
     <>
-      <div id="tutorial-step-calendar" className={`flex flex-col gap-6 relative z-10 ${viewMode === 'monthly' ? 'h-full min-h-0' : 'h-full'}`}>
+      <div id="tutorial-step-calendar" className={`flex flex-col gap-6 relative z-10 ${viewMode === 'monthly' ? 'h-auto md:h-full md:min-h-0' : 'h-auto md:h-full'}`}>
         <div className="flex justify-between items-center w-full flex-shrink-0">
           <h2 className="text-lg font-bold text-foreground">{viewMode === 'monthly' ? 'Focused View' : 'Yearly Grid'}</h2>
           <div className="flex bg-muted p-1 rounded-xl w-fit ml-auto shadow-inner">

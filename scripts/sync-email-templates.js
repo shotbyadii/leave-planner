@@ -37,9 +37,24 @@ if (!fs.existsSync(confirmSignupPath) || !fs.existsSync(resetPasswordPath) || !f
   process.exit(1);
 }
 
-const confirmHtml = fs.readFileSync(confirmSignupPath, 'utf8');
-const resetHtml = fs.readFileSync(resetPasswordPath, 'utf8');
-const magicHtml = fs.readFileSync(magicLinkPath, 'utf8');
+// Read logo for dynamic injection into templates
+const logoPath = path.join(rootDir, 'public', 'logo-email.png');
+const appLogoBase64 = fs.existsSync(logoPath) 
+  ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
+  : '';
+
+function prepareTemplate(htmlContent) {
+  let processed = htmlContent;
+  if (appLogoBase64) {
+    // Replace any base64 png data URI inside <img> tags with current logo-email.png
+    processed = processed.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, appLogoBase64);
+  }
+  return processed;
+}
+
+const confirmHtml = prepareTemplate(fs.readFileSync(confirmSignupPath, 'utf8'));
+const resetHtml = prepareTemplate(fs.readFileSync(resetPasswordPath, 'utf8'));
+const magicHtml = prepareTemplate(fs.readFileSync(magicLinkPath, 'utf8'));
 
 console.log(`🚀 Syncing email templates to Supabase project [${projectRef}]...`);
 
@@ -47,13 +62,13 @@ async function syncTemplates() {
   const url = `https://api.supabase.com/v1/projects/${projectRef}/config/auth`;
 
   const payload = {
-    mailer_subjects_confirmation: "Confirm your Leave Planner account",
+    mailer_subjects_confirmation: "Confirm your Leave Vault account",
     mailer_templates_confirmation_content: confirmHtml,
 
-    mailer_subjects_recovery: "Reset your Leave Planner password",
+    mailer_subjects_recovery: "Reset your Leave Vault password",
     mailer_templates_recovery_content: resetHtml,
 
-    mailer_subjects_magic_link: "Your Leave Planner magic login link",
+    mailer_subjects_magic_link: "Your Leave Vault magic login link",
     mailer_templates_magic_link_content: magicHtml,
   };
 

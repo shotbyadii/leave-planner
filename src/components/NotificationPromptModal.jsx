@@ -26,7 +26,7 @@ const NotificationPromptModal = ({ isOpen, onClose, onEnable }) => {
         <div>
           <h3 className="text-lg font-black text-foreground">Enable Daily Attendance Reminders</h3>
           <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed font-medium px-2">
-            Get an automated browser notification toast every working day after 12:00 PM so you never forget to log whether today is Work From Home or In-Office.
+            Receive automated background notifications on this device every working day so you never forget to log whether today is Work From Home or In-Office — even when the app is closed.
           </p>
         </div>
 

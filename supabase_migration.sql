@@ -60,7 +60,21 @@ ALTER TABLE leave_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
--- 6. RLS Policies (Allow all for anon/public access)
+-- 6. Create push_subscriptions table
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  endpoint text NOT NULL UNIQUE,
+  p256dh text NOT NULL,
+  auth text NOT NULL,
+  user_agent text,
+  created_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamptz DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- 7. RLS Policies (Allow all for anon/public access)
 DROP POLICY IF EXISTS "Allow all on leaves" ON leaves;
 CREATE POLICY "Allow all on leaves" ON leaves FOR ALL TO anon USING (true);
 
@@ -72,3 +86,8 @@ CREATE POLICY "Allow all on company_holidays" ON company_holidays FOR ALL TO ano
 
 DROP POLICY IF EXISTS "Allow all on profiles" ON profiles;
 CREATE POLICY "Allow all on profiles" ON profiles FOR ALL TO anon USING (true);
+
+DROP POLICY IF EXISTS "Allow all on push_subscriptions" ON push_subscriptions;
+CREATE POLICY "Allow all on push_subscriptions" ON push_subscriptions FOR ALL TO anon USING (true);
+CREATE POLICY "Allow authenticated on push_subscriptions" ON push_subscriptions FOR ALL TO authenticated USING (true);
+

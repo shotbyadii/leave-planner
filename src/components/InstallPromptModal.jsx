@@ -13,6 +13,7 @@ import {
   Zap,
   Layers
 } from 'lucide-react';
+import { APP_CONFIG } from '../constants/brand';
 
 export const isRunningStandalone = () => {
   if (typeof window === 'undefined') return false;
@@ -110,9 +111,9 @@ const InstallPromptModal = ({ isOpen, onClose, deferredPrompt, onInstalled }) =>
               <div className="absolute -inset-2 bg-gradient-to-r from-primary/30 to-purple-500/30 rounded-3xl blur-xl opacity-75 animate-pulse" />
               <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-card to-muted border border-primary/30 p-2.5 shadow-2xl flex items-center justify-center">
                 <img
-                  src="/favicon.svg"
-                  alt="Leave Vault Icon"
-                  className="w-full h-full object-contain drop-shadow-md"
+                  src={APP_CONFIG.logo}
+                  alt={`${APP_CONFIG.name} Icon`}
+                  className="w-full h-full object-contain drop-shadow-md rounded-lg"
                 />
               </div>
             </div>

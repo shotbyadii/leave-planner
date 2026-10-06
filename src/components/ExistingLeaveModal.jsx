@@ -291,9 +291,9 @@ export const ExistingLeaveDetailContent = ({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.18 }}
-            className="flex flex-col w-full"
+            className="flex flex-col w-full flex-1 min-h-0 overflow-hidden"
           >
-            <div className="px-5 pb-4 pt-2 md:pt-4 border-b border-border/60 bg-card flex justify-between items-center flex-shrink-0">
+            <div className="px-5 pb-3 pt-2 md:pt-4 border-b border-border/60 bg-card flex justify-between items-center flex-shrink-0">
               <div>
                 <span className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest block mb-0.5">
                   {associatedPlan ? 'Leave Plan' : isAttendanceLog ? 'Attendance Record' : 'Individual Leave'}
@@ -310,7 +310,8 @@ export const ExistingLeaveDetailContent = ({
               </button>
             </div>
 
-            <div className="p-5 flex flex-col gap-4 overflow-y-auto no-scrollbar">
+            {/* Scrollable Body */}
+            <div className="p-5 flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 no-scrollbar overscroll-contain">
               <div className={`p-4 rounded-2xl border flex items-center justify-between ${bannerTheme}`}>
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70 font-mono">Date</span>
@@ -351,44 +352,49 @@ export const ExistingLeaveDetailContent = ({
               )}
 
               {renderMiniCalendar()}
+            </div>
 
+            {/* Pinned Action Footer */}
+            <div className="px-5 pt-2.5 pb-3.5 border-t border-border/60 bg-card/95 backdrop-blur-md flex-shrink-0">
               {isAttendanceLog ? (
-                <div className="flex flex-col gap-2 pt-1">
+                <div className="flex flex-col gap-2">
                   {isWfh ? (
                     <button
                       onClick={handleTriggerConvertToOffice}
-                      className="w-full py-3 bg-muted hover:bg-muted/80 border border-border text-foreground font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
+                      className="w-full py-2.5 bg-muted hover:bg-muted/80 border border-border text-foreground font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-98"
                     >
                       <Building2 size={15} /> Switch to In-Office Attendance
                     </button>
                   ) : (
                     <button
                       onClick={handleTriggerConvertToWfh}
-                      className="w-full py-3 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
+                      className="w-full py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-98"
                     >
                       <Home size={15} /> Switch to Work From Home
                     </button>
                   )}
 
-                  <button
-                    onClick={() => onConvertToLeave(targetDateStr)}
-                    className="w-full py-2.5 bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
-                  >
-                    <CalendarX2 size={14} /> Mark as Full Leave Instead
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onConvertToLeave(targetDateStr)}
+                      className="flex-1 py-2 bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground font-bold text-[11px] rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono active:scale-98"
+                    >
+                      <CalendarX2 size={13} /> Full Leave
+                    </button>
 
-                  <button
-                    onClick={handleTriggerCancelLeave}
-                    className="w-full py-2.5 text-red-500 hover:bg-red-500/10 rounded-xl font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
-                  >
-                    <Trash2 size={14} /> Delete Check-in Record
-                  </button>
+                    <button
+                      onClick={handleTriggerCancelLeave}
+                      className="flex-1 py-2 text-red-500 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 rounded-xl font-bold text-[11px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono active:scale-98"
+                    >
+                      <Trash2 size={13} /> Delete Record
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2 pt-1">
+                <div className="flex flex-col gap-2">
                   <button
                     onClick={handleTriggerCancelLeave}
-                    className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono shadow-sm"
+                    className="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-600 dark:text-red-400 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono shadow-sm active:scale-98"
                   >
                     <CalendarX2 size={15} /> Cancel {leaveTypeName} for {targetDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </button>
@@ -396,9 +402,9 @@ export const ExistingLeaveDetailContent = ({
                   {associatedPlan && (
                     <button
                       onClick={handleTriggerCancelPlan}
-                      className="w-full py-2.5 bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono"
+                      className="w-full py-2 bg-card hover:bg-muted border border-border text-muted-foreground hover:text-foreground font-bold text-[11px] rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer font-mono active:scale-98"
                     >
-                      <Trash2 size={14} /> Delete Entire "{associatedPlan.name}" Plan
+                      <Trash2 size={13} /> Delete Entire "{associatedPlan.name}" Plan
                     </button>
                   )}
                 </div>

@@ -4,7 +4,7 @@ import {
   Settings, X, Save, FileText, CheckCircle2, User, SlidersHorizontal, 
   LogIn, LogOut, Download, Upload, Table, AlertCircle, ShieldCheck, 
   RotateCw, Trash2, AlertTriangle, ChevronRight, Camera, Building2, 
-  Globe, Image as ImageIcon, Clock, Sparkles, Key, ExternalLink, Eye, EyeOff, Loader2
+  Globe, Image as ImageIcon, Clock, Sparkles, Key, ExternalLink, Eye, EyeOff, Loader2, Bell
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -12,6 +12,12 @@ import HolidayManager from './HolidayManager';
 import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
+import { 
+  subscribeUserToPush, 
+  unsubscribeUserFromPush, 
+  getExistingPushSubscription, 
+  triggerTestWebPush 
+} from '../utils/notificationService';
 import { 
   getStoredGeminiApiKey, 
   setStoredGeminiApiKey, 
@@ -73,6 +79,19 @@ const SettingsModal = ({
     confirmStaging: null,
     discardStaging: null
   });
+
+  // Web Push State
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [testPushStatus, setTestPushStatus] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      getExistingPushSubscription()
+        .then(sub => setPushSubscribed(Boolean(sub)))
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   const isDirty = (
     name.trim() !== (userName || '').trim() ||
@@ -751,6 +770,79 @@ const SettingsModal = ({
                         );
                       })}
                     </select>
+                  </div>
+
+                  {/* Web Push Background Notifications Card */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                        <Bell size={14} className="text-purple-500" /> Web Push Background Notifications
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                        Receive attendance reminders on iOS, Android & desktop even when Leave Planner is closed
+                      </span>
+                      {testPushStatus && (
+                        <span className="text-[10px] font-mono text-purple-500 dark:text-purple-400 mt-1 font-semibold">
+                          {testPushStatus}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      {pushSubscribed ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setTestPushStatus('Sending test push...');
+                              const res = await triggerTestWebPush();
+                              if (res && res.success) {
+                                setTestPushStatus('Test notification sent!');
+                              } else {
+                                setTestPushStatus(res?.message || 'Failed to dispatch test push');
+                              }
+                              setTimeout(() => setTestPushStatus(''), 4000);
+                            }}
+                            className="px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-xl text-xs font-bold transition-all"
+                          >
+                            Send Test
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pushLoading}
+                            onClick={async () => {
+                              setPushLoading(true);
+                              await unsubscribeUserFromPush();
+                              setPushSubscribed(false);
+                              setPushLoading(false);
+                            }}
+                            className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl text-xs font-bold transition-all"
+                          >
+                            Disable
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={pushLoading}
+                          onClick={async () => {
+                            setPushLoading(true);
+                            const res = await subscribeUserToPush();
+                            if (res && res.success) {
+                              setPushSubscribed(true);
+                              setTestPushStatus('Web Push enabled!');
+                            } else {
+                              setTestPushStatus(res?.reason || res?.error || 'Failed to enable');
+                            }
+                            setPushLoading(false);
+                            setTimeout(() => setTestPushStatus(''), 4000);
+                          }}
+                          className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20 transition-all flex items-center gap-1.5"
+                        >
+                          {pushLoading ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
+                          Enable Web Push
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               )}

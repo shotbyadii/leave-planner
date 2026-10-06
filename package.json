@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "sync:emails": "node scripts/sync-email-templates.js",
+    "push:attendance": "node scripts/send-attendance-reminders.js",
     "push": "git add . && git commit -m \"UI/UX refinements and calendar revert\" && git push origin main"
   },
   "dependencies": {
@@ -22,7 +23,8 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-leaflet": "^5.0.0",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
