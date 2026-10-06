@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "sync:emails": "node scripts/sync-email-templates.js",
     "push": "git add . && git commit -m \"UI/UX refinements and calendar revert\" && git push origin main"
   },
   "dependencies": {
