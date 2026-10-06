@@ -151,11 +151,11 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.02 }}
       transition={{ duration: 0.3 }}
-      className={`fixed inset-0 z-[200] overflow-y-auto lg:overflow-hidden select-none bg-background ${
+      className={`fixed inset-0 z-[200] overflow-y-auto lg:overflow-hidden select-none bg-background flex flex-col ${
         isDemoMode ? 'top-10' : 'top-0'
       }`}
     >
-      <div className="min-h-full lg:h-full lg:max-h-full w-full flex flex-col lg:flex-row relative">
+      <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-full flex flex-col lg:flex-row relative">
         
         {/* Left Side (Desktop): 100% height without any crop, aspect ratio locked */}
         <div className="hidden lg:flex h-full max-h-full relative bg-black items-center justify-start overflow-hidden flex-shrink-0">
@@ -167,7 +167,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
         </div>
 
         {/* Right Side (Desktop) / Centered View (Mobile): Auth Modal Gateway */}
-        <div className="w-full lg:flex-1 min-h-full lg:h-full lg:max-h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-background lg:overflow-y-auto">
+        <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-background lg:overflow-y-auto">
           
           {/* Interactive Halftone Dots Canvas strictly behind modal (z-0) */}
           <div className="absolute inset-0 z-0 overflow-hidden pointer-events-auto">
