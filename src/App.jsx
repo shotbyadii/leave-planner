@@ -20,6 +20,7 @@ import HolidayManager from './components/HolidayManager';
 import AuthModal from './components/AuthModal';
 import ProfileModal from './components/ProfileModal';
 import SplashScreen from './components/SplashScreen';
+import ResetPasswordModal from './components/ResetPasswordModal';
 import AppSkeleton from './components/AppSkeleton';
 import CompanyInput from './components/CompanyInput';
 import ThemeSelector from './components/ThemeSelector';
@@ -86,6 +87,7 @@ function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState('profile');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [userName, setUserName] = useState(localStorage.getItem('user_name') || 'User');
@@ -268,8 +270,17 @@ function App() {
     loadLeaves();
     checkAuthUser();
 
-    // Listen to Supabase auth state changes (e.g. Google OAuth redirect return)
+    // Listen to Supabase auth state changes (e.g. Google OAuth redirect return, password recovery)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setResetPasswordModalOpen(true);
+        return;
+      }
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setShowSplash(true);
+        return;
+      }
       // Do not allow initial auth state changes to disrupt initial skeleton window
       if (!isInitialAuthDone.current) return;
       if (isDemoMode) return;
@@ -285,6 +296,19 @@ function App() {
     return () => {
       subscription?.unsubscribe();
     };
+  }, []);
+
+  // Handle password recovery link routing from email (#type=recovery or #reset-password)
+  useEffect(() => {
+    const checkRecoveryHash = () => {
+      const hash = window.location.hash || '';
+      if (hash.includes('type=recovery') || hash.includes('reset-password')) {
+        setResetPasswordModalOpen(true);
+      }
+    };
+    checkRecoveryHash();
+    window.addEventListener('hashchange', checkRecoveryHash);
+    return () => window.removeEventListener('hashchange', checkRecoveryHash);
   }, []);
 
   // PWA Standalone Detection & Global Listeners
@@ -596,18 +620,33 @@ function App() {
   };
 
   const handleSignOut = async () => {
-    if (isDemoMode) {
-      await signOutDemoUser();
+    try {
+      if (isDemoMode) {
+        await signOutDemoUser();
+      } else {
+        await signOutUser();
+      }
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    } finally {
       setCurrentUser(null);
-      setShowSplash(true);
+      setSettingsModalOpen(false);
       setAuthModalOpen(false);
-      return;
+      setIsAuthChecking(false);
+      setBookedDates([]);
+      setLeavePlans([]);
+      setUserName('User');
+      setCompanyName('');
+      setCompanyLogoUrl('');
+      setAvatarUrl('');
+      localStorage.removeItem('user_name');
+      localStorage.removeItem('company_name');
+      localStorage.removeItem('avatar_url');
+      localStorage.removeItem('company_logo_url');
+      localStorage.removeItem('remember_me');
+      setShowSplash(true);
+      await loadLeaves(null);
     }
-
-    await signOutUser();
-    setCurrentUser(null);
-    setIsAuthChecking(false);
-    setShowSplash(true);
   };
 
   const handleRestartDemo = async () => {
@@ -1378,6 +1417,15 @@ function App() {
                 </button>
               );
             })()}
+
+            <button
+              type="button"
+              onClick={handleSignOut}
+              title="Sign Out"
+              className="hidden md:flex p-2 rounded-full bg-muted/60 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground border border-border/80 transition-colors cursor-pointer"
+            >
+              <LogOut size={14} />
+            </button>
 
             <ThemeSelector theme={theme} setTheme={setTheme} />
           </div>
@@ -2875,6 +2923,19 @@ function App() {
           },
           names: leaveNames,
           colors: leaveColors
+        }}
+      />
+
+      {/* Password Reset Recovery Modal */}
+      <ResetPasswordModal
+        isOpen={resetPasswordModalOpen}
+        onClose={() => setResetPasswordModalOpen(false)}
+        onSuccess={() => {
+          setResetPasswordModalOpen(false);
+          setShowSplash(false);
+          if (window.location.hash.includes('type=recovery') || window.location.hash.includes('reset-password')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
         }}
       />
 

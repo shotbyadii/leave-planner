@@ -375,15 +375,13 @@ const SettingsModal = ({
 
           {/* Left Footer Action: Sign Out & Close (Desktop only) */}
           <div className="hidden md:flex items-center gap-2 mt-4 pt-4 border-t border-border/60">
-            {currentUser && (
-              <button
-                type="button"
-                onClick={() => { onClose(); if (onSignOut) onSignOut(); }}
-                className="flex-1 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <LogOut size={13} /> Sign Out
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => { onClose(); if (onSignOut) onSignOut(); }}
+              className="flex-1 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <LogOut size={13} /> Sign Out
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -639,6 +637,22 @@ const SettingsModal = ({
                         <ChevronRight size={14} />
                       </button>
                     )}
+
+                    {/* Sign Out Action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onSignOut) onSignOut();
+                      }}
+                      className="w-full py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LogOut size={14} />
+                        <span>Sign Out of Account</span>
+                      </div>
+                      <ChevronRight size={14} />
+                    </button>
 
                   </div>
                 </motion.div>

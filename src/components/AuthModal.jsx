@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogIn, UserPlus, Mail, Lock, User, ArrowRight, ShieldCheck, X, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle, isSupabaseConfigured } from '../services/authService';
+import { LogIn, UserPlus, Mail, Lock, User, ArrowRight, ShieldCheck, X, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle, Sparkles, ChevronLeft } from 'lucide-react';
+import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail, isSupabaseConfigured } from '../services/authService';
 import { signUpDemoUser } from '../services/demoService';
 
 const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, currentProfile = {}, isDemoMode = false }) => {
-  const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup'
+  const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup' | 'forgot_password'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,6 +17,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyEmailSent, setVerifyEmailSent] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Clear fields appropriately on mode change or modal open
   const handleSwitchMode = (newMode) => {
@@ -60,6 +61,24 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (mode === 'forgot_password') {
+      if (!email.trim()) {
+        setErrorMsg('Please enter your email address.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const { error } = await sendPasswordResetEmail(email.trim());
+        if (error) throw error;
+        setResetEmailSent(true);
+      } catch (err) {
+        setErrorMsg(err.message || 'Failed to send password reset email. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     
     if (!isDemoMode && !email) {
       setErrorMsg('Please enter an email address.');
@@ -229,7 +248,22 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
               className="flex flex-col"
             >
               {/* Tab Switcher (Only in Live Mode) */}
-              {!isDemoMode && (
+              {mode === 'forgot_password' ? (
+                <div className="flex items-center justify-between p-4 border-b border-border bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setMode('login'); setErrorMsg(''); }}
+                      className="p-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-xs font-black font-mono uppercase tracking-wider text-foreground">
+                      Reset Password
+                    </span>
+                  </div>
+                </div>
+              ) : !isDemoMode && (
                 <div className="flex border-b border-border dark:border-zinc-800 bg-muted/20 dark:bg-[#181818]">
                   <button
                     type="button"
@@ -275,35 +309,101 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
                 </div>
               )}
 
-              {/* Google OAuth Button (Live Mode only) */}
-              {!isDemoMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    className="w-full py-3.5 bg-muted/60 hover:bg-muted border border-border text-foreground font-bold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99]"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                    </svg>
-                    <span>Continue with Google</span>
-                  </button>
-
-                  {/* Divider */}
-                  <div className="flex items-center gap-3 my-1">
-                    <div className="h-px flex-1 bg-border/60" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground font-mono">or email</span>
-                    <div className="h-px flex-1 bg-border/60" />
+              {mode === 'forgot_password' ? (
+                resetEmailSent ? (
+                  <div className="py-4 flex flex-col items-center text-center gap-3 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shadow-sm">
+                      <CheckCircle2 size={26} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Recovery Link Sent</h4>
+                      <p className="text-xs text-muted-foreground max-w-xs leading-relaxed mt-1">
+                        If an account exists for <span className="text-foreground font-semibold">{email}</span>, a reset email has been sent. Follow the link to choose a new password.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setMode('login'); setResetEmailSent(false); }}
+                      className="w-full py-3 mt-2 bg-primary text-primary-foreground font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-primary/20"
+                    >
+                      <ChevronLeft size={14} /> Back to Sign In
+                    </button>
                   </div>
-                </>
-              )}
+                ) : (
+                  <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+                    <div className="flex flex-col gap-1">
+                      <h4 className="text-xs font-bold text-foreground">Reset your password</h4>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Enter your registered email address to receive a secure password recovery link.
+                      </p>
+                    </div>
 
-              {/* Email Form */}
-              <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                    <div className="relative">
+                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Email Address"
+                        required
+                        autoComplete="email"
+                        className="w-full bg-muted/40 border border-border/80 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-[border-color,box-shadow] duration-150"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 mt-1 font-black text-xs rounded-2xl bg-primary text-primary-foreground flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      {loading ? <span>Sending link...</span> : (
+                        <>
+                          <span>Send Recovery Link</span>
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setMode('login'); setErrorMsg(''); }}
+                      className="w-full py-2 text-xs font-bold text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft size={14} /> Back to Sign In
+                    </button>
+                  </form>
+                )
+              ) : (
+                <>
+                  {/* Google OAuth Button (Live Mode only) */}
+                  {!isDemoMode && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        disabled={loading}
+                        className="w-full py-3.5 bg-muted/60 hover:bg-muted border border-border text-foreground font-bold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99]"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                        </svg>
+                        <span>Continue with Google</span>
+                      </button>
+
+                      {/* Divider */}
+                      <div className="flex items-center gap-3 my-1">
+                        <div className="h-px flex-1 bg-border/60" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground font-mono">or email</span>
+                        <div className="h-px flex-1 bg-border/60" />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Email Form */}
+                  <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 {mode === 'signup' && (
                   <div className="relative">
                     <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -400,17 +500,28 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
                   </div>
                 )}
 
-                {/* Remember Me Checkbox (Live Mode only) */}
+                {/* Remember Me & Forgot Password Row (Live Mode only) */}
                 {!isDemoMode && (
-                  <label className="flex items-center gap-2 cursor-pointer my-1 text-xs text-muted-foreground hover:text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 accent-primary"
-                    />
-                    <span className="font-medium">Remember login on this device</span>
-                  </label>
+                  <div className="flex items-center justify-between my-1 text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 accent-primary"
+                      />
+                      <span className="font-medium text-[11px]">Remember me</span>
+                    </label>
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => { setMode('forgot_password'); setErrorMsg(''); setResetEmailSent(false); }}
+                        className="text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 <button
@@ -432,6 +543,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
                   )}
                 </button>
               </form>
+            </>
+          )}
 
             </div>
           </motion.div>

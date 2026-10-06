@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Magic Sign-In Link</title>
+  <style>
+    /* Reset & Base Fonts */
+    body, p, h1, h2, h3, div, a, span {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Geist Sans', Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #09090b;
+      color: #fafafa;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+      padding: 32px 16px;
+    }
+    .wrapper {
+      max-width: 540px;
+      margin: 0 auto;
+      background-color: #121214;
+      border: 1px solid #27272a;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    .top-accent {
+      height: 4px;
+      background: linear-gradient(90deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
+      width: 100%;
+    }
+    .content {
+      padding: 36px 32px;
+    }
+    .brand-icon {
+      display: inline-block;
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      border-radius: 10px;
+      text-align: center;
+      line-height: 34px;
+      font-size: 16px;
+      color: #ffffff;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #e4e4e7;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+    }
+    .brand-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      color: #c084fc;
+      background-color: rgba(192, 132, 252, 0.1);
+      border: 1px solid rgba(192, 132, 252, 0.25);
+      border-radius: 6px;
+      padding: 2px 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin-bottom: 12px;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #a1a1aa;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .btn-container {
+      margin: 28px 0;
+      text-align: left;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #ffffff;
+      color: #09090b !important;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 14px 28px;
+      border-radius: 14px;
+      letter-spacing: -0.01em;
+      box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15);
+      text-align: center;
+    }
+    .info-box {
+      background-color: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 16px;
+      padding: 16px;
+      margin: 24px 0 20px 0;
+    }
+    .info-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #71717a;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      margin-bottom: 6px;
+    }
+    .info-text {
+      font-size: 12px;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+    .fallback-box {
+      margin-top: 20px;
+      padding: 14px;
+      background-color: #141416;
+      border: 1px dashed #27272a;
+      border-radius: 12px;
+    }
+    .fallback-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #71717a;
+      margin-bottom: 6px;
+    }
+    .fallback-url {
+      font-size: 11px;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      color: #38bdf8;
+      word-break: break-all;
+      text-decoration: none;
+    }
+    .footer {
+      padding: 24px 32px;
+      background-color: #0e0e10;
+      border-top: 1px solid #1f1f23;
+      text-align: left;
+    }
+    .footer-text {
+      font-size: 11px;
+      color: #71717a;
+      line-height: 1.6;
+    }
+    .footer-brand {
+      font-weight: 700;
+      color: #a1a1aa;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="top-accent"></div>
+    <div class="content">
+      <!-- Header -->
+      <table style="width: 100%; margin-bottom: 24px;">
+        <tr>
+          <td>
+            <div class="brand-icon">✨</div>
+          </td>
+          <td style="padding-left: 10px; width: 100%;">
+            <span class="brand-title">LEAVE PLANNER</span>
+            <span class="brand-badge" style="margin-left: 6px;">MAGIC SIGN-IN</span>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Hero Heading -->
+      <h1 class="title">Sign in to Leave Planner</h1>
+      <p class="subtitle">
+        Click the button below to instantly sign in to your Leave Planner workspace. No password required.
+      </p>
+
+      <!-- Call To Action -->
+      <div class="btn-container">
+        <a href="{{ .ConfirmationURL }}" class="btn" target="_blank">Sign In to Workspace →</a>
+      </div>
+
+      <!-- Security Notice -->
+      <div class="info-box">
+        <div class="info-title">Security Notice</div>
+        <p class="info-text">
+          This sign-in link is single-use and will expire shortly. If you did not request this link, you can safely ignore this email.
+        </p>
+      </div>
+
+      <!-- Fallback Raw Link -->
+      <div class="fallback-box">
+        <div class="fallback-label">Trouble clicking the button? Copy and paste this link:</div>
+        <a href="{{ .ConfirmationURL }}" class="fallback-url" target="_blank">{{ .ConfirmationURL }}</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-text">
+        <span class="footer-brand">Leave Planner Vault</span> &bull; Quick Sign-in Service<br>
+        Automated sign-in email.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

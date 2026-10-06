@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, CalendarDays, MapPin, Home, LogIn, UserPlus, Mail, Lock, 
   User, ArrowRight, ShieldCheck, X, AlertCircle, Eye, EyeOff, 
-  CheckCircle2, XCircle, ChevronRight, Globe
+  CheckCircle2, XCircle, ChevronRight, Globe, ChevronLeft 
 } from 'lucide-react';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle, isSupabaseConfigured } from '../services/authService';
+import { signInWithEmail, signUpWithEmail, signInWithGoogle, sendPasswordResetEmail, isSupabaseConfigured } from '../services/authService';
 import { signUpDemoUser } from '../services/demoService';
 
 const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, currentProfile = {}, isDemoMode = false }) => {
-  const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup'
+  const [mode, setMode] = useState(isDemoMode ? 'signup' : 'login'); // 'login' | 'signup' | 'forgot_password'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,6 +21,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyEmailSent, setVerifyEmailSent] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -44,6 +45,24 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (mode === 'forgot_password') {
+      if (!email.trim()) {
+        setErrorMsg('Please enter your email address.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const { error } = await sendPasswordResetEmail(email.trim());
+        if (error) throw error;
+        setResetEmailSent(true);
+      } catch (err) {
+        setErrorMsg(err.message || 'Failed to send password reset email. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     if (!isDemoMode && !email) {
       setErrorMsg('Please enter an email address.');
@@ -224,9 +243,15 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
             {/* Header / Tabs */}
             <div className="p-4 sm:p-5 border-b border-zinc-800 bg-[#161616] flex justify-between items-center">
               <span className="text-xs font-black uppercase tracking-wider text-zinc-400 font-mono">
-                {verifyEmailSent ? 'Email Verification' : isDemoMode ? 'Create Demo Account' : (mode === 'login' ? 'Welcome Back' : 'Create Account')}
+                {verifyEmailSent 
+                  ? 'Email Verification' 
+                  : mode === 'forgot_password'
+                    ? 'Reset Password'
+                    : isDemoMode 
+                      ? 'Create Demo Account' 
+                      : (mode === 'login' ? 'Welcome Back' : 'Create Account')}
               </span>
-              {!verifyEmailSent && !isDemoMode && (
+              {!verifyEmailSent && !isDemoMode && mode !== 'forgot_password' && (
                 <div className="flex bg-[#1a1a1a] p-1 rounded-xl border border-zinc-800">
                   <button
                     type="button"
@@ -254,7 +279,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
               )}
             </div>
 
-            {/* Verification Screen OR Auth Form */}
+            {/* Verification Screen OR Forgot Password Screen OR Auth Form */}
             <AnimatePresence mode="wait">
               {verifyEmailSent ? (
                 <motion.div 
@@ -278,13 +303,102 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                     <button
                       type="button"
                       onClick={() => { setVerifyEmailSent(false); setMode('login'); }}
-                      className="w-full py-3 bg-white text-black hover:bg-zinc-100 font-black text-xs rounded-2xl shadow-lg shadow-white/10 flex items-center justify-center gap-2 transition-all"
+                      className="w-full py-3 bg-white text-black hover:bg-zinc-100 font-black text-xs rounded-2xl shadow-lg shadow-white/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
                       <span>Back to Sign In</span>
                       <ArrowRight size={14} />
                     </button>
                   </div>
                 </motion.div>
+              ) : mode === 'forgot_password' ? (
+                resetEmailSent ? (
+                  <motion.div
+                    key="reset-sent"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="p-6 sm:p-8 flex flex-col items-center text-center gap-4"
+                  >
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-inner">
+                      <CheckCircle2 size={30} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">Recovery Link Sent</h3>
+                      <p className="text-xs text-zinc-400 leading-relaxed mt-1.5">
+                        If an account exists for <span className="font-bold text-white">{email}</span>, a secure recovery email has been sent. Check your inbox and follow the link to reset your password.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 w-full mt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setResetEmailSent(false); setMode('login'); }}
+                        className="w-full py-3 bg-white text-black hover:bg-zinc-100 font-black text-xs rounded-2xl shadow-lg shadow-white/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <ChevronLeft size={14} />
+                        <span>Back to Sign In</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="forgot-form"
+                    layout
+                    transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                    className="p-5 sm:p-6 flex flex-col gap-3.5 sm:gap-4"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-sm font-bold text-white">Reset your password</h3>
+                      <p className="text-xs text-zinc-400 leading-relaxed">
+                        Enter your registered account email to receive a password recovery link.
+                      </p>
+                    </div>
+
+                    {errorMsg && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-xs font-bold text-red-400 flex items-center gap-2 animate-in fade-in duration-200">
+                        <AlertCircle size={15} className="flex-shrink-0 text-red-400" /> {errorMsg}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+                      <div className="relative">
+                        <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="Your Account Email"
+                          required
+                          autoComplete="email"
+                          className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3.5 mt-1 bg-white text-black font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-white/10 hover:bg-zinc-100 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                      >
+                        {loading ? (
+                          <span>Sending link...</span>
+                        ) : (
+                          <>
+                            <span>Send Recovery Link</span>
+                            <ArrowRight size={14} />
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setErrorMsg(''); }}
+                        className="w-full py-2 text-xs font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft size={14} /> Back to Sign In
+                      </button>
+                    </form>
+                  </motion.div>
+                )
               ) : (
                 <motion.div 
                   key="auth-form"
@@ -455,17 +569,28 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                       )}
                     </AnimatePresence>
 
-                    {/* Remember Me Checkbox (Live Mode Only) */}
+                    {/* Remember Me & Forgot Password Row (Live Mode Only) */}
                     {!isDemoMode && (
-                      <label className="flex items-center gap-2 cursor-pointer my-1 text-xs text-zinc-300 hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={rememberMe}
-                          onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded border-zinc-700 text-white focus:ring-zinc-600 accent-white"
-                        />
-                        <span className="font-medium">Remember login on this device</span>
-                      </label>
+                      <div className="flex items-center justify-between my-1 text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 hover:text-white">
+                          <input
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="w-4 h-4 rounded border-zinc-700 text-white focus:ring-zinc-600 accent-white"
+                          />
+                          <span className="font-medium text-[11px]">Remember me</span>
+                        </label>
+                        {mode === 'login' && (
+                          <button
+                            type="button"
+                            onClick={() => { setMode('forgot_password'); setErrorMsg(''); setResetEmailSent(false); }}
+                            className="text-[11px] font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            Forgot password?
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     <button
