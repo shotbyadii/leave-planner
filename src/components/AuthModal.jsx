@@ -546,6 +546,17 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo, cu
             </>
           )}
 
+              {/* Privacy Policy & Terms of Service Links */}
+              <div className="flex items-center justify-center gap-3 pt-2 text-[10px] text-muted-foreground font-medium">
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Privacy Policy
+                </a>
+                <span>&bull;</span>
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Terms of Service
+                </a>
+              </div>
+
             </div>
           </motion.div>
         )}

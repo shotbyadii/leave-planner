@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - Leave Planner</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    /* Slate Design System - CSS Variables & Base */
+    :root {
+      --bg: #09090b;
+      --card: #121214;
+      --card-muted: #18181b;
+      --border: #27272a;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --text-sub: #71717a;
+      --primary: #ffffff;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-amber: #f59e0b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Geist Sans', Helvetica, Arial, sans-serif;
+      line-height: 1.65;
+      padding: 32px 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85);
+    }
+    .top-gradient {
+      height: 4px;
+      background: linear-gradient(90deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
+      width: 100%;
+    }
+    .header {
+      padding: 40px 36px 28px 36px;
+      border-bottom: 1px solid var(--border);
+      background-color: rgba(24, 24, 27, 0.4);
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #e4e4e7;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      color: #c084fc;
+      background-color: rgba(192, 132, 252, 0.1);
+      border: 1px solid rgba(192, 132, 252, 0.25);
+      border-radius: 6px;
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .last-updated {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+    }
+    .content {
+      padding: 36px;
+    }
+    .intro-box {
+      background-color: var(--card-muted);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 32px;
+      font-size: 14px;
+      color: #d4d4d8;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      margin: 32px 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h2 span.num {
+      color: var(--accent-purple);
+      font-family: ui-monospace, 'Geist Mono', monospace;
+      font-size: 15px;
+    }
+    p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      line-height: 1.7;
+    }
+    ul {
+      margin: 10px 0 18px 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    li {
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+    li strong {
+      color: #f4f4f5;
+    }
+    .footer {
+      padding: 28px 36px;
+      border-top: 1px solid var(--border);
+      background-color: #0d0d0f;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: gap;
+      gap: 16px;
+    }
+    .footer a {
+      color: var(--accent-blue);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    .nav-btn {
+      display: inline-block;
+      padding: 8px 18px;
+      background-color: #ffffff;
+      color: #09090b !important;
+      text-decoration: none !important;
+      font-weight: 800;
+      font-size: 12px;
+      border-radius: 12px;
+      transition: all 0.15s ease;
+    }
+    .nav-btn:hover {
+      background-color: #e4e4e7;
+    }
+    @media (max-width: 640px) {
+      .header, .content, .footer {
+        padding: 24px 20px;
+      }
+      h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-gradient"></div>
+
+    <div class="header">
+      <div class="brand-row">
+        <div class="brand-icon">LV</div>
+        <span class="brand-title">LEAVE PLANNER</span>
+        <span class="badge">TERMS OF SERVICE</span>
+      </div>
+      <h1>Terms of Service</h1>
+      <p class="last-updated">Effective Date: October 6, 2026</p>
+    </div>
+
+    <div class="content">
+      <div class="intro-box">
+        By accessing or using <strong>Leave Planner</strong> (&ldquo;the Application&rdquo;), you agree to be bound by these Terms of Service. If you do not agree to these terms, please refrain from using the Application.
+      </div>
+
+      <h2><span class="num">1.</span> Service Overview</h2>
+      <p>
+        Leave Planner is an intelligent schedule organization and attendance tracking tool designed for professionals and teams to calculate leave quotas (Planned Leave, Emergency Leave, Extra Leave, WFH), visualize upcoming public holidays, plan multi-day vacations, and back up schedule records.
+      </p>
+
+      <h2><span class="num">2.</span> Account Registration & Security</h2>
+      <ul>
+        <li><strong>Authentication:</strong> You may authenticate through standard email/password or third-party OAuth providers such as Google. You are responsible for maintaining the confidentiality of your authentication credentials.</li>
+        <li><strong>Account Responsibility:</strong> You are responsible for all activities occurring under your registered account. Notify us immediately if you suspect unauthorized access.</li>
+      </ul>
+
+      <h2><span class="num">3.</span> Acceptable Use</h2>
+      <p>You agree not to use the Application for any unlawful purpose, including but not limited to:</p>
+      <ul>
+        <li>Attempting to bypass database Row Level Security policies or access another user&rsquo;s private leave data.</li>
+        <li>Transmitting malicious scripts, denial-of-service traffic, or automated scrapers against our APIs.</li>
+        <li>Impersonating another employee, workspace administrator, or corporate organization.</li>
+      </ul>
+
+      <h2><span class="num">4.</span> User Content & Data Ownership</h2>
+      <p>
+        You retain full ownership of all data, leave records, holiday lists, and quota parameters entered into the Application. You grant Leave Planner solely the limited right to store, display, and synchronize this data for your account. You may export or purge this data at any time.
+      </p>
+
+      <h2><span class="num">5.</span> AI Assistant & Document Parsing Disclaimer</h2>
+      <p>
+        Leave Planner may offer optional assistant tools to extract holiday dates or draft trip itineraries from text, PDFs, or images. These automated suggestions are provided for convenience only. You are solely responsible for reviewing and verifying the accuracy of parsed dates before submitting formal leave requests to your employer or HR organization.
+      </p>
+
+      <h2><span class="num">6.</span> Termination & Account Deletion</h2>
+      <p>
+        You may discontinue using the Application at any time. You have the right to permanently delete your account and all associated data via the <em>Delete Account & Data</em> control in the Application&rsquo;s settings panel. We reserve the right to suspend accounts that violate acceptable use or endanger system security.
+      </p>
+
+      <h2><span class="num">7.</span> Disclaimer of Warranties</h2>
+      <p>
+        The Application is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis without warranties of any kind, either express or implied. While we strive for maximum uptime and reliability, Leave Planner does not guarantee that the service will be uninterrupted or error-free. Leave Planner is not responsible for formal employment, payroll, or HR policy discrepancies between you and your employer.
+      </p>
+
+      <h2><span class="num">8.</span> Limitation of Liability</h2>
+      <p>
+        To the fullest extent permitted by applicable law, Leave Planner and its developers shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the Application.
+      </p>
+
+      <h2><span class="num">9.</span> Updates to These Terms</h2>
+      <p>
+        We may update these Terms of Service periodically. Continued use of the Application following any modifications indicates your acceptance of the updated terms.
+      </p>
+    </div>
+
+    <div class="footer">
+      <div style="font-size: 12px; color: var(--text-sub);">
+        &copy; 2026 Leave Planner. All rights reserved. &bull; <a href="/privacy">Privacy Policy</a>
+      </div>
+      <a href="/" class="nav-btn">Return to App &rarr;</a>
+    </div>
+  </div>
+</body>
+</html>

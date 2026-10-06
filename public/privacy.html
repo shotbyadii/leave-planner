@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Leave Planner</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    /* Slate Design System - CSS Variables & Base */
+    :root {
+      --bg: #09090b;
+      --card: #121214;
+      --card-muted: #18181b;
+      --border: #27272a;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --text-sub: #71717a;
+      --primary: #ffffff;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Geist Sans', Helvetica, Arial, sans-serif;
+      line-height: 1.65;
+      padding: 32px 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85);
+    }
+    .top-gradient {
+      height: 4px;
+      background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 50%, #10b981 100%);
+      width: 100%;
+    }
+    .header {
+      padding: 40px 36px 28px 36px;
+      border-bottom: 1px solid var(--border);
+      background-color: rgba(24, 24, 27, 0.4);
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #e4e4e7;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+      color: var(--accent-cyan);
+      background-color: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      border-radius: 6px;
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .last-updated {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-family: ui-monospace, 'Geist Mono', SFMono-Regular, monospace;
+    }
+    .content {
+      padding: 36px;
+    }
+    .intro-box {
+      background-color: var(--card-muted);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 32px;
+      font-size: 14px;
+      color: #d4d4d8;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      margin: 32px 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h2 span.num {
+      color: var(--accent-blue);
+      font-family: ui-monospace, 'Geist Mono', monospace;
+      font-size: 15px;
+    }
+    p {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      line-height: 1.7;
+    }
+    ul {
+      margin: 10px 0 18px 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    li {
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+    li strong {
+      color: #f4f4f5;
+    }
+    .highlight-card {
+      background-color: rgba(59, 130, 246, 0.06);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 16px;
+      padding: 18px;
+      margin: 20px 0;
+    }
+    .highlight-card h3 {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #60a5fa;
+      font-family: ui-monospace, 'Geist Mono', monospace;
+      margin-bottom: 8px;
+    }
+    .highlight-card p {
+      font-size: 13px;
+      color: #bfdbfe;
+      margin: 0;
+    }
+    .footer {
+      padding: 28px 36px;
+      border-top: 1px solid var(--border);
+      background-color: #0d0d0f;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: gap;
+      gap: 16px;
+    }
+    .footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    .nav-btn {
+      display: inline-block;
+      padding: 8px 18px;
+      background-color: #ffffff;
+      color: #09090b !important;
+      text-decoration: none !important;
+      font-weight: 800;
+      font-size: 12px;
+      border-radius: 12px;
+      transition: all 0.15s ease;
+    }
+    .nav-btn:hover {
+      background-color: #e4e4e7;
+    }
+    @media (max-width: 640px) {
+      .header, .content, .footer {
+        padding: 24px 20px;
+      }
+      h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-gradient"></div>
+
+    <div class="header">
+      <div class="brand-row">
+        <div class="brand-icon">LV</div>
+        <span class="brand-title">LEAVE PLANNER</span>
+        <span class="badge">LEGAL COMPLIANCE</span>
+      </div>
+      <h1>Privacy Policy</h1>
+      <p class="last-updated">Effective Date: October 6, 2026</p>
+    </div>
+
+    <div class="content">
+      <div class="intro-box">
+        <strong>Leave Planner</strong> (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the Application&rdquo;) is an employee leave scheduling and attendance vault designed to help individuals and teams plan, calculate, and visualize paid time off (PL, EL, RH, WFH). We are committed to transparency, data ownership, and protecting your personal information.
+      </div>
+
+      <h2><span class="num">1.</span> Information We Collect</h2>
+      <p>We collect only the data necessary to provide and synchronize your leave schedule:</p>
+      <ul>
+        <li><strong>Account & Profile Information:</strong> When you register via email or sign in with Google OAuth, we receive your name, email address, and profile photo/avatar URL. You may also optionally supply your workspace company name.</li>
+        <li><strong>Leave & Attendance Records:</strong> Dates booked, category types (Planned Leave, Emergency Leave, Extra Leave, Work From Home), notes, leave durations (full-day or half-day), and custom quota balances.</li>
+        <li><strong>Company Public Holidays:</strong> Custom or auto-imported calendar public holiday listings configured within your vault.</li>
+        <li><strong>Technical & Session Data:</strong> Local browser storage preferences (e.g. active color themes, calendar display toggle, offline state caches).</li>
+      </ul>
+
+      <h2><span class="num">2.</span> How We Use Your Information</h2>
+      <p>Your data is used strictly to power your application experience:</p>
+      <ul>
+        <li>Computing remaining annual quotas and leave utilization ratios in real-time.</li>
+        <li>Visualizing calendar days, grouping multi-day vacations, and highlighting potential long weekends.</li>
+        <li>Securing multi-user isolation so that your records are solely visible to your authenticated account.</li>
+        <li>We <strong>do not sell, rent, monetize, or trade</strong> your personal or employment information to third-party data brokers or advertisers.</li>
+      </ul>
+
+      <div class="highlight-card">
+        <h3>Google User Data Policy & Limited Use Disclosure</h3>
+        <p>
+          Leave Planner accesses Google user information solely via Google OAuth for account authentication. We request only basic identity scopes (name, email address, avatar). We do not request access to Google Drive, Gmail, contacts, or calendar contents. Our use of Google user data adheres strictly to the <strong>Google API Services User Data Policy</strong>, including the Limited Use requirements.
+        </p>
+      </div>
+
+      <h2><span class="num">3.</span> Data Storage & Infrastructure Security</h2>
+      <p>
+        Leave Planner leverages enterprise-grade cloud database infrastructure provided by <strong>Supabase</strong> (PostgreSQL).
+      </p>
+      <ul>
+        <li><strong>Row Level Security (RLS):</strong> Database records are isolated with strict Row Level Security policies enforcing that each user can only read and mutate their own rows.</li>
+        <li><strong>Encryption in Transit:</strong> All communication between your client device and the backend APIs is encrypted using modern TLS (HTTPS).</li>
+        <li><strong>Local Demo Sandbox:</strong> In interactive demo or guest mode, mock data is stored entirely in temporary session memory and vanishes when the tab is closed.</li>
+      </ul>
+
+      <h2><span class="num">4.</span> Calendar & Document Parsing (AI Features)</h2>
+      <p>
+        If you utilize the optional calendar assistant or import holiday schedules via PDF or images, document processing occurs ephemerally to parse dates and holiday names. We do not use your confidential company documents or schedule data to train public machine learning models.
+      </p>
+
+      <h2><span class="num">5.</span> Data Portability & Account Deletion Rights</h2>
+      <p>You have full sovereignty over your information:</p>
+      <ul>
+        <li><strong>JSON & CSV Export:</strong> You can export complete backups of all your leave logs, holiday lists, and quota parameters directly from the <em>Data & Backups</em> settings panel at any time.</li>
+        <li><strong>Permanent Account Deletion:</strong> You can permanently wipe your profile, leave bookings, and account record from our database at any time by selecting <em>Delete Account & Data</em> in your Account Settings.</li>
+      </ul>
+
+      <h2><span class="num">6.</span> Third-Party Service Providers</h2>
+      <p>We work with trusted infrastructure providers to deliver the application:</p>
+      <ul>
+        <li><strong>Google OAuth:</strong> For secure federated authentication.</li>
+        <li><strong>Supabase:</strong> For user authentication, cloud database, and secure storage.</li>
+        <li><strong>Vercel:</strong> For cloud hosting and global edge content delivery.</li>
+      </ul>
+
+      <h2><span class="num">7.</span> Contact & Inquiries</h2>
+      <p>
+        If you have questions regarding this Privacy Policy or wish to request data assistance, please reach out to our project team via the official repository or workspace administrator.
+      </p>
+    </div>
+
+    <div class="footer">
+      <div style="font-size: 12px; color: var(--text-sub);">
+        &copy; 2026 Leave Planner. All rights reserved. &bull; <a href="/terms">Terms of Service</a>
+      </div>
+      <a href="/" class="nav-btn">Return to App &rarr;</a>
+    </div>
+  </div>
+</body>
+</html>

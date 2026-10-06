@@ -614,6 +614,17 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
             </AnimatePresence>
 
           </motion.div>
+
+          {/* Privacy Policy & Terms of Service Links */}
+          <div className="flex items-center justify-center gap-3 mt-3 text-[11px] text-zinc-500 font-medium">
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
+              Privacy Policy
+            </a>
+            <span>&bull;</span>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
+              Terms of Service
+            </a>
+          </div>
         </div>
 
       </div>
