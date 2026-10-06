@@ -191,12 +191,12 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
             <motion.div 
               layout 
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="bg-[#121212] text-zinc-100 border border-zinc-800 rounded-[28px] sm:rounded-[32px] shadow-2xl shadow-black/90 overflow-hidden"
+              className="bg-card text-card-foreground border border-border rounded-[28px] sm:rounded-[32px] shadow-2xl shadow-black/10 dark:shadow-black/90 overflow-hidden"
             >
             
             {/* Header / Tabs */}
-            <div className="p-4 sm:p-5 border-b border-zinc-800 bg-[#161616] flex justify-between items-center">
-              <span className="text-xs font-black uppercase tracking-wider text-zinc-400 font-mono">
+            <div className="p-4 sm:p-5 border-b border-border bg-muted/40 flex justify-between items-center">
+              <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono">
                 {verifyEmailSent 
                   ? 'Email Verification' 
                   : mode === 'forgot_password'
@@ -206,12 +206,12 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                       : (mode === 'login' ? 'Welcome Back' : 'Create Account')}
               </span>
               {!verifyEmailSent && !isDemoMode && mode !== 'forgot_password' && (
-                <div className="flex bg-[#1a1a1a] p-1 rounded-xl border border-zinc-800">
+                <div className="flex bg-muted p-1 rounded-xl border border-border/80">
                   <button
                     type="button"
                     onClick={() => { setMode('login'); setErrorMsg(''); }}
                     className={`px-3.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                      mode === 'login' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                      mode === 'login' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Sign In
@@ -224,7 +224,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                       if (name === 'User') setName('');
                     }}
                     className={`px-3.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                      mode === 'signup' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                      mode === 'signup' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Register
@@ -248,16 +248,16 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                     <Mail size={28} />
                   </div>
                   <div>
-                    <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">Verify Your Email</h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed mt-1.5">
-                      We've sent a verification link to <span className="font-bold text-white">{email}</span>. Please check your inbox to confirm your account.
+                    <h3 className="text-lg sm:text-xl font-black text-foreground tracking-tight">Verify Your Email</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">
+                      We've sent a verification link to <span className="font-bold text-foreground">{email}</span>. Please check your inbox to confirm your account.
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 w-full mt-2">
                     <button
                       type="button"
                       onClick={() => { setVerifyEmailSent(false); setMode('login'); }}
-                      className="w-full py-3 bg-white text-black hover:bg-zinc-100 font-black text-xs rounded-2xl shadow-lg shadow-white/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      className="w-full py-3 bg-primary text-primary-foreground hover:opacity-90 font-black text-xs rounded-2xl shadow-lg shadow-primary/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
                       <span>Back to Sign In</span>
                       <ArrowRight size={14} />
@@ -278,16 +278,16 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                       <CheckCircle2 size={30} />
                     </div>
                     <div>
-                      <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">Recovery Link Sent</h3>
-                      <p className="text-xs text-zinc-400 leading-relaxed mt-1.5">
-                        If an account exists for <span className="font-bold text-white">{email}</span>, a secure recovery email has been sent. Check your inbox and follow the link to reset your password.
+                      <h3 className="text-lg sm:text-xl font-black text-foreground tracking-tight">Recovery Link Sent</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">
+                        If an account exists for <span className="font-bold text-foreground">{email}</span>, a secure recovery email has been sent. Check your inbox and follow the link to reset your password.
                       </p>
                     </div>
                     <div className="flex flex-col gap-2 w-full mt-2">
                       <button
                         type="button"
                         onClick={() => { setResetEmailSent(false); setMode('login'); }}
-                        className="w-full py-3 bg-white text-black hover:bg-zinc-100 font-black text-xs rounded-2xl shadow-lg shadow-white/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        className="w-full py-3 bg-primary text-primary-foreground hover:opacity-90 font-black text-xs rounded-2xl shadow-lg shadow-primary/10 flex items-center justify-center gap-2 transition-all cursor-pointer"
                       >
                         <ChevronLeft size={14} />
                         <span>Back to Sign In</span>
@@ -302,8 +302,8 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                     className="p-5 sm:p-6 flex flex-col gap-3.5 sm:gap-4"
                   >
                     <div className="flex flex-col gap-1">
-                      <h3 className="text-sm font-bold text-white">Reset your password</h3>
-                      <p className="text-xs text-zinc-400 leading-relaxed">
+                      <h3 className="text-sm font-bold text-foreground">Reset your password</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         Enter your registered account email to receive a password recovery link.
                       </p>
                     </div>
@@ -316,7 +316,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
 
                     <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
                       <div className="relative">
-                        <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <input
                           type="email"
                           value={email}
@@ -324,14 +324,14 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                           placeholder="Your Account Email"
                           required
                           autoComplete="email"
-                          className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
+                          className="w-full bg-muted/40 border border-border hover:border-border/80 focus:border-foreground rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 transition-[border-color,box-shadow] duration-150"
                         />
                       </div>
 
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3.5 mt-1 bg-white text-black font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-white/10 hover:bg-zinc-100 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                        className="w-full py-3.5 mt-1 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/10 hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                       >
                         {loading ? (
                           <span>Sending link...</span>
@@ -346,7 +346,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                       <button
                         type="button"
                         onClick={() => { setMode('login'); setErrorMsg(''); }}
-                        className="w-full py-2 text-xs font-bold text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        className="w-full py-2 text-xs font-bold text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <ChevronLeft size={14} /> Back to Sign In
                       </button>
@@ -388,7 +388,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                         type="button"
                         onClick={handleGoogleLogin}
                         disabled={loading}
-                        className="w-full py-3 sm:py-3.5 bg-[#1c1c1c] hover:bg-[#262626] border border-zinc-800 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                        className="w-full py-3 sm:py-3.5 bg-muted/60 hover:bg-muted border border-border text-foreground font-bold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                       >
                         <svg className="w-4 h-4" viewBox="0 0 24 24">
                           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -401,9 +401,9 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
 
                       {/* Divider */}
                       <div className="flex items-center gap-3 my-0.5">
-                        <div className="h-px flex-1 bg-zinc-800" />
-                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 font-mono">or email</span>
-                        <div className="h-px flex-1 bg-zinc-800" />
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground font-mono">or email</span>
+                        <div className="h-px flex-1 bg-border" />
                       </div>
                     </>
                   )}
@@ -421,14 +421,14 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                           className="p-1 -m-1"
                         >
                           <div className="relative">
-                            <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                            <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                             <input
                               type="text"
                               value={name}
                               onChange={(e) => setName(e.target.value)}
                               placeholder="Full Display Name"
                               autoComplete="off"
-                              className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
+                              className="w-full bg-muted/40 border border-border hover:border-border/80 focus:border-foreground rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 transition-[border-color,box-shadow] duration-150"
                             />
                           </div>
                         </motion.div>
@@ -436,7 +436,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                     </AnimatePresence>
 
                     <div className="relative">
-                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <input
                         type="email"
                         value={email}
@@ -444,12 +444,12 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                         placeholder={isDemoMode ? "Email Address (optional for demo)" : "Email Address"}
                         required={!isDemoMode}
                         autoComplete="email"
-                        className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
+                        className="w-full bg-muted/40 border border-border hover:border-border/80 focus:border-foreground rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 transition-[border-color,box-shadow] duration-150"
                       />
                     </div>
 
                     <div className="relative">
-                      <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={password}
@@ -457,12 +457,12 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                         placeholder={isDemoMode ? "Password (optional for demo)" : "Password"}
                         required={!isDemoMode}
                         autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                        className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
+                        className="w-full bg-muted/40 border border-border hover:border-border/80 focus:border-foreground rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 transition-[border-color,box-shadow] duration-150"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors p-1"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                       >
                         {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
@@ -479,7 +479,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                           className="p-1 -m-1 flex flex-col gap-3"
                         >
                           <div className="relative">
-                            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                             <input
                               type={showConfirmPassword ? 'text' : 'password'}
                               value={confirmPassword}
@@ -487,33 +487,33 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                               placeholder="Confirm Password"
                               required={mode === 'signup' && !isDemoMode}
                               autoComplete="new-password"
-                              className="w-full bg-[#1c1c1c] border border-zinc-800 hover:border-zinc-700 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-600 transition-[border-color,box-shadow] duration-150"
+                              className="w-full bg-muted/40 border border-border hover:border-border/80 focus:border-foreground rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/10 transition-[border-color,box-shadow] duration-150"
                             />
                             <button
                               type="button"
                               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors p-1"
+                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                             >
                               {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                             </button>
                           </div>
 
                           {password.length > 0 && (
-                            <div className="p-3 bg-[#1c1c1c] border border-zinc-800 rounded-2xl flex flex-col gap-1.5">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 font-mono">
+                            <div className="p-3 bg-muted/40 border border-border rounded-2xl flex flex-col gap-1.5">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground font-mono">
                                 Password Requirements
                               </span>
                               <div className="grid grid-cols-2 gap-1 text-[11px] font-medium">
-                                <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
+                                <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-500 font-bold' : 'text-muted-foreground/60'}`}>
                                   {hasMinLength ? <CheckCircle2 size={12} /> : <XCircle size={12} />} 8+ chars
                                 </div>
-                                <div className={`flex items-center gap-1.5 ${hasUppercase ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
+                                <div className={`flex items-center gap-1.5 ${hasUppercase ? 'text-emerald-500 font-bold' : 'text-muted-foreground/60'}`}>
                                   {hasUppercase ? <CheckCircle2 size={12} /> : <XCircle size={12} />} 1 Uppercase
                                 </div>
-                                <div className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
+                                <div className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-500 font-bold' : 'text-muted-foreground/60'}`}>
                                   {hasNumber ? <CheckCircle2 size={12} /> : <XCircle size={12} />} 1 Number
                                 </div>
-                                <div className={`flex items-center gap-1.5 ${hasSpecial ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
+                                <div className={`flex items-center gap-1.5 ${hasSpecial ? 'text-emerald-500 font-bold' : 'text-muted-foreground/60'}`}>
                                   {hasSpecial ? <CheckCircle2 size={12} /> : <XCircle size={12} />} 1 Symbol
                                 </div>
                               </div>
@@ -526,12 +526,12 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                     {/* Remember Me & Forgot Password Row (Live Mode Only) */}
                     {!isDemoMode && (
                       <div className="flex items-center justify-between my-1 text-xs">
-                        <label className="flex items-center gap-2 cursor-pointer text-zinc-300 hover:text-white">
+                        <label className="flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground">
                           <input
                             type="checkbox"
                             checked={rememberMe}
                             onChange={(e) => setRememberMe(e.target.checked)}
-                            className="w-4 h-4 rounded border-zinc-700 text-white focus:ring-zinc-600 accent-white"
+                            className="w-4 h-4 rounded border-border text-primary focus:ring-ring accent-foreground"
                           />
                           <span className="font-medium text-[11px]">Remember me</span>
                         </label>
@@ -539,7 +539,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                           <button
                             type="button"
                             onClick={() => { setMode('forgot_password'); setErrorMsg(''); setResetEmailSent(false); }}
-                            className="text-[11px] font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            className="text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                           >
                             Forgot password?
                           </button>
@@ -550,7 +550,7 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-3.5 mt-1 bg-white text-black font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-white/10 hover:bg-zinc-100 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                      className="w-full py-3.5 mt-1 bg-primary text-primary-foreground font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-primary/10 hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
                     >
                       {loading ? (
                         <span>Processing...</span>
@@ -570,12 +570,12 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
           </motion.div>
 
           {/* Privacy Policy & Terms of Service Links */}
-          <div className="flex items-center justify-center gap-3 mt-3 text-[11px] text-zinc-500 font-medium">
-            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
+          <div className="flex items-center justify-center gap-3 mt-3 text-[11px] text-muted-foreground font-medium">
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
               Privacy Policy
             </a>
             <span>&bull;</span>
-            <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-300 transition-colors">
+            <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
               Terms of Service
             </a>
           </div>

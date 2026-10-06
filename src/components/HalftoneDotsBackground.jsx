@@ -3,8 +3,10 @@ import React, { useEffect, useRef } from 'react';
 /**
  * HalftoneDotsBackground
  * Renders an interactive manga-style halftone dot matrix on a HTML5 Canvas.
- * Dots are subtle/faint white by default, and subtly react to mouse cursor proximity
- * with smooth scaling and luminance boost.
+ * Dots dynamically invert based on theme:
+ * - Light Mode: Crisp dark/black dots on white background
+ * - Dark Mode: Luminous white dots on dark background
+ * Reacts to mouse cursor proximity with smooth magnetic pull, size growth, and opacity boost.
  */
 const HalftoneDotsBackground = ({ className = '' }) => {
   const canvasRef = useRef(null);
@@ -18,11 +20,11 @@ const HalftoneDotsBackground = ({ className = '' }) => {
     let width = 0;
     let height = 0;
 
-    // Grid config - smaller, sharper dots with clear baseline visibility
-    const spacing = 14; // Distance between dot centers in px
-    const baseRadius = 0.55; // Tiny needle-sharp base dot
-    const maxRadius = 1.35; // Maximum size on magnetic hover
-    const hoverRadius = 130; // Mouse interaction influence radius in px
+    // Grid configuration - stylish, clearly defined halftone dots with dynamic mouse attraction
+    const spacing = 18; // Distance between dot centers in px (clean, airy, modern)
+    const baseRadius = 1.15; // Crisp, clearly visible base dot radius (~2.3px diameter)
+    const maxRadius = 3.2; // Pronounced maximum size on magnetic hover (~6.4px diameter)
+    const hoverRadius = 140; // Mouse interaction radius in px
     const maxMagneticPull = 5.5; // Max px dots get pulled towards the cursor
 
     const mouse = {
@@ -33,13 +35,28 @@ const HalftoneDotsBackground = ({ className = '' }) => {
       active: false
     };
 
+    // Helper to reliably check theme: checks html.dark / html.light / localStorage before fallback to system media
+    const getIsDarkTheme = () => {
+      const root = document.documentElement;
+      if (root.classList.contains('dark')) return true;
+      if (root.classList.contains('light')) return false;
+      const storedTheme = localStorage.getItem('theme');
+      if (storedTheme === 'dark') return true;
+      if (storedTheme === 'light') return false;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    };
+
     const resize = () => {
-      const rect = canvas.parentElement?.getBoundingClientRect() || { width: window.innerWidth, height: window.innerHeight };
+      const rect = canvas.getBoundingClientRect();
+      const parentRect = canvas.parentElement?.getBoundingClientRect();
+      const w = Math.round(rect.width > 0 ? rect.width : (parentRect?.width || window.innerWidth));
+      const h = Math.round(rect.height > 0 ? rect.height : (parentRect?.height || window.innerHeight));
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = rect.width;
-      height = rect.height;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+
+      width = w;
+      height = h;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
@@ -70,11 +87,11 @@ const HalftoneDotsBackground = ({ className = '' }) => {
       mouse.targetY = -9999;
     };
 
-    const parent = canvas.parentElement || window;
-    parent.addEventListener('mousemove', handleMouseMove, { passive: true });
-    parent.addEventListener('mouseleave', handleMouseLeave, { passive: true });
-    parent.addEventListener('touchmove', handleTouchMove, { passive: true });
-    parent.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('mouseleave', handleMouseLeave, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('resize', resize, { passive: true });
 
     const resizeObserver = new ResizeObserver(resize);
     if (canvas.parentElement) {
@@ -95,6 +112,12 @@ const HalftoneDotsBackground = ({ className = '' }) => {
       const cols = Math.ceil(width / spacing) + 2;
       const rows = Math.ceil(height / spacing) + 2;
 
+      // Live theme detection: dark vs light
+      const isDarkTheme = getIsDarkTheme();
+      // Light Mode: Black dots (0, 0, 0) | Dark Mode: White dots (255, 255, 255)
+      const dotColor = isDarkTheme ? '255, 255, 255' : '0, 0, 0';
+      const baseAlpha = isDarkTheme ? 0.35 : 0.32;
+
       for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
           // Stagger alternate rows slightly for classic diagonal halftone pattern
@@ -102,9 +125,9 @@ const HalftoneDotsBackground = ({ className = '' }) => {
           const originX = i * spacing + offsetX;
           const originY = j * spacing;
 
-          // Natural organic ambient wave motion (subtle ocean/floating drift)
-          const waveX = Math.sin(originY * 0.04 + t * 1.5) * 1.8 + Math.cos(originX * 0.03 + t * 0.8) * 0.8;
-          const waveY = Math.cos(originX * 0.04 + t * 1.3) * 1.8 + Math.sin(originY * 0.03 + t * 0.9) * 0.8;
+          // Natural organic ambient wave motion (subtle floating drift)
+          const waveX = Math.sin(originY * 0.04 + t * 1.5) * 1.6 + Math.cos(originX * 0.03 + t * 0.8) * 0.8;
+          const waveY = Math.cos(originX * 0.04 + t * 1.3) * 1.6 + Math.sin(originY * 0.03 + t * 0.9) * 0.8;
           const currentX = originX + waveX;
           const currentY = originY + waveY;
 
@@ -114,9 +137,9 @@ const HalftoneDotsBackground = ({ className = '' }) => {
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           // Subtle organic breathing of dots
-          const breath = Math.sin(originX * 0.05 + originY * 0.05 + t * 2) * 0.08;
-          let r = baseRadius + Math.max(0, breath * 0.2);
-          let alpha = Math.min(1, Math.max(0.2, 0.40 + breath)); // Natural luminous pulse
+          const breath = Math.sin(originX * 0.05 + originY * 0.05 + t * 2) * 0.12;
+          let r = baseRadius + Math.max(0, breath * 0.25);
+          let alpha = Math.min(1, Math.max(0.18, baseAlpha + breath * 0.5));
           let drawX = currentX;
           let drawY = currentY;
 
@@ -129,14 +152,14 @@ const HalftoneDotsBackground = ({ className = '' }) => {
             drawX = currentX + (dx / dist) * pull;
             drawY = currentY + (dy / dist) * pull;
 
-            // Scale and brighten on hover
+            // Scale and boost opacity on hover
             r = baseRadius + (maxRadius - baseRadius) * easeFactor;
-            alpha = Math.min(1, alpha + 0.6 * easeFactor); // Crisp full-brightness on hover
+            alpha = Math.min(isDarkTheme ? 0.95 : 0.85, alpha + (isDarkTheme ? 0.65 : 0.55) * easeFactor);
           }
 
           ctx.beginPath();
           ctx.arc(drawX, drawY, r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.fillStyle = `rgba(${dotColor}, ${alpha})`;
           ctx.fill();
         }
       }
@@ -144,15 +167,16 @@ const HalftoneDotsBackground = ({ className = '' }) => {
       animationFrameId = requestAnimationFrame(render);
     };
 
-    render();
+    animationFrameId = requestAnimationFrame(render);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
-      parent.removeEventListener('mousemove', handleMouseMove);
-      parent.removeEventListener('mouseleave', handleMouseLeave);
-      parent.removeEventListener('touchmove', handleTouchMove);
-      parent.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('resize', resize);
     };
   }, []);
 
