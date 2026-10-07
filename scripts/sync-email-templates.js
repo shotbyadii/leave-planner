@@ -37,18 +37,13 @@ if (!fs.existsSync(confirmSignupPath) || !fs.existsSync(resetPasswordPath) || !f
   process.exit(1);
 }
 
-// Read logo for dynamic injection into templates
-const logoPath = path.join(rootDir, 'public', 'logo-email.png');
-const appLogoBase64 = fs.existsSync(logoPath) 
-  ? `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`
-  : '';
+// Canonical public HTTPS URL for email logo (email clients block base64 data URIs)
+const PUBLIC_LOGO_URL = 'https://raw.githubusercontent.com/shotbyadii/leave-planner/main/public/logo-email.png';
 
 function prepareTemplate(htmlContent) {
   let processed = htmlContent;
-  if (appLogoBase64) {
-    // Replace any base64 png data URI inside <img> tags with current logo-email.png
-    processed = processed.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, appLogoBase64);
-  }
+  // Replace any residual base64 png data URIs with the canonical public HTTPS URL
+  processed = processed.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, PUBLIC_LOGO_URL);
   return processed;
 }
 

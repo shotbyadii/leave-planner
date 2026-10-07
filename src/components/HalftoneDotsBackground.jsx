@@ -8,7 +8,7 @@ import React, { useEffect, useRef } from 'react';
  * - Dark Mode: Luminous white dots on dark background
  * Reacts to mouse cursor proximity with smooth magnetic pull, size growth, and opacity boost.
  */
-const HalftoneDotsBackground = ({ className = '' }) => {
+const HalftoneDotsBackground = ({ className = '', excludeSelector = '[data-splash-cover]' }) => {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -19,6 +19,8 @@ const HalftoneDotsBackground = ({ className = '' }) => {
     let animationFrameId;
     let width = 0;
     let height = 0;
+    let cachedExcludeRect = null;
+    let lastRectCheck = 0;
 
     // Grid configuration - stylish, clearly defined halftone dots with dynamic mouse attraction
     const spacing = 18; // Distance between dot centers in px (clean, airy, modern)
@@ -46,6 +48,33 @@ const HalftoneDotsBackground = ({ className = '' }) => {
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
     };
 
+    const updateExcludeRect = (now = 0) => {
+      if (now - lastRectCheck < 250 && cachedExcludeRect) return cachedExcludeRect;
+      lastRectCheck = now;
+      if (!excludeSelector) {
+        cachedExcludeRect = null;
+        return null;
+      }
+      const el = document.querySelector(excludeSelector);
+      if (!el) {
+        cachedExcludeRect = null;
+        return null;
+      }
+      const cRect = canvas.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      if (eRect.width <= 0 || eRect.height <= 0) {
+        cachedExcludeRect = null;
+        return null;
+      }
+      cachedExcludeRect = {
+        left: eRect.left - cRect.left,
+        top: eRect.top - cRect.top,
+        right: eRect.right - cRect.left,
+        bottom: eRect.bottom - cRect.top
+      };
+      return cachedExcludeRect;
+    };
+
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       const parentRect = canvas.parentElement?.getBoundingClientRect();
@@ -58,6 +87,7 @@ const HalftoneDotsBackground = ({ className = '' }) => {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      updateExcludeRect(0);
     };
 
     const handleMouseMove = (e) => {
@@ -109,21 +139,31 @@ const HalftoneDotsBackground = ({ className = '' }) => {
 
       ctx.clearRect(0, 0, width, height);
 
-      const cols = Math.ceil(width / spacing) + 2;
-      const rows = Math.ceil(height / spacing) + 2;
-
       // Live theme detection: dark vs light
       const isDarkTheme = getIsDarkTheme();
       // Light Mode: Black dots (0, 0, 0) | Dark Mode: White dots (255, 255, 255)
       const dotColor = isDarkTheme ? '255, 255, 255' : '0, 0, 0';
       const baseAlpha = isDarkTheme ? 0.35 : 0.32;
 
+      // Mobile check (under 768px): scale dot size down by 30%
+      const isMobile = width < 768 || (typeof window !== 'undefined' && window.innerWidth < 768);
+      const sizeMultiplier = isMobile ? 0.70 : 1.0;
+      const effectiveBaseRadius = baseRadius * sizeMultiplier;
+      const effectiveMaxRadius = maxRadius * sizeMultiplier;
+      const currentSpacing = isMobile ? 14 : spacing;
+      const currentHoverRadius = isMobile ? 95 : hoverRadius;
+      const currentMagneticPull = isMobile ? 3.5 : maxMagneticPull;
+
+      const cols = Math.ceil(width / currentSpacing) + 2;
+      const rows = Math.ceil(height / currentSpacing) + 2;
+      const excludeRect = updateExcludeRect(time);
+
       for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
           // Stagger alternate rows slightly for classic diagonal halftone pattern
-          const offsetX = (j % 2 === 1) ? spacing * 0.5 : 0;
-          const originX = i * spacing + offsetX;
-          const originY = j * spacing;
+          const offsetX = (j % 2 === 1) ? currentSpacing * 0.5 : 0;
+          const originX = i * currentSpacing + offsetX;
+          const originY = j * currentSpacing;
 
           // Natural organic ambient wave motion (subtle floating drift)
           const waveX = Math.sin(originY * 0.04 + t * 1.5) * 1.6 + Math.cos(originX * 0.03 + t * 0.8) * 0.8;
@@ -131,30 +171,48 @@ const HalftoneDotsBackground = ({ className = '' }) => {
           const currentX = originX + waveX;
           const currentY = originY + waveY;
 
+          // Skip dots that fall inside the excluded cover art bounds (guarantees cover stays strictly in front)
+          if (excludeRect &&
+              currentX >= excludeRect.left &&
+              currentX <= excludeRect.right &&
+              currentY >= excludeRect.top &&
+              currentY <= excludeRect.bottom) {
+            continue;
+          }
+
           // Distance from dot to mouse
           const dx = mouse.x - currentX;
           const dy = mouse.y - currentY;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           // Subtle organic breathing of dots
-          const breath = Math.sin(originX * 0.05 + originY * 0.05 + t * 2) * 0.12;
-          let r = baseRadius + Math.max(0, breath * 0.25);
+          const breath = Math.sin(originX * 0.05 + originY * 0.05 + t * 2) * (isMobile ? 0.08 : 0.12);
+          let r = effectiveBaseRadius + Math.max(0, breath * 0.25);
           let alpha = Math.min(1, Math.max(0.18, baseAlpha + breath * 0.5));
           let drawX = currentX;
           let drawY = currentY;
 
-          if (dist < hoverRadius && dist > 0.001) {
-            const factor = 1 - (dist / hoverRadius);
+          if (dist < currentHoverRadius && dist > 0.001) {
+            const factor = 1 - (dist / currentHoverRadius);
             const easeFactor = factor * factor;
 
             // Magnetic attraction: gently attract dot toward cursor
-            const pull = maxMagneticPull * easeFactor;
+            const pull = currentMagneticPull * easeFactor;
             drawX = currentX + (dx / dist) * pull;
             drawY = currentY + (dy / dist) * pull;
 
             // Scale and boost opacity on hover
-            r = baseRadius + (maxRadius - baseRadius) * easeFactor;
+            r = effectiveBaseRadius + (effectiveMaxRadius - effectiveBaseRadius) * easeFactor;
             alpha = Math.min(isDarkTheme ? 0.95 : 0.85, alpha + (isDarkTheme ? 0.65 : 0.55) * easeFactor);
+          }
+
+          // Also skip if magnetic pull dragged dot inside the exclude area
+          if (excludeRect &&
+              drawX >= excludeRect.left &&
+              drawX <= excludeRect.right &&
+              drawY >= excludeRect.top &&
+              drawY <= excludeRect.bottom) {
+            continue;
           }
 
           ctx.beginPath();

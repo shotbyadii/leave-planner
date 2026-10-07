@@ -155,39 +155,52 @@ const SplashScreen = ({ isOpen, onClose, onAuthSuccess, onEnterDemo, onExitDemo,
         isDemoMode ? 'top-10' : 'top-0'
       }`}
     >
-      <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-full flex flex-col lg:flex-row relative">
+      {/* Interactive Halftone Dots Canvas extending across entire splash screen background */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <HalftoneDotsBackground className="w-full h-full" />
+      </div>
+
+      {/* Ambient Glow on Desktop right side */}
+      <div className="hidden lg:block absolute top-1/4 right-1/4 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0" />
+
+      <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-full flex flex-col lg:flex-row relative z-10">
         
-        {/* Left Side (Desktop): 100% height without any crop, aspect ratio locked */}
-        <div className="hidden lg:flex h-full max-h-full relative bg-black items-center justify-start overflow-hidden flex-shrink-0">
-          <img 
-            src={APP_CONFIG.splashArt} 
-            alt={APP_CONFIG.name}
-            className="h-full w-auto max-h-full object-contain block"
-          />
+        {/* Left Side (Desktop): Inset by 12px with rounded corners, strictly in front of dots background */}
+        <div className="hidden lg:flex h-full max-h-full p-3 items-center justify-start overflow-hidden flex-shrink-0 relative z-30 isolate">
+          <a
+            data-splash-cover="true"
+            href="https://www.instagram.com/mopusha/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-full w-auto max-h-full relative block overflow-hidden rounded-[14px] shadow-none dark:shadow-2xl dark:shadow-black/70 border border-border/80 hover:border-foreground/30 transition-all group cursor-pointer bg-[#fdfdfb] dark:bg-[#0c0c0e] z-30 isolate select-none"
+            title="Artwork by @mopusha on Instagram"
+          >
+            <img 
+              src={APP_CONFIG.splashArt} 
+              alt={`${APP_CONFIG.name} by @mopusha`}
+              className="h-full w-auto max-h-full object-contain block select-none bg-[#fdfdfb] dark:bg-[#0c0c0e]"
+            />
+            {/* Subtle credit badge on hover */}
+            <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md text-[10px] font-mono font-medium text-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 pointer-events-none border border-white/10 shadow-lg">
+              <span>@mopusha</span>
+            </div>
+          </a>
         </div>
 
         {/* Right Side (Desktop) / Centered View (Mobile): Auth Modal Gateway */}
-        <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-background lg:overflow-y-auto">
+        <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-full flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative lg:overflow-y-auto">
           
-          {/* Interactive Halftone Dots Canvas strictly behind modal (z-0) */}
-          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-auto">
-            <HalftoneDotsBackground className="w-full h-full" />
-          </div>
-
-          {/* Ambient Glow on Desktop right side */}
-          <div className="hidden lg:block absolute top-1/4 right-1/4 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none animate-pulse z-0" />
-          
-          {/* Mobile Top Header: Logo + App Name (No other text) */}
-          <div className="flex lg:hidden items-center justify-center gap-3 mb-6 relative z-10">
-            <div className="w-10 h-10 rounded-2xl bg-card border border-border/80 p-1 flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden flex-shrink-0">
-              <img src={APP_CONFIG.logo} alt={APP_CONFIG.name} className="w-full h-full object-contain rounded-xl" />
-            </div>
-            <span className="text-xl font-black font-mono tracking-tight text-foreground">
-              {APP_CONFIG.name}
-            </span>
-          </div>
-
           <div className="w-full max-w-md mx-auto relative z-10">
+            {/* Mobile Top Header: Logo + App Name (Left aligned with auth modal) */}
+            <div className="flex lg:hidden items-center justify-start gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-card border border-border/80 p-1 flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden flex-shrink-0">
+                <img src={APP_CONFIG.logo} alt={APP_CONFIG.name} className="w-full h-full object-contain rounded-xl" />
+              </div>
+              <span className="text-xl font-black font-mono tracking-tight text-foreground">
+                {APP_CONFIG.name}
+              </span>
+            </div>
+
             <motion.div 
               layout 
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}

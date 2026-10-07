@@ -108,6 +108,16 @@
     cursor: text !important;
     -webkit-tap-highlight-color: transparent !important;
   }
+  /* Suppress browser native password reveal & clear buttons (e.g. Edge, IE) so only custom eye icons appear */
+  ::-ms-reveal,
+  ::-ms-clear,
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+  }
   /* Prevent browser autofill white background flash */
   input:-webkit-autofill,
   input:-webkit-autofill:hover, 

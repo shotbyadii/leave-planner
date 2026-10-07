@@ -305,6 +305,57 @@ function App() {
     };
   }, []);
 
+  // Multi-device & multi-instance realtime synchronization
+  useEffect(() => {
+    if (!currentUser?.id || isDemoMode) return;
+
+    let channel;
+    try {
+      channel = supabase
+        .channel(`realtime-leaves-${currentUser.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'leaves',
+            filter: `user_id=eq.${currentUser.id}`
+          },
+          () => {
+            loadLeaves(currentUser);
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription error:', err);
+    }
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [currentUser?.id, isDemoMode]);
+
+  // Cross-tab / cross-instance broadcast channel for instantaneous local sync
+  useEffect(() => {
+    let bc;
+    try {
+      bc = new BroadcastChannel('leave-vault-sync');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'LEAVES_UPDATED') {
+          loadLeaves(currentUser);
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      try {
+        bc?.close();
+      } catch (e) {}
+    };
+  }, [currentUser]);
+
   // Handle password recovery link routing from email (#type=recovery or #reset-password)
   useEffect(() => {
     const checkRecoveryHash = () => {
@@ -578,7 +629,7 @@ function App() {
   const handleAuthSuccess = async (user) => {
     setCurrentUser(user);
     setIsAuthChecking(false);
-    setShowSplash(false);
+    setIsLeavesLoaded(false);
 
     if (user) {
       const nameToUse = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || userName;
@@ -593,10 +644,14 @@ function App() {
           setOnboardingOpen(true);
         }
         await loadLeaves(user);
+        setShowSplash(false);
         return;
       }
 
-      const profile = await fetchUserProfile(user.id);
+      const profilePromise = fetchUserProfile(user.id);
+      const leavesPromise = loadLeaves(user);
+      const [profile] = await Promise.all([profilePromise, leavesPromise]);
+
       if (!profile) {
         // Fresh brand-new account: create default clean profile in Supabase
         const newProfile = await upsertUserProfile(user.id, {
@@ -617,7 +672,10 @@ function App() {
         syncProfileToState(profile, user);
         localStorage.setItem('onboarding_completed', 'true');
       }
-      await loadLeaves(user);
+
+      setShowSplash(false);
+    } else {
+      setShowSplash(true);
     }
   };
 
@@ -769,6 +827,19 @@ function App() {
 
   const [wfhPromptHour, setWfhPromptHour] = useState(localStorage.getItem('wfh_prompt_hour') || '12');
 
+  // Auto-dismiss or suppress attendance modal whenever today's status is already recorded in bookedDates
+  useEffect(() => {
+    if (!isLeavesLoaded) return;
+    const todayStr = getTodayStr();
+    const hasStatusRecorded = bookedDates.some(b => b.date === todayStr);
+    if (hasStatusRecorded) {
+      setHasPromptedWfh(true);
+      if (wfhModalOpen) {
+        setWfhModalOpen(false);
+      }
+    }
+  }, [isLeavesLoaded, bookedDates, wfhModalOpen, devDateStr]);
+
   // Daily Working Day Attendance Check-in Prompt
   useEffect(() => {
     if (!isLeavesLoaded) return;
@@ -780,6 +851,14 @@ function App() {
       const now = getTodayDate();
       const promptHourNum = parseInt(wfhPromptHour || '12', 10);
       const isAfterPromptHour = devDateStr ? true : now.getHours() >= promptHourNum;
+
+      if (hasStatusRecorded) {
+        setHasPromptedWfh(true);
+        if (wfhModalOpen) {
+          setWfhModalOpen(false);
+        }
+        return;
+      }
 
       // Only prompt attendance if onboarding, tutorial, splash, and install modal are not active
       if (isWorkday && !hasStatusRecorded && isAfterPromptHour && !hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
@@ -798,29 +877,42 @@ function App() {
     // Run check immediately
     checkAndTriggerAttendancePrompt();
 
-    // Check every 30 seconds and when app gains focus or becomes visible
-    const intervalId = setInterval(checkAndTriggerAttendancePrompt, 30000);
+    // Check periodically and sync fresh database leaves when app gains focus or becomes visible across multiple devices/instances
+    const handleSyncAndCheck = async () => {
+      if (currentUser?.id || isDemoMode) {
+        await loadLeaves(currentUser);
+      }
+      checkAndTriggerAttendancePrompt();
+    };
+
+    const intervalId = setInterval(handleSyncAndCheck, 30000);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        checkAndTriggerAttendancePrompt();
+        handleSyncAndCheck();
       }
     };
 
-    window.addEventListener('focus', checkAndTriggerAttendancePrompt);
+    window.addEventListener('focus', handleSyncAndCheck);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       clearInterval(intervalId);
-      window.removeEventListener('focus', checkAndTriggerAttendancePrompt);
+      window.removeEventListener('focus', handleSyncAndCheck);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, onboardingOpen, isTutorialActive, installModalOpen, showSplash]);
+  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, onboardingOpen, isTutorialActive, installModalOpen, showSplash, wfhModalOpen, currentUser]);
 
   const handleWfhStatusSelect = async (statusType) => {
     const todayStr = getTodayStr();
+    setHasPromptedWfh(true);
+    setWfhModalOpen(false);
     await addLeave(todayStr, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
     await loadLeaves();
-    setWfhModalOpen(false);
+    try {
+      const bc = new BroadcastChannel('leave-vault-sync');
+      bc.postMessage({ type: 'LEAVES_UPDATED', todayStr, statusType });
+      bc.close();
+    } catch (e) {}
   };
 
   const handleWfhMarkLeave = () => {
