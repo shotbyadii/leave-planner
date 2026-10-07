@@ -94,6 +94,7 @@ export const DEFAULT_LEAVE_CONFIGS = [
     color: 'pink',
     quota: 1,
     cadence: 'month',
+    subtitle: 'Monthly health and wellness allowance',
     deductsFromAnnual: false,
     enabled: false,
     isSystem: false,
@@ -101,25 +102,7 @@ export const DEFAULT_LEAVE_CONFIGS = [
     constraints: {
       maxConsecutive: 1,
       requiresNote: false,
-      warningMessage: 'Menstrual leave is limited to 1 day per calendar month.',
-    }
-  },
-  {
-    id: 'mental',
-    name: 'Mental Health Day',
-    shortCode: 'MH',
-    tier: 'special',
-    color: 'purple',
-    quota: 2,
-    cadence: 'year',
-    deductsFromAnnual: false,
-    enabled: false,
-    isSystem: false,
-    allowsHalfDay: true,
-    constraints: {
-      maxConsecutive: 1,
-      requiresNote: false,
-      warningMessage: 'Mental health days are designed for single-day rest and recuperation.',
+      warningMessage: null,
     }
   },
   {
@@ -130,32 +113,15 @@ export const DEFAULT_LEAVE_CONFIGS = [
     color: 'indigo',
     quota: 5,
     cadence: 'event',
+    subtitle: 'Compassionate leave for family loss or bereavement',
     deductsFromAnnual: false,
     enabled: false,
     isSystem: false,
     allowsHalfDay: false,
     constraints: {
       maxConsecutive: 5,
-      requiresNote: true,
-      warningMessage: 'Please provide relevant details or documentation for HR records.',
-    }
-  },
-  {
-    id: 'parental',
-    name: 'Parental Leave',
-    shortCode: 'PLV',
-    tier: 'special',
-    color: 'amber',
-    quota: 60,
-    cadence: 'total',
-    deductsFromAnnual: false,
-    enabled: false,
-    isSystem: false,
-    allowsHalfDay: false,
-    constraints: {
-      maxConsecutive: null,
-      requiresNote: true,
-      warningMessage: 'Parental leave requires workspace manager pre-approval.',
+      requiresNote: false,
+      warningMessage: null,
     }
   }
 ];

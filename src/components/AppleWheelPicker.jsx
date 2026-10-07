@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, Shield } from 'lucide-react';
 import { COLOR_PALETTE } from '../utils/colorUtils';
 
 const AppleWheelPicker = ({ 
@@ -14,7 +14,9 @@ const AppleWheelPicker = ({
   onCustomNameChange,
   color = 'blue',
   onColorChange,
-  onRemove = null
+  onRemove = null,
+  maxConsecutive = null,
+  onMaxConsecutiveChange = null
 }) => {
   const scrollRef = useRef(null);
   const isScrollingRef = useRef(false);
@@ -187,6 +189,30 @@ const AppleWheelPicker = ({
           })}
         </div>
       </div>
+
+      {/* Continuous Limit Policy Field */}
+      {onMaxConsecutiveChange && (
+        <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[10px]">
+          <span className="font-mono text-muted-foreground flex items-center gap-1 font-bold">
+            <Shield size={11} className="text-amber-500" /> Max in a row:
+          </span>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={1}
+              max={30}
+              placeholder="None"
+              value={maxConsecutive ?? ''}
+              onChange={(e) => {
+                const val = e.target.value === '' ? null : Math.max(1, parseInt(e.target.value, 10));
+                onMaxConsecutiveChange(val);
+              }}
+              className="w-12 text-center font-mono font-bold text-foreground bg-muted/60 border border-border/60 rounded-md px-1 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+            <span className="text-[9px] font-mono text-muted-foreground">days</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -29,7 +29,7 @@ import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import AppleBalanceTicker from './components/AppleBalanceTicker';
 import { getLeaveColor, getShortform, COLOR_PALETTE } from './utils/colorUtils';
-import { buildInitialLeaveConfigs } from './services/leaveConfigService';
+import { buildInitialLeaveConfigs, checkLeaveConstraints } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
@@ -2737,16 +2737,26 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Policy Constraints Warning synced with desktop */}
-                      {mobileLeaveType === 'el' && checkSequentialELWarning(previewDates.filter(d => !isHoliday(d) && !isWeekend(d)), bookedDates) && (
-                        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                          <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-                          <div className="text-xs text-red-600 dark:text-red-400">
-                            <span className="font-black block mb-1 uppercase tracking-wider text-[10px] font-mono">Medical Certificate Required</span>
-                            You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
+                      {/* Universal Policy & Continuous Constraints Warning */}
+                      {(() => {
+                        const activeCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
+                        const workingPreview = previewDates.filter(d => !isHoliday(d) && !isWeekend(d));
+                        const warnings = activeCfg ? checkLeaveConstraints(workingPreview, activeCfg, bookedDates, 1) : [];
+                        if (warnings.length === 0) return null;
+                        return (
+                          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            {warnings.map((w, idx) => (
+                              <div key={idx} className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-2xl p-3.5 flex gap-3 items-start shadow-sm">
+                                <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={18} />
+                                <div className="text-xs">
+                                  <span className="font-black block mb-0.5 uppercase tracking-wider text-[10px] font-mono">{w.title || 'Policy Notice'}</span>
+                                  <p className="leading-relaxed">{w.message}</p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {(() => {
                         const activeCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;

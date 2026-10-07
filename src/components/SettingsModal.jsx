@@ -883,6 +883,8 @@ const SettingsModal = ({
                                 color={c.color}
                                 onColorChange={(val) => updateConfig(c.id, { color: val })}
                                 onRemove={annualConfigs.length > 1 ? () => removeConfig(c.id) : null}
+                                maxConsecutive={c.constraints?.maxConsecutive}
+                                onMaxConsecutiveChange={(val) => updateConfig(c.id, { constraints: { ...(c.constraints || {}), maxConsecutive: val } })}
                               />
 
                               {/* Policy Rules & Constraints Drawer */}
@@ -1108,17 +1110,28 @@ const SettingsModal = ({
                                   <div className="flex items-center gap-1.5">
                                     <button
                                       type="button"
-                                      onClick={() => updateConfig(c.id, { quota: Math.max(1, c.quota - 1) })}
+                                      onClick={() => updateConfig(c.id, { quota: Math.max(1, (parseInt(c.quota, 10) || 1) - 1) })}
                                       className="w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center text-xs font-black cursor-pointer hover:bg-muted/80"
                                     >
                                       -
                                     </button>
-                                    <span className="w-8 text-center text-xs font-mono font-black text-foreground">
-                                      {c.quota}
-                                    </span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={90}
+                                      value={c.quota ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
+                                        updateConfig(c.id, { quota: val });
+                                      }}
+                                      onBlur={() => {
+                                        if (!c.quota || c.quota < 1) updateConfig(c.id, { quota: 1 });
+                                      }}
+                                      className="w-10 text-center text-xs font-mono font-black text-foreground bg-transparent border border-border/40 rounded py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                                    />
                                     <button
                                       type="button"
-                                      onClick={() => updateConfig(c.id, { quota: c.quota + 1 })}
+                                      onClick={() => updateConfig(c.id, { quota: (parseInt(c.quota, 10) || 1) + 1 })}
                                       className="w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center text-xs font-black cursor-pointer hover:bg-muted/80"
                                     >
                                       +

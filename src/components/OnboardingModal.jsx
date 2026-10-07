@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, 
   SlidersHorizontal, Building2, Clock, Bell, ShieldCheck, Key, ExternalLink,
-  Plus, Trash2, Heart, Moon, Umbrella, Baby, X
+  Plus, Trash2, Heart, Moon, Umbrella, Baby, X, Shield, Edit3
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -35,8 +35,18 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
   // Custom Annual Leave Creator State
   const [isAddingAnnual, setIsAddingAnnual] = useState(false);
   const [newAnnualName, setNewAnnualName] = useState('');
-  const [newAnnualQuota, setNewAnnualQuota] = useState(10);
+  const [newAnnualQuota, setNewAnnualQuota] = useState('10');
   const [newAnnualColor, setNewAnnualColor] = useState('purple');
+  const [newAnnualMaxConsecutive, setNewAnnualMaxConsecutive] = useState('');
+
+  // Special Benefits Creator & Editor State
+  const [isAddingSpecial, setIsAddingSpecial] = useState(false);
+  const [newSpecialName, setNewSpecialName] = useState('');
+  const [newSpecialQuota, setNewSpecialQuota] = useState('1');
+  const [newSpecialCadence, setNewSpecialCadence] = useState('month');
+  const [newSpecialSubtitle, setNewSpecialSubtitle] = useState('');
+  const [newSpecialColor, setNewSpecialColor] = useState('pink');
+  const [editingSpecialId, setEditingSpecialId] = useState(null);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -381,7 +391,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                             <X size={14} />
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div>
                             <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Category Name</label>
                             <input
@@ -399,7 +409,24 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                               min={1}
                               max={60}
                               value={newAnnualQuota}
-                              onChange={(e) => setNewAnnualQuota(Math.max(1, parseInt(e.target.value || '1', 10)))}
+                              onChange={(e) => setNewAnnualQuota(e.target.value)}
+                              onBlur={() => {
+                                const val = parseInt(newAnnualQuota, 10);
+                                if (isNaN(val) || val < 1) setNewAnnualQuota('1');
+                                else if (val > 60) setNewAnnualQuota('60');
+                              }}
+                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Max in a row (Continuous)</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={30}
+                              placeholder="Unlimited"
+                              value={newAnnualMaxConsecutive}
+                              onChange={(e) => setNewAnnualMaxConsecutive(e.target.value)}
                               className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                             />
                           </div>
@@ -424,6 +451,8 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                             onClick={() => {
                               const cleanName = newAnnualName.trim();
                               if (!cleanName) return;
+                              const parsedQuota = Math.max(1, parseInt(newAnnualQuota, 10) || 10);
+                              const parsedMaxConsecutive = newAnnualMaxConsecutive ? Math.max(1, parseInt(newAnnualMaxConsecutive, 10)) : null;
                               const newId = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 10) + '_' + Date.now().toString().slice(-4);
                               const newConf = {
                                 id: newId,
@@ -431,16 +460,18 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                 shortCode: deriveShortCode(cleanName),
                                 tier: 'annual',
                                 color: newAnnualColor,
-                                quota: newAnnualQuota,
+                                quota: parsedQuota,
                                 cadence: 'year',
                                 deductsFromAnnual: true,
                                 enabled: true,
                                 isSystem: false,
                                 allowsHalfDay: true,
-                                constraints: { maxConsecutive: null, requiresNote: false }
+                                constraints: { maxConsecutive: parsedMaxConsecutive, requiresNote: false, warningMessage: null }
                               };
                               setLeaveConfigs(prev => [...prev, newConf]);
                               setNewAnnualName('');
+                              setNewAnnualQuota('10');
+                              setNewAnnualMaxConsecutive('');
                               setIsAddingAnnual(false);
                             }}
                             className="px-4 py-1.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl shadow-xs disabled:opacity-40 cursor-pointer"
@@ -478,6 +509,13 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                               color={conf.color}
                               onColorChange={(val) => {
                                 setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, color: val } : c));
+                              }}
+                              maxConsecutive={conf.constraints?.maxConsecutive}
+                              onMaxConsecutiveChange={(val) => {
+                                setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? {
+                                  ...c,
+                                  constraints: { ...(c.constraints || {}), maxConsecutive: val }
+                                } : c));
                               }}
                               onRemove={annuals.length > 1 ? () => {
                                 setLeaveConfigs(prev => prev.filter(c => c.id !== conf.id));
@@ -548,87 +586,316 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                   </div>
                 )}
 
-                {/* TIER 3: Special Benefits (Menstrual, Mental Health, Bereavement, Parental) */}
+                {/* TIER 3: Special Benefits (Menstrual, Bereavement, Custom) */}
                 {onboardingTierTab === 'special' && (
                   <div className="flex flex-col gap-3 animate-in fade-in duration-200">
-                    <p className="text-[11px] text-muted-foreground px-1">
-                      Bonus policy benefits that do <strong>not</strong> deduct from your annual vacation bank:
-                    </p>
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        Bonus policy benefits that do <strong>not</strong> deduct from your annual vacation bank:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingSpecial(!isAddingSpecial);
+                          setEditingSpecialId(null);
+                        }}
+                        className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1 cursor-pointer transition-colors flex-shrink-0"
+                      >
+                        <Plus size={13} /> Add Benefit
+                      </button>
+                    </div>
+
+                    {/* Inline Creator for Custom Special Benefit */}
+                    {isAddingSpecial && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-card border border-primary/30 rounded-2xl p-4 flex flex-col gap-3 shadow-md"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase font-mono tracking-wider text-foreground">
+                            New Special Benefit
+                          </span>
+                          <button 
+                            type="button" 
+                            onClick={() => setIsAddingSpecial(false)}
+                            className="text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Benefit Name</label>
+                            <input
+                              type="text"
+                              value={newSpecialName}
+                              onChange={(e) => setNewSpecialName(e.target.value)}
+                              placeholder="e.g. Mental Health Day, Study Leave..."
+                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Allowance Days Quota</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={90}
+                              value={newSpecialQuota}
+                              onChange={(e) => setNewSpecialQuota(e.target.value)}
+                              onBlur={() => {
+                                const val = parseInt(newSpecialQuota, 10);
+                                if (isNaN(val) || val < 1) setNewSpecialQuota('1');
+                                else if (val > 90) setNewSpecialQuota('90');
+                              }}
+                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Frequency Cadence</label>
+                            <select
+                              value={newSpecialCadence}
+                              onChange={(e) => setNewSpecialCadence(e.target.value)}
+                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                            >
+                              <option value="month">Per Calendar Month</option>
+                              <option value="year">Per Year</option>
+                              <option value="event">Per Occurrence / Total</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Subtitle / Description</label>
+                          <input
+                            type="text"
+                            value={newSpecialSubtitle}
+                            onChange={(e) => setNewSpecialSubtitle(e.target.value)}
+                            placeholder="e.g. Personal rest and wellbeing allowance"
+                            className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
+                            {COLOR_PALETTE.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setNewSpecialColor(c.id)}
+                                className={`w-4 h-4 rounded-full ${c.bg} transition-transform cursor-pointer ${
+                                  newSpecialColor === c.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!newSpecialName.trim()}
+                            onClick={() => {
+                              const cleanName = newSpecialName.trim();
+                              if (!cleanName) return;
+                              const parsedQuota = Math.max(1, parseInt(newSpecialQuota, 10) || 1);
+                              const newId = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 10) + '_' + Date.now().toString().slice(-4);
+                              const newConf = {
+                                id: newId,
+                                name: cleanName,
+                                shortCode: deriveShortCode(cleanName),
+                                tier: 'special',
+                                color: newSpecialColor,
+                                quota: parsedQuota,
+                                cadence: newSpecialCadence,
+                                subtitle: newSpecialSubtitle.trim() || 'Company benefit allowance',
+                                deductsFromAnnual: false,
+                                enabled: true,
+                                isSystem: false,
+                                allowsHalfDay: true,
+                                constraints: { maxConsecutive: null, requiresNote: false, warningMessage: null }
+                              };
+                              setLeaveConfigs(prev => [...prev, newConf]);
+                              setNewSpecialName('');
+                              setNewSpecialQuota('1');
+                              setNewSpecialSubtitle('');
+                              setIsAddingSpecial(false);
+                            }}
+                            className="px-4 py-1.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl shadow-xs disabled:opacity-40 cursor-pointer"
+                          >
+                            Add Benefit
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
 
                     <div className="flex flex-col gap-2.5">
                       {leaveConfigs.filter(c => c.tier === 'special').map(conf => {
                         const iconMap = {
                           menstrual: Heart,
-                          mental: Moon,
                           bereavement: Umbrella,
+                          mental: Moon,
                           parental: Baby
                         };
                         const Icon = iconMap[conf.id] || Sparkles;
+                        const isEditing = editingSpecialId === conf.id;
 
                         return (
                           <div
                             key={conf.id}
-                            className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                            className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-3 ${
                               conf.enabled 
                                 ? 'bg-card border-border/80 shadow-xs' 
                                 : 'bg-muted/20 border-border/40 opacity-75'
                             }`}
                           >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                conf.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                              }`}>
-                                <Icon size={16} />
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-bold text-foreground flex items-center gap-1.5 truncate">
-                                  {conf.name}
-                                  <span className="text-[10px] font-mono text-muted-foreground font-medium">
-                                    ({conf.cadence === 'month' ? `${conf.quota}d / mo` : conf.cadence === 'year' ? `${conf.quota}d / yr` : `${conf.quota} days`})
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                  conf.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  <Icon size={16} />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5 truncate">
+                                    {conf.name}
+                                    <span className="text-[10px] font-mono text-muted-foreground font-medium">
+                                      ({conf.cadence === 'month' ? `${conf.quota}d / mo` : conf.cadence === 'year' ? `${conf.quota}d / yr` : `${conf.quota} days`})
+                                    </span>
                                   </span>
-                                </span>
-                                <span className="text-[10px] text-muted-foreground truncate">
-                                  {conf.constraints?.warningMessage || 'Independent benefit allowance'}
-                                </span>
+                                  <span className="text-[10px] text-muted-foreground truncate">
+                                    {conf.subtitle || (conf.cadence === 'month' ? 'Monthly benefit allowance' : 'Company benefit allowance')}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {conf.enabled && (
+                                  <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: Math.max(1, (parseInt(c.quota, 10) || 1) - 1) } : c));
+                                      }}
+                                      className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={90}
+                                      value={conf.quota ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: val } : c));
+                                      }}
+                                      onBlur={() => {
+                                        if (!conf.quota || conf.quota < 1) {
+                                          setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: 1 } : c));
+                                        }
+                                      }}
+                                      className="w-9 text-center text-xs font-bold font-mono bg-transparent text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: (parseInt(c.quota, 10) || 1) + 1 } : c));
+                                      }}
+                                      className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors cursor-pointer"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingSpecialId(isEditing ? null : conf.id)}
+                                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
+                                  title="Edit details"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
+
+                                {/* Custom Rounded Slate Checkbox Button */}
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={conf.enabled}
+                                  onClick={() => {
+                                    setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, enabled: !c.enabled } : c));
+                                  }}
+                                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                                    conf.enabled
+                                      ? 'bg-primary border-primary text-primary-foreground shadow-xs'
+                                      : 'bg-muted/40 border-border/80 hover:border-foreground/30 text-transparent'
+                                  }`}
+                                  title={conf.enabled ? 'Enabled' : 'Disabled'}
+                                >
+                                  <Check size={12} strokeWidth={3} className={conf.enabled ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} />
+                                </button>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {conf.enabled && (
-                                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
+                            {/* Inline Editor Drawer for Benefit */}
+                            {isEditing && (
+                              <div className="pt-2.5 border-t border-border/50 flex flex-col gap-2.5 animate-in fade-in duration-150">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Title</label>
+                                    <input
+                                      type="text"
+                                      value={conf.name}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, name: val, shortCode: deriveShortCode(val) } : c));
+                                      }}
+                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Cadence</label>
+                                    <select
+                                      value={conf.cadence}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, cadence: val } : c));
+                                      }}
+                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer"
+                                    >
+                                      <option value="month">Per Calendar Month</option>
+                                      <option value="year">Per Year</option>
+                                      <option value="event">Per Occurrence / Total</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1">
+                                    <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Subtitle / Description</label>
+                                    <input
+                                      type="text"
+                                      value={conf.subtitle || ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, subtitle: val } : c));
+                                      }}
+                                      placeholder="Brief benefit description..."
+                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                    />
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: Math.max(1, c.quota - 1) } : c));
+                                      setLeaveConfigs(prev => prev.filter(c => c.id !== conf.id));
+                                      setEditingSpecialId(null);
                                     }}
-                                    className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors"
+                                    className="px-2.5 py-1.5 mt-3.5 text-red-500 hover:bg-red-500/10 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                    title="Delete benefit"
                                   >
-                                    -
-                                  </button>
-                                  <span className="text-xs font-bold font-mono px-1.5 min-w-[20px] text-center">
-                                    {conf.quota}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: c.quota + 1 } : c));
-                                    }}
-                                    className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors"
-                                  >
-                                    +
+                                    <Trash2 size={12} /> Remove
                                   </button>
                                 </div>
-                              )}
-                              <input
-                                type="checkbox"
-                                checked={conf.enabled}
-                                onChange={(e) => {
-                                  const isChecked = e.target.checked;
-                                  setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, enabled: isChecked } : c));
-                                }}
-                                className="w-5 h-5 accent-primary cursor-pointer"
-                              />
-                            </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

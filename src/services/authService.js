@@ -138,6 +138,7 @@ export const upsertUserProfile = async (userId, profileData) => {
     quota_wfh: profileData.quotas?.wfh,
     leave_names: profileData.names,
     leave_colors: profileData.colors,
+    leave_configs: profileData.leaveConfigs || profileData.leave_configs || null,
     avatar_url: profileData.avatarUrl || profileData.avatar_url || null,
     company_name: profileData.companyName || profileData.company_name || null,
     company_logo_url: profileData.companyLogoUrl || profileData.company_logo_url || null,
