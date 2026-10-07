@@ -14,7 +14,7 @@ import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../services/aiAssi
 import { DEFAULT_LEAVE_CONFIGS, deriveShortCode, buildInitialLeaveConfigs } from '../services/leaveConfigService';
 import { COLOR_PALETTE } from '../utils/colorUtils';
 
-const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
+const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveConfigs: propLeaveConfigs = null }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(initialName && initialName !== 'User' ? initialName : (typeof window !== 'undefined' ? localStorage.getItem('user_name') || '' : ''));
   const [companyName, setCompanyName] = useState('');
@@ -24,7 +24,12 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
   const [holidays, setHolidays] = useState(() => getStoredHolidays());
 
   // 3-Tier Leave Configurations State
-  const [leaveConfigs, setLeaveConfigs] = useState(() => buildInitialLeaveConfigs());
+  const [leaveConfigs, setLeaveConfigs] = useState(() => {
+    if (Array.isArray(propLeaveConfigs) && propLeaveConfigs.length > 0) {
+      return propLeaveConfigs;
+    }
+    return buildInitialLeaveConfigs();
+  });
   const [onboardingTierTab, setOnboardingTierTab] = useState('annual'); // 'annual' | 'wfh' | 'special'
 
   // Custom Annual Leave Creator State
@@ -42,8 +47,11 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
         const saved = localStorage.getItem('user_name');
         if (saved && saved !== 'User') setName(saved);
       }
+      if (Array.isArray(propLeaveConfigs) && propLeaveConfigs.length > 0) {
+        setLeaveConfigs(propLeaveConfigs);
+      }
     }
-  }, [isOpen, initialName]);
+  }, [isOpen, initialName, propLeaveConfigs]);
 
   const [isCompanySearching, setIsCompanySearching] = useState(false);
 

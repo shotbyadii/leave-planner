@@ -34,9 +34,17 @@ class ErrorBoundary extends React.Component {
             <AlertTriangle size={32} />
           </div>
           <h1 className="text-2xl font-black mb-2 tracking-tight">Something went wrong</h1>
-          <p className="text-sm text-slate-400 max-w-sm mb-6 leading-relaxed">
+          <p className="text-sm text-slate-400 max-w-sm mb-4 leading-relaxed">
             The application encountered an unexpected display issue. Your saved data is safe.
           </p>
+          {this.state.error && (
+            <div className="max-w-md w-full bg-red-950/40 border border-red-500/30 rounded-xl p-3 text-left mb-6 font-mono text-xs text-red-300 overflow-x-auto max-h-40">
+              <p className="font-bold mb-1 text-red-200">{this.state.error.message || String(this.state.error)}</p>
+              {this.state.error.stack && (
+                <pre className="text-[10px] text-red-400/80 whitespace-pre-wrap">{this.state.error.stack.split('\n').slice(0, 4).join('\n')}</pre>
+              )}
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={this.handleReload}

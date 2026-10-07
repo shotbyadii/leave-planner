@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { COLOR_PALETTE } from '../utils/colorUtils';
 
 const AppleWheelPicker = ({ 
