@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, 
-  SlidersHorizontal, Building2, Clock, Bell, ShieldCheck, Key, ExternalLink 
+  SlidersHorizontal, Building2, Clock, Bell, ShieldCheck, Key, ExternalLink,
+  Plus, Trash2, Heart, Moon, Umbrella, Baby, X
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -10,6 +11,8 @@ import HolidayManager from './HolidayManager';
 import { getStoredHolidays, saveStoredHolidays } from '../data/holidays';
 import { showAppNotification, requestNotificationPermission, isNotificationGranted } from '../utils/notificationService';
 import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../services/aiAssistantService';
+import { DEFAULT_LEAVE_CONFIGS, deriveShortCode, buildInitialLeaveConfigs } from '../services/leaveConfigService';
+import { COLOR_PALETTE } from '../utils/colorUtils';
 
 const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
   const [step, setStep] = useState(1);
@@ -19,6 +22,16 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
   const [geminiApiKey, setGeminiApiKey] = useState(() => getStoredGeminiApiKey());
   const [notifGranted, setNotifGranted] = useState(() => isNotificationGranted());
   const [holidays, setHolidays] = useState(() => getStoredHolidays());
+
+  // 3-Tier Leave Configurations State
+  const [leaveConfigs, setLeaveConfigs] = useState(() => buildInitialLeaveConfigs());
+  const [onboardingTierTab, setOnboardingTierTab] = useState('annual'); // 'annual' | 'wfh' | 'special'
+
+  // Custom Annual Leave Creator State
+  const [isAddingAnnual, setIsAddingAnnual] = useState(false);
+  const [newAnnualName, setNewAnnualName] = useState('');
+  const [newAnnualQuota, setNewAnnualQuota] = useState(10);
+  const [newAnnualColor, setNewAnnualColor] = useState('purple');
 
   React.useEffect(() => {
     if (isOpen) {
@@ -74,6 +87,17 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
     if (geminiApiKey.trim()) {
       setStoredGeminiApiKey(geminiApiKey.trim());
     }
+
+    // Build backward-compatible dictionaries
+    const derivedQuotas = {};
+    const derivedNames = {};
+    const derivedColors = {};
+    for (const c of leaveConfigs) {
+      derivedQuotas[c.id] = c.quota;
+      derivedNames[c.id] = c.name;
+      derivedColors[c.id] = c.color;
+    }
+
     if (onComplete) {
       onComplete({
         name: name.trim() || 'User',
@@ -81,9 +105,10 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
         wfhPromptHour,
         notifEnabled: notifGranted,
         geminiApiKey: geminiApiKey.trim(),
-        quotas,
-        names,
-        colors,
+        leaveConfigs,
+        quotas: derivedQuotas,
+        names: derivedNames,
+        colors: derivedColors,
         holidays
       });
     }
@@ -255,7 +280,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
               </motion.div>
             )}
 
-            {/* STEP 3: Quotas, Colors & Names */}
+            {/* STEP 3: 3-Tier Quotas, Colors & Category Names */}
             {step === 3 && (
               <motion.div 
                 key="step3"
@@ -263,72 +288,345 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '' }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-4 max-w-2xl mx-auto w-full"
               >
                 <div className="text-center">
                   <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-2 shadow-inner">
                     <SlidersHorizontal size={24} />
                   </div>
-                  <h2 className="text-xl font-black text-foreground tracking-tight">Quotas, Colors & Category Names</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Configure your annual leave limits, category names, and UI theme colors.</p>
+                  <h2 className="text-xl font-black text-foreground tracking-tight">Leave Quotas & Policy Tiers</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Customize your vacation categories, monthly remote allowance, and bonus benefits.</p>
                 </div>
 
-                {/* 4 Horizontally Stacked Columns */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  
-                  {/* PL Tumbler */}
-                  <AppleWheelPicker
-                    code="PL"
-                    label="Privileged Leave"
-                    value={quotas.pl}
-                    onChange={(val) => setQuotas(q => ({ ...q, pl: val }))}
-                    min={0} max={30}
-                    customName={names.pl}
-                    onCustomNameChange={(val) => setNames(n => ({ ...n, pl: val }))}
-                    color={colors.pl}
-                    onColorChange={(val) => setColors(c => ({ ...c, pl: val }))}
-                  />
+                {/* 3-Tier Segmented Header Tabs */}
+                <div className="flex p-1 bg-muted/60 border border-border/80 rounded-2xl gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingTierTab('annual')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      onboardingTierTab === 'annual' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>Annual Bank</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
+                      {leaveConfigs.filter(c => c.tier === 'annual').length}
+                    </span>
+                  </button>
 
-                  {/* EL Tumbler */}
-                  <AppleWheelPicker
-                    code="EL"
-                    label="Emergency Leave"
-                    value={quotas.el}
-                    onChange={(val) => setQuotas(q => ({ ...q, el: val }))}
-                    min={0} max={20}
-                    customName={names.el}
-                    onCustomNameChange={(val) => setNames(n => ({ ...n, el: val }))}
-                    color={colors.el}
-                    onColorChange={(val) => setColors(c => ({ ...c, el: val }))}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingTierTab('wfh')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      onboardingTierTab === 'wfh' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>Work From Home</span>
+                    <span className={`w-2 h-2 rounded-full ${leaveConfigs.find(c => c.id === 'wfh')?.enabled ? 'bg-cyan-500' : 'bg-muted-foreground/40'}`} />
+                  </button>
 
-                  {/* RH Tumbler */}
-                  <AppleWheelPicker
-                    code="RH"
-                    label="Extra Leave"
-                    value={quotas.rh}
-                    onChange={(val) => setQuotas(q => ({ ...q, rh: val }))}
-                    min={0} max={10}
-                    customName={names.rh}
-                    onCustomNameChange={(val) => setNames(n => ({ ...n, rh: val }))}
-                    color={colors.rh}
-                    onColorChange={(val) => setColors(c => ({ ...c, rh:val }))}
-                  />
-
-                  {/* WFH Tumbler */}
-                  <AppleWheelPicker
-                    code="WFH"
-                    label="Monthly WFH"
-                    value={quotas.wfh}
-                    onChange={(val) => setQuotas(q => ({ ...q, wfh: val }))}
-                    min={0} max={20}
-                    customName={names.wfh}
-                    onCustomNameChange={(val) => setNames(n => ({ ...n, wfh: val }))}
-                    color={colors.wfh}
-                    onColorChange={(val) => setColors(c => ({ ...c, wfh: val }))}
-                  />
-
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingTierTab('special')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      onboardingTierTab === 'special' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>Special Benefits</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
+                      {leaveConfigs.filter(c => c.tier === 'special' && c.enabled).length}
+                    </span>
+                  </button>
                 </div>
+
+                {/* TIER 1: Annual Leave Bank */}
+                {onboardingTierTab === 'annual' && (
+                  <div className="flex flex-col gap-3 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-bold text-muted-foreground">
+                        Annual Vacation Bank (Deducts from core quota)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingAnnual(!isAddingAnnual)}
+                        className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={13} /> Add Category
+                      </button>
+                    </div>
+
+                    {/* Inline Creator for Custom Annual Category */}
+                    {isAddingAnnual && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-card border border-primary/30 rounded-2xl p-4 flex flex-col gap-3 shadow-md"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase font-mono tracking-wider text-foreground">
+                            New Annual Leave Category
+                          </span>
+                          <button 
+                            type="button" 
+                            onClick={() => setIsAddingAnnual(false)}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Category Name</label>
+                            <input
+                              type="text"
+                              value={newAnnualName}
+                              onChange={(e) => setNewAnnualName(e.target.value)}
+                              placeholder="e.g. Casual Leave, Comp Off..."
+                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Annual Days Quota</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={60}
+                              value={newAnnualQuota}
+                              onChange={(e) => setNewAnnualQuota(Math.max(1, parseInt(e.target.value || '1', 10)))}
+                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
+                            {COLOR_PALETTE.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setNewAnnualColor(c.id)}
+                                className={`w-4 h-4 rounded-full ${c.bg} transition-transform ${
+                                  newAnnualColor === c.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!newAnnualName.trim()}
+                            onClick={() => {
+                              const cleanName = newAnnualName.trim();
+                              if (!cleanName) return;
+                              const newId = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 10) + '_' + Date.now().toString().slice(-4);
+                              const newConf = {
+                                id: newId,
+                                name: cleanName,
+                                shortCode: deriveShortCode(cleanName),
+                                tier: 'annual',
+                                color: newAnnualColor,
+                                quota: newAnnualQuota,
+                                cadence: 'year',
+                                deductsFromAnnual: true,
+                                enabled: true,
+                                isSystem: false,
+                                allowsHalfDay: true,
+                                constraints: { maxConsecutive: null, requiresNote: false }
+                              };
+                              setLeaveConfigs(prev => [...prev, newConf]);
+                              setNewAnnualName('');
+                              setIsAddingAnnual(false);
+                            }}
+                            className="px-4 py-1.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl shadow-xs disabled:opacity-40 cursor-pointer"
+                          >
+                            Add to Bank
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Auto-Adapting Wheel Pickers Grid */}
+                    {(() => {
+                      const annuals = leaveConfigs.filter(c => c.tier === 'annual');
+                      const gridColsClass = annuals.length === 1 ? 'grid-cols-1 max-w-xs mx-auto' :
+                                            annuals.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+                                            annuals.length === 3 ? 'grid-cols-1 sm:grid-cols-3' :
+                                            'grid-cols-2 md:grid-cols-4';
+                      return (
+                        <div className={`grid ${gridColsClass} gap-3`}>
+                          {annuals.map((conf) => (
+                            <AppleWheelPicker
+                              key={conf.id}
+                              code={conf.shortCode}
+                              label={conf.name}
+                              value={conf.quota}
+                              onChange={(val) => {
+                                setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: val } : c));
+                              }}
+                              min={0}
+                              max={45}
+                              customName={conf.name}
+                              onCustomNameChange={(val) => {
+                                setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, name: val, shortCode: deriveShortCode(val) } : c));
+                              }}
+                              color={conf.color}
+                              onColorChange={(val) => {
+                                setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, color: val } : c));
+                              }}
+                              onRemove={annuals.length > 1 ? () => {
+                                setLeaveConfigs(prev => prev.filter(c => c.id !== conf.id));
+                              } : null}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* TIER 2: Monthly Remote (WFH) */}
+                {onboardingTierTab === 'wfh' && (
+                  <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                    {(() => {
+                      const wfhConf = leaveConfigs.find(c => c.id === 'wfh') || { quota: 10, enabled: true, color: 'cyan', name: 'Work From Home' };
+                      return (
+                        <div className="flex flex-col gap-4">
+                          <div className="bg-card border border-border rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center font-bold">
+                                <Home size={18} />
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-bold text-foreground">Enable Work From Home (WFH)</h4>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  Enable monthly remote attendance tracking and daily check-in alerts.
+                                </p>
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={wfhConf.enabled !== false}
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                setLeaveConfigs(prev => prev.map(c => c.id === 'wfh' ? { ...c, enabled: isChecked } : c));
+                              }}
+                              className="w-5 h-5 accent-cyan-500 cursor-pointer"
+                            />
+                          </div>
+
+                          {wfhConf.enabled !== false && (
+                            <div className="max-w-xs mx-auto w-full">
+                              <AppleWheelPicker
+                                code="WFH"
+                                label="Monthly WFH"
+                                value={wfhConf.quota}
+                                onChange={(val) => {
+                                  setLeaveConfigs(prev => prev.map(c => c.id === 'wfh' ? { ...c, quota: val } : c));
+                                }}
+                                min={0}
+                                max={30}
+                                customName={wfhConf.name}
+                                onCustomNameChange={(val) => {
+                                  setLeaveConfigs(prev => prev.map(c => c.id === 'wfh' ? { ...c, name: val } : c));
+                                }}
+                                color={wfhConf.color || 'cyan'}
+                                onColorChange={(val) => {
+                                  setLeaveConfigs(prev => prev.map(c => c.id === 'wfh' ? { ...c, color: val } : c));
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* TIER 3: Special Benefits (Menstrual, Mental Health, Bereavement, Parental) */}
+                {onboardingTierTab === 'special' && (
+                  <div className="flex flex-col gap-3 animate-in fade-in duration-200">
+                    <p className="text-[11px] text-muted-foreground px-1">
+                      Bonus policy benefits that do <strong>not</strong> deduct from your annual vacation bank:
+                    </p>
+
+                    <div className="flex flex-col gap-2.5">
+                      {leaveConfigs.filter(c => c.tier === 'special').map(conf => {
+                        const iconMap = {
+                          menstrual: Heart,
+                          mental: Moon,
+                          bereavement: Umbrella,
+                          parental: Baby
+                        };
+                        const Icon = iconMap[conf.id] || Sparkles;
+
+                        return (
+                          <div
+                            key={conf.id}
+                            className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                              conf.enabled 
+                                ? 'bg-card border-border/80 shadow-xs' 
+                                : 'bg-muted/20 border-border/40 opacity-75'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                conf.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                              }`}>
+                                <Icon size={16} />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-bold text-foreground flex items-center gap-1.5 truncate">
+                                  {conf.name}
+                                  <span className="text-[10px] font-mono text-muted-foreground font-medium">
+                                    ({conf.cadence === 'month' ? `${conf.quota}d / mo` : conf.cadence === 'year' ? `${conf.quota}d / yr` : `${conf.quota} days`})
+                                  </span>
+                                </span>
+                                <span className="text-[10px] text-muted-foreground truncate">
+                                  {conf.constraints?.warningMessage || 'Independent benefit allowance'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {conf.enabled && (
+                                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: Math.max(1, c.quota - 1) } : c));
+                                    }}
+                                    className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="text-xs font-bold font-mono px-1.5 min-w-[20px] text-center">
+                                    {conf.quota}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: c.quota + 1 } : c));
+                                    }}
+                                    className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              )}
+                              <input
+                                type="checkbox"
+                                checked={conf.enabled}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, enabled: isChecked } : c));
+                                }}
+                                className="w-5 h-5 accent-primary cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 

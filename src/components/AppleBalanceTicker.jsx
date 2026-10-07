@@ -203,6 +203,10 @@ const AppleBalanceTicker = ({
       leaveType === 'wfh' ? 'cyan' :
       leaveType === 'el' ? 'orange' :
       leaveType === 'rh' ? 'green' :
+      leaveType === 'menstrual' ? 'pink' :
+      leaveType === 'mental' ? 'purple' :
+      leaveType === 'bereavement' ? 'indigo' :
+      leaveType === 'parental' ? 'amber' :
       'blue'
     );
     return COLOR_CONFIG[effectiveColorKey] || COLOR_CONFIG.blue;
@@ -347,7 +351,7 @@ const AppleBalanceTicker = ({
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="w-full max-w-sm p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-colors duration-300 ${theme.bg} ${theme.border}"
+          className={`w-full max-w-sm p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-colors duration-300 ${theme.bg} ${theme.border}`}
         >
           <div className={`p-1.5 rounded-xl bg-card border ${theme.border} ${theme.text} flex-shrink-0 mt-0.5 shadow-xs`}>
             <IconComponent size={18} />

@@ -4,13 +4,15 @@ import {
   Settings, X, Save, FileText, CheckCircle2, User, SlidersHorizontal, 
   LogIn, LogOut, Download, Upload, Table, AlertCircle, ShieldCheck, 
   RotateCw, Trash2, AlertTriangle, ChevronRight, Camera, Building2, 
-  Globe, Image as ImageIcon, Clock, Sparkles, Key, ExternalLink, Eye, EyeOff, Loader2, Bell
+  Globe, Image as ImageIcon, Clock, Sparkles, Key, ExternalLink, Eye, EyeOff, Loader2, Bell,
+  Plus, ChevronDown, ChevronUp, Shield, Info
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
 import HolidayManager from './HolidayManager';
 import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
+import { COLOR_PALETTE } from '../utils/colorUtils';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 import { 
   subscribeUserToPush, 
@@ -27,6 +29,7 @@ import {
   getStoredGeminiModel,
   setStoredGeminiModel
 } from '../services/aiAssistantService';
+import { buildInitialLeaveConfigs, deriveShortCode, DEFAULT_LEAVE_CONFIGS } from '../services/leaveConfigService';
 
 const SettingsModal = ({ 
   isOpen, 
@@ -37,6 +40,7 @@ const SettingsModal = ({
   quotas = { pl: 15, el: 10, rh: 1, wfh: 10 },
   leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Extra Leave', wfh: 'Work From Home' },
   leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
+  leaveConfigs: propLeaveConfigs = null,
   wfhPromptHour: propWfhPromptHour = '12',
   onSaveSettings,
   currentUser = null,
@@ -63,7 +67,104 @@ const SettingsModal = ({
   const [currentQuotas, setCurrentQuotas] = useState({ ...quotas });
   const [currentNames, setCurrentNames] = useState({ ...leaveNames });
   const [currentColors, setCurrentColors] = useState({ ...leaveColors });
+  const [currentConfigs, setCurrentConfigs] = useState(() => {
+    return buildInitialLeaveConfigs({
+      storedConfigs: propLeaveConfigs,
+      legacyQuotas: quotas,
+      legacyNames: leaveNames,
+      legacyColors: leaveColors,
+    });
+  });
+  const [quotasTierTab, setQuotasTierTab] = useState('annual'); // 'annual' | 'remote' | 'special'
+  const [expandedConfigId, setExpandedConfigId] = useState(null);
+  const [newAnnualCategoryName, setNewAnnualCategoryName] = useState('');
+  const [newSpecialCategoryName, setNewSpecialCategoryName] = useState('');
+  const [showAddAnnualForm, setShowAddAnnualForm] = useState(false);
+  const [showAddSpecialForm, setShowAddSpecialForm] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentConfigs(buildInitialLeaveConfigs({
+        storedConfigs: propLeaveConfigs,
+        legacyQuotas: quotas,
+        legacyNames: leaveNames,
+        legacyColors: leaveColors,
+      }));
+    }
+  }, [isOpen, propLeaveConfigs, quotas, leaveNames, leaveColors]);
+
+  // Mutator helpers for 3-tier configurations
+  const updateConfig = (id, updates) => {
+    setCurrentConfigs(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const next = { ...c, ...updates };
+      if (updates.constraints) {
+        next.constraints = { ...c.constraints, ...updates.constraints };
+      }
+      return next;
+    }));
+  };
+
+  const removeConfig = (id) => {
+    setCurrentConfigs(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleAddAnnualCategory = () => {
+    if (!newAnnualCategoryName.trim()) return;
+    const nameTrim = newAnnualCategoryName.trim();
+    const id = 'annual_' + Date.now();
+    const shortCode = deriveShortCode(nameTrim);
+    const newConfig = {
+      id,
+      name: nameTrim,
+      shortCode,
+      tier: 'annual',
+      color: 'indigo',
+      quota: 5,
+      cadence: 'year',
+      deductsFromAnnual: true,
+      enabled: true,
+      isSystem: false,
+      allowsHalfDay: true,
+      constraints: {
+        maxConsecutive: null,
+        requiresNote: false,
+        warningMessage: null,
+      }
+    };
+    setCurrentConfigs(prev => [...prev, newConfig]);
+    setNewAnnualCategoryName('');
+    setShowAddAnnualForm(false);
+  };
+
+  const handleAddSpecialCategory = () => {
+    if (!newSpecialCategoryName.trim()) return;
+    const nameTrim = newSpecialCategoryName.trim();
+    const id = 'special_' + Date.now();
+    const shortCode = deriveShortCode(nameTrim);
+    const newConfig = {
+      id,
+      name: nameTrim,
+      shortCode,
+      tier: 'special',
+      color: 'pink',
+      quota: 1,
+      cadence: 'month',
+      deductsFromAnnual: false,
+      enabled: true,
+      isSystem: false,
+      allowsHalfDay: true,
+      constraints: {
+        maxConsecutive: 1,
+        requiresNote: false,
+        warningMessage: null,
+      }
+    };
+    setCurrentConfigs(prev => [...prev, newConfig]);
+    setNewSpecialCategoryName('');
+    setShowAddSpecialForm(false);
+  };
 
   // Gemini AI State
   const [geminiKey, setGeminiKey] = useState(() => getStoredGeminiApiKey());
@@ -93,6 +194,10 @@ const SettingsModal = ({
     }
   }, [isOpen]);
 
+  const initialSerializedConfigs = JSON.stringify(
+    propLeaveConfigs || buildInitialLeaveConfigs({ legacyQuotas: quotas, legacyNames: leaveNames, legacyColors: leaveColors })
+  );
+
   const isDirty = (
     name.trim() !== (userName || '').trim() ||
     companyName.trim() !== (propCompanyName || '').trim() ||
@@ -100,9 +205,7 @@ const SettingsModal = ({
     String(wfhPromptHour) !== String(propWfhPromptHour || '12') ||
     geminiKey.trim() !== getStoredGeminiApiKey() ||
     selectedModel !== getStoredGeminiModel() ||
-    JSON.stringify(currentQuotas) !== JSON.stringify(quotas) ||
-    JSON.stringify(currentNames) !== JSON.stringify(leaveNames) ||
-    JSON.stringify(currentColors) !== JSON.stringify(leaveColors)
+    JSON.stringify(currentConfigs) !== initialSerializedConfigs
   );
 
   const handleDiscardChanges = () => {
@@ -112,9 +215,12 @@ const SettingsModal = ({
     setWfhPromptHour(propWfhPromptHour || '12');
     setGeminiKey(getStoredGeminiApiKey());
     setSelectedModel(getStoredGeminiModel());
-    setCurrentQuotas({ ...quotas });
-    setCurrentNames({ ...leaveNames });
-    setCurrentColors({ ...leaveColors });
+    setCurrentConfigs(buildInitialLeaveConfigs({
+      storedConfigs: propLeaveConfigs,
+      legacyQuotas: quotas,
+      legacyNames: leaveNames,
+      legacyColors: leaveColors,
+    }));
   };
 
   const handleTestGeminiKey = async () => {
@@ -197,15 +303,26 @@ const SettingsModal = ({
   const handleSave = () => {
     setStoredGeminiApiKey(geminiKey.trim());
     setStoredGeminiModel(selectedModel);
+
+    const updatedQuotas = {};
+    const updatedNames = {};
+    const updatedColors = {};
+    currentConfigs.forEach(c => {
+      updatedQuotas[c.id] = c.quota;
+      updatedNames[c.id] = c.name;
+      updatedColors[c.id] = c.color;
+    });
+
     if (onSaveSettings) {
       onSaveSettings({
         name: name.trim() || 'User',
         companyName: companyName.trim(),
         companyLogoUrl: companyLogoUrl,
         avatarUrl: avatarUrl,
-        quotas: currentQuotas,
-        names: currentNames,
-        colors: currentColors,
+        quotas: updatedQuotas,
+        names: updatedNames,
+        colors: updatedColors,
+        leaveConfigs: currentConfigs,
         wfhPromptHour: String(wfhPromptHour)
       });
     }
@@ -677,69 +794,382 @@ const SettingsModal = ({
                 </motion.div>
               )}
 
-              {activeTab === 'quotas' && (
-                <motion.div 
-                  key="quotas"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18, ease: "easeInOut" }}
-                  className="flex flex-col gap-4"
-                >
-                  <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5 px-1">
-                    <SlidersHorizontal size={14} className="text-cyan-500" /> Leave Quotas, Colors & Category Names
-                  </span>
+              {activeTab === 'quotas' && (() => {
+                const annualConfigs = currentConfigs.filter(c => c.tier === 'annual');
+                const wfhConfig = currentConfigs.find(c => c.id === 'wfh') || { 
+                  id: 'wfh', name: 'Work From Home', shortCode: 'WFH', tier: 'monthly', color: 'cyan', quota: 10, cadence: 'month', deductsFromAnnual: false, enabled: true, constraints: { maxConsecutive: 3 } 
+                };
+                const specialConfigs = currentConfigs.filter(c => c.tier === 'special');
 
-                  {/* Quotas & Custom Names Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <AppleWheelPicker
-                      code="PL"
-                      label="Planned Leave"
-                      value={currentQuotas.pl}
-                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, pl: val }))}
-                      min={0} max={30}
-                      customName={currentNames.pl}
-                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, pl: val }))}
-                      color={currentColors.pl}
-                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, pl: val }))}
-                    />
+                return (
+                  <motion.div 
+                    key="quotas"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.18, ease: "easeInOut" }}
+                    className="flex flex-col gap-4"
+                  >
+                    {/* 3-Tier Segmented Sub-Tab Switcher */}
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted/60 border border-border/80 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => setQuotasTierTab('annual')}
+                        className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          quotasTierTab === 'annual'
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <span>🏖️ Annual Bank</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
+                          {annualConfigs.length}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuotasTierTab('remote')}
+                        className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          quotasTierTab === 'remote'
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <span>🏠 Remote</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
+                          {wfhConfig.enabled ? `${wfhConfig.quota}/mo` : 'Off'}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuotasTierTab('special')}
+                        className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          quotasTierTab === 'special'
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <span>🌸 Special</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
+                          {specialConfigs.filter(c => c.enabled).length}
+                        </span>
+                      </button>
+                    </div>
 
-                    <AppleWheelPicker
-                      code="EL"
-                      label="Emergency Leave"
-                      value={currentQuotas.el}
-                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, el: val }))}
-                      min={0} max={20}
-                      customName={currentNames.el}
-                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, el: val }))}
-                      color={currentColors.el}
-                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, el: val }))}
-                    />
+                    {/* ─── TIER 1: ANNUAL LEAVE BANK ─── */}
+                    {quotasTierTab === 'annual' && (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                            <SlidersHorizontal size={14} className="text-cyan-500" /> Tier 1: Annual Vacation Bank
+                          </span>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            Deducts from yearly vacation allowance
+                          </span>
+                        </div>
 
-                    <AppleWheelPicker
-                      code="RH"
-                      label="Extra Leave"
-                      value={currentQuotas.rh}
-                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, rh: val }))}
-                      min={0} max={10}
-                      customName={currentNames.rh}
-                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, rh: val }))}
-                      color={currentColors.rh}
-                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, rh: val }))}
-                    />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {annualConfigs.map((c) => (
+                            <div key={c.id} className="flex flex-col gap-2">
+                              <AppleWheelPicker
+                                code={c.shortCode}
+                                label={c.name}
+                                value={c.quota}
+                                onChange={(val) => updateConfig(c.id, { quota: val })}
+                                min={0} 
+                                max={45}
+                                customName={c.name}
+                                onCustomNameChange={(val) => updateConfig(c.id, { name: val, shortCode: deriveShortCode(val) })}
+                                color={c.color}
+                                onColorChange={(val) => updateConfig(c.id, { color: val })}
+                                onRemove={annualConfigs.length > 1 ? () => removeConfig(c.id) : null}
+                              />
 
-                    <AppleWheelPicker
-                      code="WFH"
-                      label="Monthly WFH"
-                      value={currentQuotas.wfh}
-                      onChange={(val) => setCurrentQuotas(prev => ({ ...prev, wfh: val }))}
-                      min={0} max={20}
-                      customName={currentNames.wfh}
-                      onCustomNameChange={(val) => setCurrentNames(prev => ({ ...prev, wfh: val }))}
-                      color={currentColors.wfh}
-                      onColorChange={(val) => setCurrentColors(prev => ({ ...prev, wfh: val }))}
-                    />
-                  </div>
+                              {/* Policy Rules & Constraints Drawer */}
+                              <div className="bg-card/70 border border-border/80 rounded-2xl p-2.5 flex flex-col gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedConfigId(expandedConfigId === c.id ? null : c.id)}
+                                  className="w-full flex items-center justify-between text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                >
+                                  <span className="flex items-center gap-1.5 font-mono">
+                                    <Shield size={12} className="text-amber-500" /> Rules & Policy Constraints
+                                  </span>
+                                  {expandedConfigId === c.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                </button>
+
+                                {expandedConfigId === c.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="flex flex-col gap-2 pt-2 border-t border-border/50"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[11px] font-medium text-muted-foreground font-mono">Max Consecutive Days</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="30"
+                                        placeholder="None"
+                                        value={c.constraints?.maxConsecutive || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                                          updateConfig(c.id, { constraints: { maxConsecutive: val } });
+                                        }}
+                                        className="w-20 bg-muted border border-border rounded-xl px-2.5 py-1 text-xs font-mono font-bold text-foreground text-right"
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[11px] font-medium text-muted-foreground font-mono">Require Note / Document</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => updateConfig(c.id, { constraints: { requiresNote: !c.constraints?.requiresNote } })}
+                                        className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                                          c.constraints?.requiresNote ? 'bg-primary' : 'bg-muted border border-border'
+                                        }`}
+                                      >
+                                        <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-all ${
+                                          c.constraints?.requiresNote ? 'left-4.5' : 'left-0.5'
+                                        }`} />
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Add Custom Annual Category */}
+                        {showAddAnnualForm ? (
+                          <div className="p-3 bg-muted/40 border border-border rounded-2xl flex flex-col gap-2.5">
+                            <span className="text-xs font-bold text-foreground font-mono">New Annual Leave Category</span>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="e.g. Sabbatical, Floating Holiday"
+                                value={newAnnualCategoryName}
+                                onChange={(e) => setNewAnnualCategoryName(e.target.value)}
+                                className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddAnnualCategory}
+                                className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl cursor-pointer"
+                              >
+                                Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowAddAnnualForm(false)}
+                                className="px-3 py-2 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowAddAnnualForm(true)}
+                            className="w-full py-3 border border-dashed border-border/80 hover:border-foreground/40 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                          >
+                            <Plus size={14} /> Add Custom Annual Category
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ─── TIER 2: MONTHLY REMOTE (WFH) ─── */}
+                    {quotasTierTab === 'remote' && (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between p-4 bg-muted/30 border border-border/60 rounded-3xl">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-foreground">Enable Remote / Work From Home</span>
+                            <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                              Allow logging WFH in daily check-in and booking bar
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateConfig('wfh', { enabled: !wfhConfig.enabled })}
+                            className={`w-10 h-6 rounded-full transition-colors relative cursor-pointer ${
+                              wfhConfig.enabled ? 'bg-cyan-500' : 'bg-muted border border-border'
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${
+                              wfhConfig.enabled ? 'left-5' : 'left-1'
+                            }`} />
+                          </button>
+                        </div>
+
+                        {wfhConfig.enabled && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <AppleWheelPicker
+                              code="WFH"
+                              label="Monthly WFH Allowance"
+                              value={wfhConfig.quota}
+                              onChange={(val) => updateConfig('wfh', { quota: val })}
+                              min={0}
+                              max={31}
+                              customName={wfhConfig.name}
+                              onCustomNameChange={(val) => updateConfig('wfh', { name: val, shortCode: deriveShortCode(val) })}
+                              color={wfhConfig.color}
+                              onColorChange={(val) => updateConfig('wfh', { color: val })}
+                            />
+
+                            <div className="p-4 bg-card border border-border/80 rounded-2xl flex flex-col justify-between gap-3">
+                              <div>
+                                <span className="text-xs font-black uppercase font-mono tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                  <Shield size={14} className="text-cyan-500" /> Consecutive WFH Policy Limit
+                                </span>
+                                <p className="text-[11px] text-muted-foreground mt-1">
+                                  Show an alert if user exceeds consecutive WFH days without coming into the office.
+                                </p>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-foreground font-mono">Max Consecutive Days</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="15"
+                                  value={wfhConfig.constraints?.maxConsecutive || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                                    updateConfig('wfh', { constraints: { maxConsecutive: val } });
+                                  }}
+                                  className="w-20 bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground text-right"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ─── TIER 3: SPECIAL & BONUS BENEFITS ─── */}
+                    {quotasTierTab === 'special' && (
+                      <div className="flex flex-col gap-3">
+                        <div className="p-3 bg-pink-500/10 border border-pink-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-pink-600 dark:text-pink-400">
+                          <Info size={16} className="flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Independent Balances:</strong> Special benefits (Menstrual, Mental Health, Bereavement, Parental) do <strong>NOT</strong> deduct from your annual vacation bank.
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {specialConfigs.map((c) => (
+                            <div key={c.id} className="p-3.5 bg-card border border-border/80 rounded-2xl flex flex-col gap-2.5 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center font-mono text-xs font-black text-foreground border border-border">
+                                    {c.shortCode}
+                                  </span>
+                                  <div>
+                                    <input
+                                      type="text"
+                                      value={c.name}
+                                      onChange={(e) => updateConfig(c.id, { name: e.target.value, shortCode: deriveShortCode(e.target.value) })}
+                                      className="text-xs font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none"
+                                    />
+                                    <div className="text-[10px] text-muted-foreground font-mono">
+                                      {c.cadence === 'month' ? 'Per Calendar Month' : c.cadence === 'year' ? 'Per Year' : 'Per Occurrence'}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateConfig(c.id, { enabled: !c.enabled })}
+                                    className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                                      c.enabled ? 'bg-primary' : 'bg-muted border border-border'
+                                    }`}
+                                  >
+                                    <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-all ${
+                                      c.enabled ? 'left-4.5' : 'left-0.5'
+                                    }`} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeConfig(c.id)}
+                                    className="p-1 text-muted-foreground hover:text-red-500 rounded-md transition-colors cursor-pointer"
+                                    title="Remove Benefit"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {c.enabled && (
+                                <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-muted-foreground font-mono">Allowance Quota</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateConfig(c.id, { quota: Math.max(1, c.quota - 1) })}
+                                      className="w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center text-xs font-black cursor-pointer hover:bg-muted/80"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-8 text-center text-xs font-mono font-black text-foreground">
+                                      {c.quota}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateConfig(c.id, { quota: c.quota + 1 })}
+                                      className="w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center text-xs font-black cursor-pointer hover:bg-muted/80"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Add Custom Special Benefit */}
+                        {showAddSpecialForm ? (
+                          <div className="p-3 bg-muted/40 border border-border rounded-2xl flex flex-col gap-2.5">
+                            <span className="text-xs font-bold text-foreground font-mono">New Special Benefit Category</span>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="e.g. Wellness Break, Volunteer Day"
+                                value={newSpecialCategoryName}
+                                onChange={(e) => setNewSpecialCategoryName(e.target.value)}
+                                className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddSpecialCategory}
+                                className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl cursor-pointer"
+                              >
+                                Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowAddSpecialForm(false)}
+                                className="px-3 py-2 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowAddSpecialForm(true)}
+                            className="w-full py-3 border border-dashed border-border/80 hover:border-foreground/40 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                          >
+                            <Plus size={14} /> Add Custom Special Benefit
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                   {/* Daily Attendance Check-in Prompt Preference */}
                   <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between">
@@ -845,7 +1275,8 @@ const SettingsModal = ({
                     </div>
                   </div>
                 </motion.div>
-              )}
+              );
+            })()}
 
               {/* Gemini AI Assistant Settings Tab */}
               {activeTab === 'ai' && (

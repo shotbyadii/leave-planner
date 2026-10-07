@@ -29,6 +29,7 @@ import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import AppleBalanceTicker from './components/AppleBalanceTicker';
 import { getLeaveColor, getShortform, COLOR_PALETTE } from './utils/colorUtils';
+import { buildInitialLeaveConfigs } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
@@ -143,6 +144,34 @@ function App() {
     rh: { total: parseInt(localStorage.getItem('quota_rh') || '1', 10), used: 0, label: leaveNames.rh || 'Extra Leave', color: leaveColors.rh || 'green', bg: getLeaveColor(leaveColors.rh).bg, badge: getLeaveColor(leaveColors.rh).badge },
     wfh: { total: parseInt(localStorage.getItem('quota_wfh') || '10', 10), used: 0, label: leaveNames.wfh || 'Work From Home', color: leaveColors.wfh || 'cyan', bg: getLeaveColor(leaveColors.wfh).bg, badge: getLeaveColor(leaveColors.wfh).badge }
   });
+
+  const [leaveConfigs, setLeaveConfigs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('leave_configs');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return buildInitialLeaveConfigs({
+      legacyQuotas: {
+        pl: parseInt(localStorage.getItem('quota_pl') || '15', 10),
+        el: parseInt(localStorage.getItem('quota_el') || '10', 10),
+        rh: parseInt(localStorage.getItem('quota_rh') || '1', 10),
+        wfh: parseInt(localStorage.getItem('quota_wfh') || '10', 10),
+      },
+      legacyNames: (function() {
+        try {
+          const s = localStorage.getItem('leave_names');
+          return s ? JSON.parse(s) : null;
+        } catch (e) { return null; }
+      })(),
+      legacyColors: (function() {
+        try {
+          const s = localStorage.getItem('leave_colors');
+          return s ? JSON.parse(s) : null;
+        } catch (e) { return null; }
+      })()
+    });
+  });
+
   const mainScrollContainerRef = useRef(null);
   const [bookedDates, setBookedDates] = useState([]);
   const [leavePlans, setLeavePlans] = useState([]);
@@ -524,6 +553,19 @@ function App() {
         badge: getLeaveColor(colorsToUse.wfh || prev.wfh?.color || 'cyan').badge
       }
     }));
+
+    if (profile.leave_configs) {
+      setLeaveConfigs(profile.leave_configs);
+      localStorage.setItem('leave_configs', JSON.stringify(profile.leave_configs));
+    } else {
+      const built = buildInitialLeaveConfigs({
+        legacyQuotas: { pl: plQuota, el: elQuota, rh: rhQuota, wfh: wfhQuota },
+        legacyNames: namesToUse,
+        legacyColors: colorsToUse,
+      });
+      setLeaveConfigs(built);
+      localStorage.setItem('leave_configs', JSON.stringify(built));
+    }
   };
 
   const checkAuthUser = async () => {
@@ -1021,16 +1063,39 @@ function App() {
       .filter(d => d.type === 'wfh' && typeof d.date === 'string' && d.date.startsWith(targetMonthKey))
       .reduce((sum, d) => sum + (d.duration || 1), 0);
 
-    setLeaves(prev => ({
-      ...prev,
-      pl: { ...prev.pl, used: plUsed },
-      el: { ...prev.el, used: elUsed },
-      rh: { ...prev.rh, used: rhUsed },
-      wfh: { ...prev.wfh, used: wfhUsed, total: prev.wfh?.total || parseInt(localStorage.getItem('quota_wfh') || '10', 10) }
-    }));
+    setLeaves(prev => {
+      const next = {
+        ...prev,
+        pl: { ...prev.pl, used: plUsed },
+        el: { ...prev.el, used: elUsed },
+        rh: { ...prev.rh, used: rhUsed },
+        wfh: { ...prev.wfh, used: wfhUsed, total: prev.wfh?.total || parseInt(localStorage.getItem('quota_wfh') || '10', 10) }
+      };
+
+      if (Array.isArray(leaveConfigs)) {
+        leaveConfigs.forEach(c => {
+          const usedForType = datesArray
+            .filter(d => d.type === c.id && (c.cadence === 'month' ? typeof d.date === 'string' && d.date.startsWith(targetMonthKey) : true))
+            .reduce((sum, d) => sum + (d.duration || 1), 0);
+          const clr = c.color || 'blue';
+          next[c.id] = {
+            total: c.quota,
+            used: usedForType,
+            label: c.name,
+            color: clr,
+            bg: getLeaveColor(clr).bg,
+            badge: getLeaveColor(clr).badge,
+            tier: c.tier,
+            deductsFromAnnual: c.deductsFromAnnual
+          };
+        });
+      }
+
+      return next;
+    });
   };
 
-  const handleSaveSettings = async ({ name, companyName, companyLogoUrl, avatarUrl, quotas, names, colors, wfhPromptHour: newPromptHour }) => {
+  const handleSaveSettings = async ({ name, companyName, companyLogoUrl, avatarUrl, quotas, names, colors, leaveConfigs: newLeaveConfigs, wfhPromptHour: newPromptHour }) => {
     if (name) {
       setUserName(name);
       localStorage.setItem('user_name', name);
@@ -1059,11 +1124,15 @@ function App() {
         setHasPromptedWfh(false);
       }
     }
+    if (newLeaveConfigs) {
+      setLeaveConfigs(newLeaveConfigs);
+      localStorage.setItem('leave_configs', JSON.stringify(newLeaveConfigs));
+    }
     if (quotas) {
-      localStorage.setItem('quota_pl', quotas.pl);
-      localStorage.setItem('quota_el', quotas.el);
-      localStorage.setItem('quota_rh', quotas.rh);
-      localStorage.setItem('quota_wfh', quotas.wfh);
+      if (quotas.pl !== undefined) localStorage.setItem('quota_pl', quotas.pl);
+      if (quotas.el !== undefined) localStorage.setItem('quota_el', quotas.el);
+      if (quotas.rh !== undefined) localStorage.setItem('quota_rh', quotas.rh);
+      if (quotas.wfh !== undefined) localStorage.setItem('quota_wfh', quotas.wfh);
     }
     if (names) {
       setLeaveNames(names);
@@ -1074,7 +1143,7 @@ function App() {
       localStorage.setItem('leave_colors', JSON.stringify(colors));
     }
 
-    if (names || colors || quotas) {
+    if (names || colors || quotas || newLeaveConfigs) {
       setLeaves(prev => {
         const next = { ...prev };
         const activeNames = names || leaveNames;
@@ -1093,6 +1162,23 @@ function App() {
         if (activeColors.el) { next.el.color = activeColors.el; next.el.bg = getLeaveColor(activeColors.el).bg; next.el.badge = getLeaveColor(activeColors.el).badge; }
         if (activeColors.rh) { next.rh.color = activeColors.rh; next.rh.bg = getLeaveColor(activeColors.rh).bg; next.rh.badge = getLeaveColor(activeColors.rh).badge; }
 
+        if (Array.isArray(newLeaveConfigs)) {
+          newLeaveConfigs.forEach(c => {
+            const clr = c.color || 'blue';
+            next[c.id] = {
+              ...(next[c.id] || {}),
+              total: c.quota,
+              used: next[c.id]?.used || 0,
+              label: c.name,
+              color: clr,
+              bg: getLeaveColor(clr).bg,
+              badge: getLeaveColor(clr).badge,
+              tier: c.tier,
+              deductsFromAnnual: c.deductsFromAnnual
+            };
+          });
+        }
+
         return { ...next };
       });
     }
@@ -1109,6 +1195,7 @@ function App() {
         quota_wfh: quotas ? quotas.wfh : parseInt(localStorage.getItem('quota_wfh') || '10', 10),
         leave_names: names || leaveNames,
         leave_colors: colors || leaveColors,
+        leave_configs: newLeaveConfigs || leaveConfigs,
         wfh_prompt_hour: newPromptHour !== undefined ? newPromptHour : (wfhPromptHour || '12')
       });
     } else {
@@ -1128,6 +1215,7 @@ function App() {
           },
           names: names || leaveNames,
           colors: colors || leaveColors,
+          leave_configs: newLeaveConfigs || leaveConfigs,
           wfhPromptHour: newPromptHour !== undefined ? newPromptHour : (wfhPromptHour || '12')
         });
       }
@@ -1302,15 +1390,17 @@ function App() {
     }
     const dates = previewDates;
     const actualLeaves = dates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
+    const type = (mobileLeaveType || 'pl').toLowerCase();
+    const activeConfig = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
+    const allowsHalf = activeConfig ? activeConfig.allowsHalfDay !== false : (type === 'el' || type === 'pl');
     const elDiffHours = mobileToHour > mobileFromHour ? mobileToHour - mobileFromHour : 0;
-    const isHalfDay = mobileLeaveType === 'el' && dates.length === 1 && elDiffHours > 0 && elDiffHours < 4.5;
+    const isHalfDay = allowsHalf && dates.length === 1 && elDiffHours > 0 && elDiffHours < 4.5;
     const durationPerDay = isHalfDay ? 0.5 : 1;
     const leavesNeeded = isHalfDay ? 0.5 : actualLeaves;
 
-    const type = (mobileLeaveType || 'pl').toLowerCase();
-    const maxWfh = 10;
+    const maxWfh = activeConfig?.quota || 10;
     let curBalance = 0;
-    let total = 15;
+    let total = activeConfig?.quota || (leaves[type]?.total || 15);
 
     if (type === 'wfh') {
       const targetMonthKey = (dates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
@@ -1320,19 +1410,18 @@ function App() {
       total = maxWfh;
       curBalance = Math.max(0, maxWfh - wfhUsedThisMonth);
     } else {
-      total = leaves[type]?.total || (type === 'el' ? 10 : type === 'rh' ? 1 : 15);
       const used = leaves[type]?.used || 0;
       curBalance = Math.max(0, total - used);
     }
     const targetBalance = Math.max(0, curBalance - leavesNeeded);
-    const chosenColor = (leaveColors && leaveColors[type]) || (type === 'el' ? 'orange' : type === 'rh' ? 'green' : type === 'wfh' ? 'cyan' : 'blue');
+    const chosenColor = activeConfig?.color || (leaveColors && leaveColors[type]) || (type === 'el' ? 'orange' : type === 'rh' ? 'green' : type === 'wfh' ? 'cyan' : 'blue');
 
     setMobileTickerData({
       initialValue: curBalance,
       targetValue: targetBalance,
       totalQuota: total,
       leaveType: type,
-      leaveLabel: leaveNames[type] || type.toUpperCase(),
+      leaveLabel: activeConfig?.name || leaveNames[type] || type.toUpperCase(),
       leaveColor: chosenColor,
       deductedCount: leavesNeeded,
       dates: [...dates],
@@ -2606,66 +2695,76 @@ function App() {
 
                       <div>
                         <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-2 block">Leave Type</label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {[
-                            { key: 'pl', label: 'PL', left: `${leaves.pl.total - leaves.pl.used} left` },
-                            { key: 'el', label: 'EL', left: `${leaves.el.total - leaves.el.used} left` },
-                            { key: 'rh', label: 'RH', left: `${leaves.rh.total - leaves.rh.used} left` },
-                            { key: 'wfh', label: 'WFH', left: 'Max 10/mo' }
-                          ].map(item => {
-                            const isActive = mobileLeaveType === item.key;
-                            const colors = {
-                              pl: { border: 'border-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', shadow: 'shadow-blue-500/20' },
-                              el: { border: 'border-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', text: 'text-orange-700 dark:text-orange-400', shadow: 'shadow-orange-500/20' },
-                              rh: { border: 'border-green-500', bg: 'bg-green-50 dark:bg-green-500/10', text: 'text-green-700 dark:text-green-400', shadow: 'shadow-green-500/20' },
-                              wfh: { border: 'border-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-500/10', text: 'text-cyan-700 dark:text-cyan-400', shadow: 'shadow-cyan-500/20' }
-                            };
-                            const colorStyle = colors[item.key] || { border: 'border-border', bg: 'bg-card', text: 'text-muted-foreground', shadow: '' };
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                          {(Array.isArray(leaveConfigs) ? leaveConfigs.filter(c => c.enabled) : [
+                            { id: 'pl', name: 'Planned', shortCode: 'PL', color: 'blue' },
+                            { id: 'el', name: 'Emergency', shortCode: 'EL', color: 'orange' },
+                            { id: 'rh', name: 'Restricted', shortCode: 'RH', color: 'green' },
+                            { id: 'wfh', name: 'WFH', shortCode: 'WFH', color: 'cyan' }
+                          ]).map(item => {
+                            const isActive = mobileLeaveType === item.id;
+                            const remaining = item.id === 'wfh'
+                              ? `${Math.max(0, (item.quota || 10) - bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(getTodayStr().substring(0, 7))).length)}/mo`
+                              : item.cadence === 'month'
+                                ? `${Math.max(0, (item.quota || 1) - (leaves[item.id]?.used || 0))}/mo`
+                                : `${Math.max(0, (item.quota || leaves[item.id]?.total || 10) - (leaves[item.id]?.used || 0))} left`;
+
+                            const theme = getLeaveTheme(item.color || 'blue');
                             return (
                               <button
-                                key={item.key}
-                                id={item.key === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
+                                key={item.id}
+                                id={item.id === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
                                 type="button"
                                 onClick={() => {
-                                  setMobileLeaveType(item.key);
+                                  setMobileLeaveType(item.id);
                                   if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
                                 }}
-                                className={`py-3 px-1 rounded-xl border-2 transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                                  isActive ? `${colorStyle.border} ${colorStyle.bg} ${colorStyle.text} shadow-sm ${colorStyle.shadow} ring-1 ring-inset ring-black/5` : 'border-border bg-card text-muted-foreground opacity-60'
+                                className={`py-2.5 px-1.5 rounded-xl border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                  isActive
+                                    ? `${theme.activeBoxBg} ${theme.activeBoxBorder} ${theme.activeText} shadow-sm ring-1 ring-inset ring-black/5`
+                                    : 'border-border bg-card text-muted-foreground opacity-70 hover:opacity-100'
                                 }`}
                               >
-                                <span className="text-[11px] font-black uppercase tracking-widest leading-none">{item.label}</span>
-                                <span className="text-[8px] font-bold opacity-80 leading-none truncate">{item.left}</span>
+                                <span className="text-[11px] font-black uppercase tracking-wider leading-none font-mono">
+                                  {item.shortCode || getShortform(item.name)}
+                                </span>
+                                <span className="text-[8px] font-bold opacity-80 leading-none truncate font-mono">
+                                  {remaining}
+                                </span>
                               </button>
                             );
                           })}
                         </div>
                       </div>
 
-                      {/* EL Warning synced with desktop */}
+                      {/* Policy Constraints Warning synced with desktop */}
                       {mobileLeaveType === 'el' && checkSequentialELWarning(previewDates.filter(d => !isHoliday(d) && !isWeekend(d)), bookedDates) && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
                           <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-                          <div className="text-xs text-red-800">
-                            <span className="font-black block mb-1 uppercase tracking-wider text-[10px]">Medical Certificate Required</span>
+                          <div className="text-xs text-red-600 dark:text-red-400">
+                            <span className="font-black block mb-1 uppercase tracking-wider text-[10px] font-mono">Medical Certificate Required</span>
                             You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
                           </div>
                         </div>
                       )}
 
-                      {mobileLeaveType === 'el' && previewDates.length === 1 && (
-                        <div className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-xl flex flex-col gap-3">
-                          <div className="flex items-center gap-2 text-orange-600">
-                            <AlertTriangle size={14} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">Partial Day Selection</span>
+                      {(() => {
+                        const activeCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
+                        const allowsHalf = activeCfg ? activeCfg.allowsHalfDay !== false : (mobileLeaveType === 'el' || mobileLeaveType === 'pl');
+                        return allowsHalf && previewDates.length === 1 && (
+                          <div className="p-3 bg-muted/40 border border-border/80 rounded-2xl flex flex-col gap-3">
+                            <div className="flex items-center gap-2 text-foreground text-xs font-bold font-mono">
+                              <Sparkles size={14} className="text-cyan-500" />
+                              <span>Partial Day Hours (Select &lt; 4.5 hrs for Half-Day)</span>
+                            </div>
+                            <TimePicker
+                              fromHour={mobileFromHour}
+                              toHour={mobileToHour}
+                              onChange={(f, t) => { setMobileFromHour(f); setMobileToHour(t); }}
+                            />
                           </div>
-                          <TimePicker
-                            fromHour={mobileFromHour}
-                            toHour={mobileToHour}
-                            onChange={(f, t) => { setMobileFromHour(f); setMobileToHour(t); }}
-                          />
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       <div>
                         <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Note (Optional)</label>
@@ -2914,6 +3013,7 @@ function App() {
             bookedDates={bookedDates}
             leaveNames={leaveNames}
             leaveColors={leaveColors}
+            leaveConfigs={leaveConfigs}
             suggestedPlanName={suggestedPlanName}
             onAdvanceTutorial={isTutorialActive ? () => setTutorialStepIndex(prev => prev + 1) : undefined}
             forceExpandModal={isTutorialActive && (tutorialStepIndex === 4 || tutorialStepIndex === 5)}
@@ -2985,6 +3085,7 @@ function App() {
             maxWfh={10}
             todayStr={todayStr}
             bookedDates={bookedDates}
+            leaveConfigs={leaveConfigs}
             leaveNames={leaveNames}
             leaveColors={leaveColors}
             wfhPromptHour={wfhPromptHour}
@@ -3048,6 +3149,7 @@ function App() {
             }}
             leaveNames={leaveNames}
             leaveColors={leaveColors}
+            leaveConfigs={leaveConfigs}
             wfhPromptHour={wfhPromptHour}
             onSaveSettings={handleSaveSettings}
             currentUser={currentUser}
@@ -3137,6 +3239,7 @@ function App() {
       <OnboardingModal
         isOpen={onboardingOpen}
         initialName={userName}
+        leaveConfigs={leaveConfigs}
         onClose={() => setOnboardingOpen(false)}
         onComplete={async (data) => {
           setWfhModalOpen(false);

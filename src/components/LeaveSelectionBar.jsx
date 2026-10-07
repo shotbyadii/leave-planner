@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Check, X, AlertTriangle, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Check, X, AlertTriangle, ArrowRight, Sparkles, SlidersHorizontal, ShieldAlert, Heart, Calendar, Clock } from 'lucide-react';
 import { isHoliday, isWeekend, publicHolidays } from '../data/holidays';
-import { checkSequentialELWarning } from '../utils/leaveOptimizer';
 import { TimePicker } from './TimePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppleBalanceTicker from './AppleBalanceTicker';
 import { getShortform, getLeaveColor, getLeaveTheme } from '../utils/colorUtils';
+import { DEFAULT_LEAVE_CONFIGS, checkLeaveConstraints, buildInitialLeaveConfigs } from '../services/leaveConfigService';
 
 const LeaveSelectionBar = ({ 
   selectionStart, 
-  previewDates, 
+  previewDates = [], 
   onCancel, 
   onApply, 
-  balances,
+  balances = {},
   leaves = {},
+  leaveConfigs = null,
   maxWfh = 10,
   bookedDates = [],
   leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' },
@@ -27,65 +28,129 @@ const LeaveSelectionBar = ({
 
   const dates = previewDates.length > 0 ? previewDates : (selectionStart ? [selectionStart] : []);
   const targetMonthKey = (dates[0] || '').substring(0, 7) || new Date().toISOString().substring(0, 7);
-  const wfhUsedThisMonth = Array.isArray(bookedDates)
-    ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).length
-    : 0;
-  const wfhRemaining = Math.max(0, maxWfh - wfhUsedThisMonth);
 
-  const effectiveBalances = isTutorialMode 
-    ? { pl: 15, el: 10, rh: 1, wfh: 10 }
-    : {
-        pl: leaves?.pl ? Math.max(0, leaves.pl.total - leaves.pl.used) : (balances?.pl ?? 15),
-        el: leaves?.el ? Math.max(0, leaves.el.total - leaves.el.used) : (balances?.el ?? 10),
-        rh: leaves?.rh ? Math.max(0, leaves.rh.total - leaves.rh.used) : (balances?.rh ?? 1),
-        wfh: wfhRemaining,
-        ...balances
-      };
+  // Active configurations for all categories
+  const activeConfigs = useMemo(() => {
+    const rawConfigs = Array.isArray(leaveConfigs) && leaveConfigs.length > 0
+      ? leaveConfigs
+      : buildInitialLeaveConfigs({ legacyNames: leaveNames, legacyColors: leaveColors });
+    return rawConfigs.filter(c => c.enabled !== false);
+  }, [leaveConfigs, leaveNames, leaveColors]);
+
+  const targetWfhQuota = useMemo(() => {
+    const wfhConf = activeConfigs.find(c => c.id === 'wfh');
+    return wfhConf ? wfhConf.quota : maxWfh;
+  }, [activeConfigs, maxWfh]);
+
+  const wfhUsedThisMonth = useMemo(() => {
+    return Array.isArray(bookedDates)
+      ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).reduce((sum, b) => sum + (b.duration || 1), 0)
+      : 0;
+  }, [bookedDates, targetMonthKey]);
+
+  const wfhRemaining = Math.max(0, targetWfhQuota - wfhUsedThisMonth);
+
+  // Calculate dynamic balances for all categories
+  const effectiveBalances = useMemo(() => {
+    if (isTutorialMode) {
+      return { pl: 15, el: 10, rh: 1, wfh: 10 };
+    }
+
+    const map = { wfh: wfhRemaining };
+    const curYear = new Date().getFullYear();
+
+    for (const conf of activeConfigs) {
+      if (conf.id === 'wfh') continue;
+
+      if (balances && balances[conf.id] !== undefined) {
+        map[conf.id] = Number(balances[conf.id]);
+        continue;
+      }
+
+      if (conf.tier === 'annual') {
+        const used = bookedDates
+          .filter(b => b && b.type === conf.id && typeof b.date === 'string' && b.date.startsWith(String(curYear)))
+          .reduce((sum, b) => sum + (b.duration || 1), 0);
+        map[conf.id] = Math.max(0, conf.quota - used);
+      } else if (conf.tier === 'special') {
+        if (conf.cadence === 'month') {
+          const used = bookedDates
+            .filter(b => b && b.type === conf.id && typeof b.date === 'string' && b.date.startsWith(targetMonthKey))
+            .reduce((sum, b) => sum + (b.duration || 1), 0);
+          map[conf.id] = Math.max(0, conf.quota - used);
+        } else if (conf.cadence === 'year') {
+          const used = bookedDates
+            .filter(b => b && b.type === conf.id && typeof b.date === 'string' && b.date.startsWith(String(curYear)))
+            .reduce((sum, b) => sum + (b.duration || 1), 0);
+          map[conf.id] = Math.max(0, conf.quota - used);
+        } else {
+          const used = bookedDates
+            .filter(b => b && b.type === conf.id)
+            .reduce((sum, b) => sum + (b.duration || 1), 0);
+          map[conf.id] = Math.max(0, conf.quota - used);
+        }
+      }
+    }
+    return map;
+  }, [isTutorialMode, activeConfigs, balances, bookedDates, targetMonthKey, wfhRemaining]);
 
   const [internalExpanded, setIsExpanded] = useState(false);
   const isExpanded = forceExpandModal || internalExpanded;
   const [tickerData, setTickerData] = useState(null);
 
+  // Active Tier tab in modal: 'annual' | 'special' | 'monthly'
+  const [activeTierTab, setActiveTierTab] = useState('annual');
+
   const [selectedType, setSelectedType] = useState(isTutorialMode ? null : 'pl');
   const [toHour, setToHour] = useState(18);
-  const [note, setNote] = useState('');
   const [fromHour, setFromHour] = useState(9);
+  const [note, setNote] = useState('');
 
-  useEffect(() => {
-    if (!isExpanded) {
-      setTickerData(null);
-    }
-  }, [isExpanded]);
-
-  useEffect(() => {
-    if (isTutorialMode) {
-      if (tutorialStepIndex === 4) {
-        setSelectedType(null);
-      } else if (tutorialStepIndex === 5) {
-        setSelectedType('pl');
-      }
-    }
-  }, [isTutorialMode, tutorialStepIndex]);
+  // Universal Duration for single-day bookings: 1 (Full Day) or 0.5 (Half Day)
+  const [duration, setDuration] = useState(1);
 
   const actualLeaves = dates.filter(d => !isHoliday(d) && !isWeekend(d));
   const baseLeavesNeeded = actualLeaves.length;
-  const hasMultiple = baseLeavesNeeded > 1;
-
   const isMultiple = dates.length > 1;
   const weekendsCount = dates.filter(d => isWeekend(d)).length;
   const holidaysCount = dates.filter(d => isHoliday(d) && !isWeekend(d)).length;
 
+  const selectedConfig = useMemo(() => {
+    return activeConfigs.find(c => c.id === selectedType) || activeConfigs[0] || null;
+  }, [activeConfigs, selectedType]);
+
+  // Auto-switch duration to 0.5 when balance is exactly 0.5 or less than 1 (fixes 0.5 lockout bug!)
+  useEffect(() => {
+    if (!isMultiple && selectedType) {
+      const curBal = effectiveBalances[selectedType] ?? 0;
+      if (curBal < 1 && curBal >= 0.5 && selectedConfig?.allowsHalfDay !== false) {
+        setDuration(0.5);
+      }
+    }
+  }, [selectedType, isMultiple, effectiveBalances, selectedConfig]);
+
+  // Automatically update active tab when selectedType changes
+  useEffect(() => {
+    if (selectedConfig?.tier) {
+      setActiveTierTab(selectedConfig.tier);
+    }
+  }, [selectedConfig]);
+
+  // Hourly timepicker calculation for legacy emergency leave half-day
   const elDiffHours = toHour > fromHour ? toHour - fromHour : 0;
-  const isHalfDay = selectedType === 'el' && !isMultiple && baseLeavesNeeded === 1 && elDiffHours > 0 && elDiffHours < 4.5;
-  const durationPerDay = isHalfDay ? 0.5 : 1;
-  const leavesNeeded = isHalfDay ? 0.5 : baseLeavesNeeded;
+  const isHourlyHalfDay = selectedType === 'el' && !isMultiple && baseLeavesNeeded === 1 && elDiffHours > 0 && elDiffHours < 4.5;
+  const durationPerDay = (!isMultiple && (duration === 0.5 || isHourlyHalfDay)) ? 0.5 : 1;
+  const leavesNeeded = isMultiple ? baseLeavesNeeded : (durationPerDay * baseLeavesNeeded);
 
-  const showElWarning = selectedType === 'el' && checkSequentialELWarning(actualLeaves, bookedDates);
+  // Universal constraint rule validation
+  const constraintWarnings = useMemo(() => {
+    if (!selectedConfig) return [];
+    return checkLeaveConstraints(actualLeaves, selectedConfig, bookedDates, durationPerDay);
+  }, [actualLeaves, selectedConfig, bookedDates, durationPerDay]);
 
-  // Auto-generate plan name: check suggestedPlanName or public holiday in range
+  // Auto-generate plan name
   const first = dates.length > 0 ? new Date(dates[0]) : new Date();
   const last = dates.length > 0 ? new Date(dates[dates.length - 1]) : new Date();
-  
   const holidayInWindow = dates.map(d => isHoliday(d)).find(Boolean);
   const holidayTitle = suggestedPlanName || (holidayInWindow ? holidayInWindow.name : null);
 
@@ -101,6 +166,12 @@ const LeaveSelectionBar = ({
     setPlanName(defaultName);
   }, [dates.length, suggestedPlanName, dates[0]]);
 
+  useEffect(() => {
+    if (!isExpanded) {
+      setTickerData(null);
+    }
+  }, [isExpanded]);
+
   if (dates.length === 0) return null;
 
   const handleApply = () => {
@@ -112,22 +183,30 @@ const LeaveSelectionBar = ({
     }
 
     const type = (selectedType || 'pl').toLowerCase();
-    const totalQuota = type === 'wfh' ? maxWfh : (leaves?.[type]?.total || (type === 'el' ? 10 : type === 'rh' ? 1 : 15));
-    const curBalance = effectiveBalances[type] ?? (type === 'wfh' ? wfhRemaining : 15);
+    const config = selectedConfig || {};
+    const totalQuota = config.quota || (type === 'wfh' ? targetWfhQuota : 15);
+    const curBalance = effectiveBalances[type] ?? 15;
     const targetBalance = Math.max(0, curBalance - leavesNeeded);
 
-    const chosenColor = (leaveColors && leaveColors[type]) || (type === 'el' ? 'orange' : type === 'rh' ? 'green' : type === 'wfh' ? 'cyan' : 'blue');
+    const chosenColor = config.color || (leaveColors && leaveColors[type]) || 'blue';
 
     setTickerData({
       initialValue: curBalance,
       targetValue: targetBalance,
       totalQuota: totalQuota,
       leaveType: type,
-      leaveLabel: leaveNames[type] || type.toUpperCase(),
+      leaveLabel: config.name || leaveNames[type] || type.toUpperCase(),
       leaveColor: chosenColor,
-      deductedCount: leavesNeeded
+      deductedCount: leavesNeeded,
+      cadence: config.cadence || 'year',
+      actionType: type === 'wfh' ? 'wfh' : (config.tier === 'special' ? 'special' : 'leave')
     });
   };
+
+  // Group active categories by tier
+  const annualConfigs = activeConfigs.filter(c => c.tier === 'annual');
+  const specialConfigs = activeConfigs.filter(c => c.tier === 'special');
+  const monthlyConfigs = activeConfigs.filter(c => c.tier === 'monthly' || c.id === 'wfh');
 
   let displayDate = '';
   if (isMultiple) {
@@ -156,7 +235,6 @@ const LeaveSelectionBar = ({
   return (
     <>
       <AnimatePresence>
-        {/* Backdrop for expanded modal */}
         {isExpanded && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -170,7 +248,6 @@ const LeaveSelectionBar = ({
 
       <AnimatePresence mode="wait">
         {isExpanded ? (
-          /* Modal Form Content (desktop expanded) */
           <motion.div 
             key="expanded-modal"
             layout
@@ -178,7 +255,7 @@ const LeaveSelectionBar = ({
             animate={{ opacity: 1, scale: 1, y: '-50%', x: '-50%' }}
             exit={{ opacity: 0, scale: 0.95, y: '-45%', x: '-50%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            className="hidden md:flex fixed top-1/2 left-1/2 bg-slate-900 text-slate-50 dark:bg-zinc-900 dark:text-zinc-50 w-[480px] max-w-[92vw] flex-col max-h-[88vh] rounded-[32px] shadow-2xl shadow-black/90 border border-border overflow-hidden z-[9990] opacity-100"
+            className="hidden md:flex fixed top-1/2 left-1/2 bg-card text-foreground w-[520px] max-w-[94vw] flex-col max-h-[90vh] rounded-[32px] shadow-2xl shadow-black/90 border border-border overflow-hidden z-[9990] opacity-100"
           >
             <AnimatePresence mode="wait" initial={false}>
               {tickerData ? (
@@ -198,7 +275,7 @@ const LeaveSelectionBar = ({
                     leaveLabel={tickerData.leaveLabel}
                     leaveColor={tickerData.leaveColor}
                     deductedCount={tickerData.deductedCount}
-                    actionType={tickerData.leaveType === 'wfh' ? 'wfh' : 'leave'}
+                    actionType={tickerData.actionType}
                     onComplete={() => {
                       onApply(dates, selectedType || 'pl', note, planName || defaultName, durationPerDay);
                       setIsExpanded(false);
@@ -216,250 +293,247 @@ const LeaveSelectionBar = ({
                   transition={{ duration: 0.18 }}
                   className="flex flex-col w-full"
                 >
-                  <div className="p-5 sm:p-6 pt-4 md:pt-6 border-b border-border bg-muted flex justify-between items-start flex-shrink-0">
+                  {/* Modal Header */}
+                  <div className="p-5 sm:p-6 pt-4 md:pt-6 border-b border-border bg-muted/40 flex justify-between items-start flex-shrink-0">
                     <div>{displayDate}</div>
-                    <button onClick={() => setIsExpanded(false)} className="text-muted-foreground hover:text-foreground bg-card p-1 rounded-md shadow-sm border border-border cursor-pointer">
-                      <X size={16} />
+                    <button 
+                      onClick={() => setIsExpanded(false)} 
+                      className="text-muted-foreground hover:text-foreground bg-card p-1.5 rounded-full shadow-xs border border-border cursor-pointer transition-colors"
+                    >
+                      <X size={15} />
                     </button>
                   </div>
 
-                <div className="px-4 sm:px-6 py-4 bg-muted border-b border-border flex flex-col gap-3 flex-shrink-0">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-foreground">Plan Breakdown</span>
-                    <span className="font-bold text-muted-foreground">{dates.length} Days Total</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(() => {
-                      const activeTheme = getLeaveColor(leaveColors[selectedType || 'pl'] || 'blue');
-                      return (
-                        <div className={`${activeTheme.bg} rounded-lg p-2 flex flex-col items-center justify-center text-center text-white transition-colors shadow-sm`}>
-                          <span className="text-xl font-bold leading-none mb-1">{leavesNeeded}</span>
-                          <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider">{leavesNeeded === 1 ? 'Leave' : 'Leaves'}</span>
-                        </div>
-                      );
-                    })()}
-                    <div className="bg-muted-foreground/10 rounded-lg p-2 flex flex-col items-center justify-center text-center border border-border">
-                      <span className="text-xl font-bold text-foreground leading-none mb-1">{weekendsCount}</span>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Weekends</span>
+                  {/* Plan Breakdown Metric Chips */}
+                  <div className="px-5 sm:px-6 py-3.5 bg-muted/20 border-b border-border flex flex-col gap-2.5 flex-shrink-0">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-foreground">Plan Breakdown</span>
+                      <span className="font-mono font-bold text-muted-foreground">{dates.length} Days Window</span>
                     </div>
-                    <div className="bg-muted-foreground/10 rounded-lg p-2 flex flex-col items-center justify-center text-center border border-border">
-                      <span className="text-xl font-bold text-foreground leading-none mb-1">{holidaysCount}</span>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Holidays</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 sm:p-6 flex flex-col gap-4 sm:gap-5 flex-1 min-h-min overflow-y-auto pb-24 md:pb-6">
-                  {/* Plan Name */}
-                  <div>
-                    <label className="text-sm font-semibold text-foreground mb-1.5 block">Plan Name</label>
-                    <input
-                      id="tutorial-step-plan-name"
-                      type="text"
-                      value={planName}
-                      onChange={(e) => setPlanName(e.target.value)}
-                      placeholder="e.g. Summer Vacation, Medical Leave..."
-                      className="w-full border border-border rounded-lg p-2.5 text-sm font-medium focus:outline-none focus:border-foreground/50 focus:ring-1 focus:ring-foreground/50 bg-card text-foreground"
-                    />
-                  </div>
-
-                  {/* Leave Type */}
-                  <div>
-                    <label className="text-sm font-semibold text-foreground mb-3 block">Leave Type</label>
-                    <div className="flex flex-col gap-3">
-                      {/* PL */}
+                    <div className="grid grid-cols-3 gap-2">
                       {(() => {
-                        const plStyle = getLeaveTheme(leaveColors.pl || 'blue');
-                        const isSelected = selectedType === 'pl';
+                        const activeTheme = getLeaveColor(selectedConfig?.color || 'blue');
                         return (
-                          <label 
-                            id="tutorial-step-category-pl" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setSelectedType('pl');
-                              if (onAdvanceTutorial) {
-                                onAdvanceTutorial();
-                              }
-                            }}
-                            className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${
-                              isSelected 
-                                ? `${plStyle.activeBoxBorder} ${plStyle.activeBoxBg} ring-1 ${plStyle.activeBoxBorder} shadow-sm` 
-                                : 'border-border hover:border-foreground/30'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                                isSelected ? plStyle.activeBoxBorder : 'border-muted-foreground/40'
-                              }`}>
-                                {isSelected && <div className={`w-2 h-2 rounded-full ${plStyle.bg}`} />}
-                              </div>
-                              <span className={`font-bold text-sm ${isSelected ? plStyle.activeText : 'text-foreground'}`}>
-                                {getShortform(leaveNames.pl, 'PL')} — {leaveNames.pl}
-                              </span>
-                            </div>
-                            <span className={`text-xs font-bold border px-2 py-1 rounded-lg ${
-                              isSelected ? plStyle.activeBadge : 'bg-background border-border text-muted-foreground'
-                            }`}>
-                              {effectiveBalances.pl} left
+                          <div className={`${activeTheme.bg} rounded-xl p-2.5 flex flex-col items-center justify-center text-center text-white transition-colors shadow-sm`}>
+                            <span className="text-xl font-black font-mono leading-none mb-1">{leavesNeeded}</span>
+                            <span className="text-[10px] font-bold text-white/90 uppercase tracking-wider">
+                              {leavesNeeded === 1 ? 'Leave Day' : 'Leave Days'}
                             </span>
-                          </label>
-                        );
-                      })()}
-
-                      {/* EL with clock picker */}
-                      {(() => {
-                        const elStyle = getLeaveTheme(leaveColors.el || 'orange');
-                        const isSelected = selectedType === 'el';
-                        const isElDisabled = effectiveBalances.el < baseLeavesNeeded || isTutorialMode;
-                        return (
-                          <div className="flex flex-col gap-2">
-                            <label 
-                              onClick={() => !isElDisabled && setSelectedType('el')}
-                              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${
-                                isSelected 
-                                  ? `${elStyle.activeBoxBorder} ${elStyle.activeBoxBg} ring-1 ${elStyle.activeBoxBorder} shadow-sm` 
-                                  : 'border-border hover:border-foreground/30'
-                              } ${isElDisabled ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                                  isSelected ? elStyle.activeBoxBorder : 'border-muted-foreground/40'
-                                }`}>
-                                  {isSelected && <div className={`w-2 h-2 rounded-full ${elStyle.bg}`} />}
-                                </div>
-                                <span className={`font-bold text-sm ${isSelected ? elStyle.activeText : 'text-foreground'}`}>
-                                  {getShortform(leaveNames.el, 'EL')} — {leaveNames.el}
-                                </span>
-                              </div>
-                              <span className={`text-xs font-bold border px-2 py-1 rounded-lg ${
-                                isSelected ? elStyle.activeBadge : 'bg-background border-border text-muted-foreground'
-                              }`}>
-                                {effectiveBalances.el} left
-                              </span>
-                            </label>
-
-                            {isSelected && !isMultiple && (
-                              <div className="animate-in slide-in-from-top-2 duration-200">
-                                <TimePicker
-                                  fromHour={fromHour}
-                                  toHour={toHour}
-                                  onChange={(f, t) => { setFromHour(f); setToHour(t); }}
-                                />
-                              </div>
-                            )}
                           </div>
                         );
                       })()}
-
-                      {/* RH */}
-                      {(() => {
-                        const rhStyle = getLeaveTheme(leaveColors.rh || 'green');
-                        const isSelected = selectedType === 'rh';
-                        const isRhDisabled = effectiveBalances.rh < baseLeavesNeeded || baseLeavesNeeded > 1 || isTutorialMode;
-                        return (
-                          <label 
-                            onClick={() => !isRhDisabled && setSelectedType('rh')}
-                            className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${
-                              isSelected 
-                                ? `${rhStyle.activeBoxBorder} ${rhStyle.activeBoxBg} ring-1 ${rhStyle.activeBoxBorder} shadow-sm` 
-                                : 'border-border hover:border-foreground/30'
-                            } ${isRhDisabled ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                                isSelected ? rhStyle.activeBoxBorder : 'border-muted-foreground/40'
-                              }`}>
-                                {isSelected && <div className={`w-2 h-2 rounded-full ${rhStyle.bg}`} />}
-                              </div>
-                              <span className={`font-bold text-sm ${isSelected ? rhStyle.activeText : 'text-foreground'}`}>
-                                {getShortform(leaveNames.rh, 'RH')} — {leaveNames.rh}
-                              </span>
-                            </div>
-                            <span className={`text-xs font-bold border px-2 py-1 rounded-lg ${
-                              isSelected ? rhStyle.activeBadge : 'bg-background border-border text-muted-foreground'
-                            }`}>
-                              {effectiveBalances.rh} left
-                            </span>
-                          </label>
-                        );
-                      })()}
-
-                      {/* WFH */}
-                      {(() => {
-                        const wfhStyle = getLeaveTheme(leaveColors.wfh || 'cyan');
-                        const isSelected = selectedType === 'wfh';
-                        return (
-                          <label 
-                            onClick={() => !isTutorialMode && setSelectedType('wfh')}
-                            className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${
-                              isSelected 
-                                ? `${wfhStyle.activeBoxBorder} ${wfhStyle.activeBoxBg} ring-1 ${wfhStyle.activeBoxBorder} shadow-sm` 
-                                : 'border-border hover:border-foreground/30'
-                            } ${isTutorialMode ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                                isSelected ? wfhStyle.activeBoxBorder : 'border-muted-foreground/40'
-                              }`}>
-                                {isSelected && <div className={`w-2 h-2 rounded-full ${wfhStyle.bg}`} />}
-                              </div>
-                              <span className={`font-bold text-sm ${isSelected ? wfhStyle.activeText : 'text-foreground'}`}>
-                                {getShortform(leaveNames.wfh, 'WFH')} — {leaveNames.wfh}
-                              </span>
-                            </div>
-                            <span className={`text-xs font-bold border px-2 py-1 rounded-lg ${
-                              isSelected ? wfhStyle.activeBadge : 'bg-background border-border text-muted-foreground'
-                            }`}>
-                              Max 10/mo
-                            </span>
-                          </label>
-                        );
-                      })()}
-                    </div>
-                  </div>
-
-                  {showElWarning && (
-                    <div className="bg-red-500/10 dark:bg-red-950/40 border border-red-500/30 text-red-700 dark:text-red-300 rounded-xl p-3.5 flex gap-3 items-start shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                      <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-                      <div className="text-xs">
-                        <span className="font-black block mb-1 uppercase tracking-wider text-[10px]">Medical Certificate Required</span>
-                        You are applying for more than 2 consecutive Emergency Leaves across your bookings. Please ensure you have a valid medical certificate to provide to HR.
+                      <div className="bg-muted/40 rounded-xl p-2.5 flex flex-col items-center justify-center text-center border border-border/80">
+                        <span className="text-xl font-black font-mono text-foreground leading-none mb-1">{weekendsCount}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Weekends</span>
+                      </div>
+                      <div className="bg-muted/40 rounded-xl p-2.5 flex flex-col items-center justify-center text-center border border-border/80">
+                        <span className="text-xl font-black font-mono text-foreground leading-none mb-1">{holidaysCount}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Holidays</span>
                       </div>
                     </div>
-                  )}
-
-                  <div>
-                    <label className="text-sm font-semibold text-foreground mb-1.5 block">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <input
-                      type="text"
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="e.g. Family vacation, Medical appointment..."
-                      className="w-full border border-border bg-card text-foreground rounded-lg p-2.5 text-sm focus:outline-none focus:border-foreground/50 focus:ring-1 focus:ring-foreground/50"
-                    />
                   </div>
-                </div>
 
-                <div className="p-4 sm:p-6 border-t border-border bg-muted flex flex-row justify-end gap-3 flex-shrink-0 mt-auto sticky bottom-0 z-10">
-                  <button onClick={() => setIsExpanded(false)} className="px-4 py-2.5 border border-border text-foreground bg-white dark:bg-zinc-800 hover:bg-muted rounded-xl text-sm font-bold transition-colors shadow-sm flex-1 cursor-pointer">
-                    Cancel
-                  </button>
-                  <button
-                    id="tutorial-step-modal-apply-btn"
-                    onClick={handleApply}
-                    disabled={!isTutorialMode && balances[selectedType] < leavesNeeded}
-                    className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-md flex-[1.5] cursor-pointer"
-                  >
-                    Confirm & Apply
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                  {/* Form Body */}
+                  <div className="p-5 sm:p-6 flex flex-col gap-5 flex-1 min-h-min overflow-y-auto max-h-[50vh]">
+                    {/* Plan Name */}
+                    <div>
+                      <label className="text-xs font-bold text-foreground mb-1.5 block">Plan Name</label>
+                      <input
+                        type="text"
+                        value={planName}
+                        onChange={(e) => setPlanName(e.target.value)}
+                        placeholder="e.g. Summer Vacation, Medical Leave..."
+                        className="w-full border border-border rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 bg-muted/40 text-foreground"
+                      />
+                    </div>
+
+                    {/* Tier Switcher Segmented Control */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold text-foreground">Leave Category</label>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground">3-Tier System</span>
+                      </div>
+
+                      <div className="flex p-1 bg-muted/50 border border-border/80 rounded-2xl gap-1 mb-3">
+                        {annualConfigs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTierTab('annual');
+                              if (annualConfigs.length > 0) setSelectedType(annualConfigs[0].id);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeTierTab === 'annual' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Annual Bank
+                          </button>
+                        )}
+                        {specialConfigs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTierTab('special');
+                              if (specialConfigs.length > 0) setSelectedType(specialConfigs[0].id);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeTierTab === 'special' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Special Benefits
+                          </button>
+                        )}
+                        {monthlyConfigs.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTierTab('monthly');
+                              if (monthlyConfigs.length > 0) setSelectedType(monthlyConfigs[0].id);
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeTierTab === 'monthly' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Remote / WFH
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Category Options List for Active Tier */}
+                      <div className="flex flex-col gap-2">
+                        {(activeTierTab === 'annual' ? annualConfigs : (activeTierTab === 'special' ? specialConfigs : monthlyConfigs)).map(config => {
+                          const confTheme = getLeaveTheme(config.color || 'blue');
+                          const isSelected = selectedType === config.id;
+                          const curBal = effectiveBalances[config.id] ?? 0;
+                          
+                          // RESOLVES 0.5 HALF-DAY BUG: Only disable if remaining balance is less than 0.5!
+                          const minReq = (!isMultiple && config.allowsHalfDay !== false) ? 0.5 : baseLeavesNeeded;
+                          const isDisabled = curBal < minReq || (config.id === 'rh' && baseLeavesNeeded > 1);
+
+                          return (
+                            <div key={config.id} className="flex flex-col gap-1.5">
+                              <label
+                                onClick={() => !isDisabled && setSelectedType(config.id)}
+                                className={`flex items-center justify-between p-3 border rounded-2xl cursor-pointer transition-all ${
+                                  isSelected 
+                                    ? `${confTheme.activeBoxBorder} ${confTheme.activeBoxBg} ring-1 ${confTheme.activeBoxBorder} shadow-xs` 
+                                    : 'border-border/80 hover:border-foreground/30 bg-card'
+                                } ${isDisabled ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                    isSelected ? confTheme.activeBoxBorder : 'border-muted-foreground/40'
+                                  }`}>
+                                    {isSelected && <div className={`w-2 h-2 rounded-full ${confTheme.bg}`} />}
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className={`font-bold text-xs ${isSelected ? confTheme.activeText : 'text-foreground'}`}>
+                                      {config.shortCode || getShortform(config.name, config.id.toUpperCase())} — {config.name}
+                                    </span>
+                                    {config.tier === 'special' && (
+                                      <span className="text-[10px] text-muted-foreground font-medium">
+                                        Non-deductible benefit
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className={`text-[11px] font-bold font-mono border px-2.5 py-1 rounded-xl ${
+                                  isSelected ? confTheme.activeBadge : 'bg-muted/40 border-border text-muted-foreground'
+                                }`}>
+                                  {curBal} {config.cadence === 'month' ? '/ mo left' : 'left'}
+                                </span>
+                              </label>
+
+                              {/* Duration Selector for Single-Day Bookings */}
+                              {isSelected && !isMultiple && config.allowsHalfDay !== false && (
+                                <div className="flex items-center justify-between p-2 px-3 bg-muted/40 border border-border/80 rounded-xl animate-in fade-in duration-200">
+                                  <span className="text-[11px] font-bold text-muted-foreground">Booking Duration:</span>
+                                  <div className="flex items-center gap-1 bg-card p-1 rounded-lg border border-border/80">
+                                    <button
+                                      type="button"
+                                      onClick={() => setDuration(1)}
+                                      disabled={curBal < 1}
+                                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold font-mono transition-all ${
+                                        duration === 1 ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                                      } ${curBal < 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    >
+                                      Full Day (1.0)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDuration(0.5)}
+                                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold font-mono transition-all ${
+                                        duration === 0.5 ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                                      }`}
+                                    >
+                                      Half Day (0.5)
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Dynamic Policy & Constraint Warning Banner */}
+                    {constraintWarnings.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        {constraintWarnings.map((warn, i) => (
+                          <div 
+                            key={i} 
+                            className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 text-amber-800 dark:text-amber-200 rounded-2xl p-3.5 flex gap-3 items-start shadow-xs animate-in fade-in slide-in-from-top-1 duration-200"
+                          >
+                            <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={16} />
+                            <div className="text-xs">
+                              <span className="font-bold block uppercase tracking-wider text-[10px] text-amber-600 dark:text-amber-400">
+                                {warn.title || 'Policy Constraint'}
+                              </span>
+                              <p className="mt-0.5 leading-relaxed text-[11px]">{warn.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Note Input */}
+                    <div>
+                      <label className="text-xs font-bold text-foreground mb-1.5 block">
+                        Reason / Note <span className="text-muted-foreground font-normal">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="e.g. Doctor appointment, Family function..."
+                        className="w-full border border-border bg-muted/40 text-foreground rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-4 sm:p-6 border-t border-border bg-muted/40 flex flex-row justify-end gap-3 flex-shrink-0 mt-auto sticky bottom-0 z-10">
+                    <button 
+                      onClick={() => setIsExpanded(false)} 
+                      className="px-4 py-2.5 border border-border text-foreground bg-card hover:bg-muted rounded-2xl text-xs font-bold transition-colors shadow-xs flex-1 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleApply}
+                      disabled={!isTutorialMode && (effectiveBalances[selectedType] ?? 0) < leavesNeeded}
+                      className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl text-xs font-bold transition-colors disabled:opacity-40 shadow-sm flex-[1.5] cursor-pointer"
+                    >
+                      Confirm & Apply
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         ) : (
-          /* Pill Content (desktop collapsed) */
+          /* Desktop Collapsed Floating Pill */
           <motion.div
             key="collapsed-pill"
             layout
@@ -467,8 +541,7 @@ const LeaveSelectionBar = ({
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: 50, x: "-50%" }}
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            id="tutorial-step-selection-bar"
-            className="hidden md:flex fixed bottom-8 left-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-3.5 rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[60] overflow-hidden items-center justify-between gap-6"
+            className="hidden md:flex fixed bottom-8 left-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-4 rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[60] overflow-hidden items-center justify-between gap-6"
           >
             <motion.div layout className="flex items-center gap-3 flex-1">
               {selectionStart && previewDates.length === 0 ? (
@@ -493,30 +566,29 @@ const LeaveSelectionBar = ({
               )}
             </motion.div>
             
-            <motion.div id="tutorial-step-confirm-modal" layout className="flex gap-2 border-l border-background/20 pl-4 md:pl-6 flex-shrink-0 items-center">
+            <motion.div layout className="flex gap-2 border-l border-background/20 pl-4 md:pl-6 flex-shrink-0 items-center">
               <button 
                 onClick={onCancel}
-                className="text-xs font-bold text-background/70 hover:text-background px-3 py-2 rounded-full hover:bg-background/20 transition-colors whitespace-nowrap"
+                className="text-xs font-bold text-background/70 hover:text-background px-3 py-2 rounded-full hover:bg-background/20 transition-colors whitespace-nowrap cursor-pointer"
               >
                 Cancel
               </button>
               {selectionStart && previewDates.length === 0 && (
                 <button 
                   onClick={() => setIsExpanded(true)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap cursor-pointer"
                 >
                   Apply Single Day <Check size={14} strokeWidth={3} />
                 </button>
               )}
               {previewDates.length > 0 && (
                 <button 
-                  id="tutorial-step-confirm-plan-btn"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsExpanded(true);
                     if (onAdvanceTutorial) onAdvanceTutorial();
                   }}
-                  className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap cursor-pointer"
                 >
                   Confirm Plan <Check size={14} strokeWidth={3} />
                 </button>

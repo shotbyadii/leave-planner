@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Building2, CalendarX2, Bell, AlertTriangle, X, Check, Sparkles } from 'lucide-react';
+import { Home, Building2, CalendarX2, Bell, AlertTriangle, X, Check, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { isWeekend, publicHolidays } from '../data/holidays';
 import { getShortform } from '../utils/colorUtils';
 import AppleBalanceTicker from './AppleBalanceTicker';
 import { showAppNotification, requestNotificationPermission, isNotificationSupported, subscribeUserToPush } from '../utils/notificationService';
+import { countConsecutiveWorkingDays } from '../services/leaveConfigService';
 
 const WfhCheckinModal = ({ 
   isOpen, 
@@ -15,12 +16,14 @@ const WfhCheckinModal = ({
   maxWfh = 10,
   todayStr = '',
   bookedDates = [],
+  leaveConfigs = null,
   leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' },
   leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
   wfhPromptHour = '12'
 }) => {
   const [notifPermission, setNotifPermission] = useState('default');
   const [selectedAction, setSelectedAction] = useState(null);
+  const [showQuickLeaves, setShowQuickLeaves] = useState(false);
 
   const formatHour = (hourStr) => {
     const h = parseInt(hourStr || '12', 10);
@@ -73,9 +76,36 @@ const WfhCheckinModal = ({
     }
   };
 
-  const remainingWfh = Math.max(0, maxWfh - wfhUsedThisMonth);
-  const isOverQuota = wfhUsedThisMonth >= maxWfh;
+  const wfhConfig = Array.isArray(leaveConfigs)
+    ? leaveConfigs.find(c => c.id === 'wfh')
+    : null;
+  const isWfhEnabled = wfhConfig ? wfhConfig.enabled : true;
+  const effectiveMaxWfh = wfhConfig ? wfhConfig.quota : maxWfh;
+  const maxConsecutiveWfh = wfhConfig?.constraints?.maxConsecutive || null;
+
+  const remainingWfh = Math.max(0, effectiveMaxWfh - wfhUsedThisMonth);
+  const isOverQuota = wfhUsedThisMonth >= effectiveMaxWfh;
   const isWarning = !isOverQuota && remainingWfh <= 2;
+
+  // Consecutive WFH check
+  const consecutiveWfhCount = todayStr 
+    ? countConsecutiveWorkingDays([todayStr], 'wfh', bookedDates)
+    : 0;
+  const isConsecutiveLimitExceeded = Boolean(maxConsecutiveWfh && consecutiveWfhCount > maxConsecutiveWfh);
+
+  // Available quick leaves to take today (Tier 3 special benefits + Emergency Leave)
+  const quickLeaves = (Array.isArray(leaveConfigs) ? leaveConfigs : [])
+    .filter(c => c.enabled && (c.tier === 'special' || c.id === 'el'));
+
+  // Currently selected action item details
+  const activeSelectedConfig = Array.isArray(leaveConfigs)
+    ? leaveConfigs.find(c => c.id === selectedAction)
+    : null;
+  const selectedLabel = activeSelectedConfig?.name || leaveNames[selectedAction] || (selectedAction === 'office' ? 'In-Office' : selectedAction);
+  const selectedColor = activeSelectedConfig?.color || leaveColors?.[selectedAction] || 'cyan';
+  const selectedTotal = activeSelectedConfig?.quota || (selectedAction === 'wfh' ? effectiveMaxWfh : 10);
+  const usedForSelected = bookedDates.filter(b => b.type === selectedAction).reduce((acc, b) => acc + (b.duration || 1), 0);
+  const remainingForSelected = selectedAction === 'wfh' ? remainingWfh : Math.max(0, selectedTotal - usedForSelected);
 
   let todayObj;
   if (todayStr && todayStr.includes('-')) {
@@ -100,11 +130,13 @@ const WfhCheckinModal = ({
     if (b.date) bookedMap[b.date] = b.type;
   });
 
-  const alertStyle = isOverQuota
-    ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
-    : (isWarning
-      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
-      : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-300');
+  const alertStyle = !isWfhEnabled
+    ? 'bg-muted border-border text-muted-foreground'
+    : (isOverQuota
+      ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+      : (isWarning
+        ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+        : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-300'));
 
   return (
     <AnimatePresence>
@@ -159,13 +191,13 @@ const WfhCheckinModal = ({
                     className="w-full flex flex-col items-center justify-center"
                   >
                     <AppleBalanceTicker
-                      initialValue={remainingWfh}
-                      targetValue={selectedAction === 'wfh' ? Math.max(0, remainingWfh - 1) : remainingWfh}
-                      totalQuota={maxWfh}
-                      leaveType="wfh"
-                      leaveLabel={leaveNames.wfh || 'Work From Home'}
-                      leaveColor={leaveColors?.wfh || 'cyan'}
-                      deductedCount={1}
+                      initialValue={remainingForSelected}
+                      targetValue={selectedAction === 'office' ? remainingForSelected : Math.max(0, remainingForSelected - 1)}
+                      totalQuota={selectedTotal}
+                      leaveType={selectedAction}
+                      leaveLabel={selectedLabel}
+                      leaveColor={selectedColor}
+                      deductedCount={selectedAction === 'office' ? 0 : 1}
                       actionType={selectedAction}
                       onComplete={() => {
                         onSelectStatus(selectedAction);
@@ -182,12 +214,14 @@ const WfhCheckinModal = ({
                     transition={{ duration: 0.18 }}
                     className="w-full flex flex-col gap-3.5 items-center text-center"
                   >
-                    {/* Healthy Balance Banner (Moved above calendar for clean layout) */}
+                    {/* Healthy Balance Banner */}
                     <div className={`w-full p-3 rounded-2xl border flex items-center gap-2.5 text-xs text-left ${alertStyle}`}>
                       <AlertTriangle size={16} className="flex-shrink-0" />
                       <span>
-                        {isOverQuota ? (
-                          <><strong>Quota Exceeded:</strong> You have used all {maxWfh} WFH days.</>
+                        {!isWfhEnabled ? (
+                          <><strong>Remote Policy:</strong> Work From Home is disabled by your policy settings.</>
+                        ) : isOverQuota ? (
+                          <><strong>Quota Exceeded:</strong> You have used all {effectiveMaxWfh} WFH days.</>
                         ) : isWarning ? (
                           <><strong>Running Low:</strong> Only {remainingWfh} WFH day{remainingWfh === 1 ? '' : 's'} remaining this month.</>
                         ) : (
@@ -196,11 +230,21 @@ const WfhCheckinModal = ({
                       </span>
                     </div>
 
+                    {/* Consecutive WFH Limit Alert */}
+                    {isWfhEnabled && isConsecutiveLimitExceeded && (
+                      <div className="w-full p-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2 text-left">
+                        <AlertTriangle size={15} className="flex-shrink-0" />
+                        <span>
+                          <strong>Consecutive Limit:</strong> Logging WFH today makes {consecutiveWfhCount} consecutive days (policy guideline is max {maxConsecutiveWfh}).
+                        </span>
+                      </div>
+                    )}
+
                     <div className="w-full bg-muted/30 border border-border rounded-2xl p-3.5 flex flex-col gap-2">
                       <div className="flex justify-between items-center px-1">
                         <span className="text-xs font-black uppercase font-mono tracking-wider text-foreground">{currentMonthName}</span>
                         <span className="text-[10px] font-bold font-mono text-cyan-500 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
-                          {wfhUsedThisMonth} / {maxWfh} WFH Used
+                          {wfhUsedThisMonth} / {effectiveMaxWfh} WFH Used
                         </span>
                       </div>
 
@@ -257,10 +301,15 @@ const WfhCheckinModal = ({
 
                     <div className="grid grid-cols-2 gap-3 w-full">
                       <button
+                        disabled={!isWfhEnabled || isOverQuota}
                         onClick={() => setSelectedAction('wfh')}
-                        className="py-3 px-4 bg-cyan-500 hover:bg-cyan-600 text-black font-bold text-xs rounded-2xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                        className={`py-3 px-4 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                          !isWfhEnabled || isOverQuota
+                            ? 'bg-muted text-muted-foreground/50 border border-border cursor-not-allowed opacity-60'
+                            : 'bg-cyan-500 hover:bg-cyan-600 text-black shadow-lg shadow-cyan-500/20'
+                        }`}
                       >
-                        <Home size={16} /> Work From Home
+                        <Home size={16} /> {!isWfhEnabled ? 'WFH Disabled' : 'Work From Home'}
                       </button>
 
                       <button
@@ -271,12 +320,63 @@ const WfhCheckinModal = ({
                       </button>
                     </div>
 
-                    <button
-                      onClick={onMarkLeave}
-                      className="w-full py-2.5 bg-muted/40 border border-border/80 text-muted-foreground hover:text-foreground text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <CalendarX2 size={15} /> Taking a Leave Today Instead?
-                    </button>
+                    {/* Expandable Quick Leaves Drawer */}
+                    <div className="w-full flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickLeaves(prev => !prev)}
+                        className="w-full py-2.5 bg-muted/40 border border-border/80 text-muted-foreground hover:text-foreground text-xs font-bold rounded-2xl flex items-center justify-between px-3.5 transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <CalendarX2 size={15} /> Taking a Leave Today Instead?
+                        </span>
+                        {showQuickLeaves ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+
+                      <AnimatePresence>
+                        {showQuickLeaves && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.18 }}
+                            className="w-full overflow-hidden flex flex-col gap-2 pt-1"
+                          >
+                            {quickLeaves.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {quickLeaves.map(q => {
+                                  const short = q.shortCode || getShortform(q.name);
+                                  return (
+                                    <button
+                                      key={q.id}
+                                      type="button"
+                                      onClick={() => setSelectedAction(q.id)}
+                                      className="p-2.5 bg-card hover:bg-muted border border-border/80 hover:border-border rounded-xl flex items-center gap-2 text-left transition-all active:scale-95 cursor-pointer"
+                                    >
+                                      <span className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center font-mono text-[10px] font-black text-foreground border border-border">
+                                        {short}
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-bold text-foreground truncate">{q.name}</div>
+                                        <div className="text-[10px] text-muted-foreground font-mono">{q.quota} {q.cadence === 'month' ? '/mo' : '/yr'}</div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={onMarkLeave}
+                              className="w-full py-2 bg-muted/60 hover:bg-muted border border-dashed border-border text-foreground/80 hover:text-foreground text-[11px] font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              <span>Open Full Planner / Select Date Range</span>
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
                     {notificationSupported && notifPermission !== 'granted' && (
                       <button

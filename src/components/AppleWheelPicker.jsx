@@ -12,7 +12,8 @@ const AppleWheelPicker = ({
   customName = '',
   onCustomNameChange,
   color = 'blue',
-  onColorChange
+  onColorChange,
+  onRemove = null
 }) => {
   const scrollRef = useRef(null);
   const isScrollingRef = useRef(false);
@@ -107,6 +108,16 @@ const AppleWheelPicker = ({
         <span className={`text-[10px] font-black uppercase tracking-wider font-mono px-2 py-0.5 rounded-md border ${currentColor.badge}`}>
           {displayShortform}
         </span>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="w-5 h-5 rounded-full bg-muted/60 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors cursor-pointer border border-border/40"
+            title="Remove category"
+          >
+            <X size={12} strokeWidth={2.5} />
+          </button>
+        )}
       </div>
 
       {/* Name Entry Field */}
