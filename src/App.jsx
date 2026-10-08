@@ -28,7 +28,7 @@ import ThemeSelector from './components/ThemeSelector';
 import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import AppleBalanceTicker from './components/AppleBalanceTicker';
-import { getLeaveColor, getShortform, COLOR_PALETTE } from './utils/colorUtils';
+import { getLeaveColor, getLeaveTheme, getShortform, COLOR_PALETTE } from './utils/colorUtils';
 import { buildInitialLeaveConfigs, checkLeaveConstraints } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
