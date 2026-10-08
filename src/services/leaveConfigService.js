@@ -149,9 +149,31 @@ export const buildInitialLeaveConfigs = ({
   legacyColors = null,
 } = {}) => {
   if (Array.isArray(storedConfigs) && storedConfigs.length > 0) {
-    // Merge existing stored configs with any newly introduced system presets
-    const existingIds = new Set(storedConfigs.map(c => c.id));
-    const merged = [...storedConfigs];
+    const defMap = new Map(DEFAULT_LEAVE_CONFIGS.map(d => [d.id, d]));
+
+    // Filter out old unconfigured legacy presets (e.g. mental, parental) that were pruned
+    const filtered = storedConfigs.filter(c => {
+      if (['mental', 'parental'].includes(c.id) && !c.enabled) return false;
+      return true;
+    });
+
+    const existingIds = new Set(filtered.map(c => c.id));
+    const merged = filtered.map(c => {
+      const def = defMap.get(c.id);
+      if (def) {
+        return {
+          ...def,
+          ...c,
+          subtitle: c.subtitle || def.subtitle,
+          constraints: {
+            ...def.constraints,
+            ...(c.constraints || {}),
+            warningMessage: def.constraints.warningMessage
+          }
+        };
+      }
+      return c;
+    });
 
     for (const def of DEFAULT_LEAVE_CONFIGS) {
       if (!existingIds.has(def.id)) {
