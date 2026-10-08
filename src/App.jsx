@@ -28,6 +28,7 @@ import ThemeSelector from './components/ThemeSelector';
 import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import AppleBalanceTicker from './components/AppleBalanceTicker';
+import SegmentedPolicyTabs, { MorphingTabContent } from './components/SegmentedPolicyTabs';
 import { getLeaveColor, getLeaveTheme, getShortform, COLOR_PALETTE } from './utils/colorUtils';
 import { getSpecialBenefitIcon } from './utils/specialBenefitUtils';
 import { buildInitialLeaveConfigs, checkLeaveConstraints } from './services/leaveConfigService';
@@ -204,6 +205,9 @@ function App() {
   const [mobileFormCompany, setMobileFormCompany] = useState('');
   const [mobileFormAvatar, setMobileFormAvatar] = useState('');
   const [companyLogoError, setCompanyLogoError] = useState(false);
+  useEffect(() => {
+    setCompanyLogoError(false);
+  }, [companyName, companyLogoUrl]);
   const [mobileFormQuotas, setMobileFormQuotas] = useState({ pl: 15, el: 10, rh: 1, wfh: 10 });
   const [mobileFormNames, setMobileFormNames] = useState({});
   const [mobileFormColors, setMobileFormColors] = useState({});
@@ -250,6 +254,7 @@ function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [topbarTierTab, setTopbarTierTab] = useState('annual'); // 'annual' | 'special' | 'remote'
   const [mobileMenuTierTab, setMobileMenuTierTab] = useState('annual'); // 'annual' | 'special' | 'remote'
+  const [mobileModalTierTab, setMobileModalTierTab] = useState('annual'); // 'annual' | 'special' | 'remote'
 
   const annualTrackerEntries = useMemo(() => {
     if (Array.isArray(leaveConfigs) && leaveConfigs.length > 0) {
@@ -321,6 +326,21 @@ function App() {
       remaining: rem
     };
   }, [bookedDates, leaveNames.wfh, leaveColors.wfh]);
+
+  // Keep mobile modal active tab in sync with currently selected leave type
+  useEffect(() => {
+    if (mobileConfirmOpen && mobileLeaveType) {
+      const curCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
+      if (curCfg) {
+        if (curCfg.tier === 'annual') setMobileModalTierTab('annual');
+        else if (curCfg.tier === 'special') setMobileModalTierTab('special');
+        else if (curCfg.tier === 'monthly' || curCfg.tier === 'remote' || curCfg.id === 'wfh') setMobileModalTierTab('remote');
+      } else if (mobileLeaveType === 'wfh') {
+        setMobileModalTierTab('remote');
+      }
+    }
+  }, [mobileConfirmOpen, mobileLeaveType, leaveConfigs]);
+
   useEffect(() => {
     localStorage.setItem('theme', theme);
     const root = document.documentElement;
@@ -632,13 +652,23 @@ function App() {
       setLeaveConfigs(profile.leave_configs);
       localStorage.setItem('leave_configs', JSON.stringify(profile.leave_configs));
     } else {
-      const built = buildInitialLeaveConfigs({
-        legacyQuotas: { pl: plQuota, el: elQuota, rh: rhQuota, wfh: wfhQuota },
-        legacyNames: namesToUse,
-        legacyColors: colorsToUse,
-      });
-      setLeaveConfigs(built);
-      localStorage.setItem('leave_configs', JSON.stringify(built));
+      let existingConfigs = null;
+      try {
+        const raw = localStorage.getItem('leave_configs');
+        if (raw) existingConfigs = JSON.parse(raw);
+      } catch (e) {}
+
+      if (Array.isArray(existingConfigs) && existingConfigs.length > 0) {
+        setLeaveConfigs(existingConfigs);
+      } else {
+        const built = buildInitialLeaveConfigs({
+          legacyQuotas: { pl: plQuota, el: elQuota, rh: rhQuota, wfh: wfhQuota },
+          legacyNames: namesToUse,
+          legacyColors: colorsToUse,
+        });
+        setLeaveConfigs(built);
+        localStorage.setItem('leave_configs', JSON.stringify(built));
+      }
     }
   };
 
@@ -1454,11 +1484,25 @@ function App() {
       // Sandboxed demo plan for tutorial mode: do NOT write to real database
       const chosenName = mobilePlanName || defaultTutorialPlanName;
       setTutorialCustomName(chosenName);
+      setLeavePlans(prev => [
+        {
+          id: 'tutorial-demo-plan-temp',
+          name: chosenName,
+          start_date: tutorialStartDate,
+          end_date: tutorialEndDate,
+          startDate: tutorialStartDate,
+          endDate: tutorialEndDate,
+          type: 'pl',
+          is_demo: true
+        },
+        ...prev.filter(p => p.id !== 'tutorial-demo-plan-temp')
+      ]);
       setPreviewDates([]);
       setSelectionStart(null);
       setMobileConfirmOpen(false);
       setMobileNote('');
       setMobileLeaveType('pl');
+      setActiveTab('tracker');
       setTutorialStepIndex(6);
       return;
     }
@@ -1667,121 +1711,93 @@ function App() {
             </div>
           </div>
 
-          {/* Redesigned Compact Desktop Tracker */}
-          <div className="hidden lg:flex items-center gap-3 flex-1 min-w-0 justify-end">
-            {/* Segmented Tier Tabs */}
-            <div className="flex items-center p-0.5 bg-muted/70 border border-border/80 rounded-xl gap-0.5 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setTopbarTierTab('annual')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                  topbarTierTab === 'annual'
-                    ? 'bg-card text-foreground shadow-xs font-black'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                title="Annual Leave Bank"
-              >
-                Annual <span className="opacity-70 font-semibold ml-0.5">({annualTrackerEntries.reduce((s, e) => s + (typeof e.remaining === 'number' ? e.remaining : parseFloat(e.remaining) || 0), 0)})</span>
-              </button>
-              {specialTrackerEntries.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setTopbarTierTab('special')}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                    topbarTierTab === 'special'
-                      ? 'bg-card text-foreground shadow-xs font-black'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  title="Special Benefits"
-                >
-                  Special <span className="opacity-70 font-semibold ml-0.5">({specialTrackerEntries.length})</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setTopbarTierTab('remote')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                  topbarTierTab === 'remote'
-                    ? 'bg-card text-foreground shadow-xs font-black'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                title="Work From Home / Remote"
-              >
-                Remote <span className="opacity-70 font-semibold ml-0.5">({remoteTrackerEntry.remaining})</span>
-              </button>
-            </div>
+          {/* Redesigned Compact Desktop Tracker (Stacked: Fixed Tab Selector on Top, Leave Bars Below) */}
+          <div className="hidden lg:flex flex-col items-end gap-1.5 flex-1 min-w-0 justify-center">
+            {/* Fixed Top Tab Selector (Linked Component) */}
+            <SegmentedPolicyTabs
+              tabs={[
+                { 
+                  id: 'annual', 
+                  label: 'Annual', 
+                  count: annualTrackerEntries.reduce((s, e) => s + (typeof e.remaining === 'number' ? e.remaining : parseFloat(e.remaining) || 0), 0) 
+                },
+                ...(specialTrackerEntries.length > 0 ? [{ 
+                  id: 'special', 
+                  label: 'Special', 
+                  count: specialTrackerEntries.length 
+                }] : []),
+                { 
+                  id: 'remote', 
+                  label: 'Remote', 
+                  count: remoteTrackerEntry.remaining 
+                }
+              ]}
+              activeTab={topbarTierTab}
+              onChange={setTopbarTierTab}
+              layoutId="desktop-topbar-tier-pill"
+              size="xs"
+              className="w-auto p-0.5"
+            />
 
-            {/* Active Tier Items Compact Capsules */}
-            <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
-              {(topbarTierTab === 'annual' 
-                ? annualTrackerEntries 
-                : topbarTierTab === 'special' 
-                  ? specialTrackerEntries 
-                  : [remoteTrackerEntry]
-              ).map(item => {
-                const colorObj = getLeaveColor(item.color || 'blue');
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-1.5 bg-muted/40 hover:bg-muted/70 border border-border/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs group flex-shrink-0 select-none cursor-default"
-                    title={`${item.name}: ${item.used} used, ${item.remaining} left`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${colorObj.bg} flex-shrink-0`} />
-                    <span className="text-[10px] font-mono font-bold text-muted-foreground group-hover:text-foreground uppercase transition-colors">
-                      {item.shortCode}
-                    </span>
-                    <div className="flex items-baseline gap-0.5 font-mono">
-                      <span className="text-xs font-black text-foreground">{item.remaining}</span>
-                      <span className="text-[9px] text-muted-foreground font-semibold">/{item.total}</span>
-                    </div>
-                    {item.cadence && (
-                      <span className="text-[8px] font-mono text-muted-foreground/60 uppercase">
-                        {item.cadence === 'month' ? 'mo' : 'yr'}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+            {/* Active Tier Leave Bars Row Below */}
+            <div className="flex items-center gap-1.5 justify-end">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                  key={topbarTierTab}
+                  initial={{ opacity: 0, y: 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -3 }}
+                  transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+                  className="flex items-center gap-1.5 flex-shrink-0"
+                >
+                  {(topbarTierTab === 'annual' 
+                    ? annualTrackerEntries 
+                    : topbarTierTab === 'special' 
+                      ? specialTrackerEntries 
+                      : [remoteTrackerEntry]
+                  ).map(item => {
+                    const colorObj = getLeaveColor(item.color || 'blue');
+                    const pct = item.total > 0 ? (item.remaining / item.total) * 100 : 0;
+                    return (
+                      <div
+                        key={item.id}
+                        data-surface="topbar-tracker"
+                        data-leave-id={item.id}
+                        className="flex flex-col justify-center gap-1 bg-muted/40 hover:bg-muted/70 border border-border/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs group flex-shrink-0 select-none cursor-default min-w-[76px]"
+                        title={`${item.name}: ${item.used} used, ${item.remaining} left`}
+                      >
+                        <div className="flex items-center justify-between gap-2 leading-none">
+                          <div className="flex items-center gap-1">
+                            <span className={`w-1.5 h-1.5 rounded-full ${colorObj.bg} flex-shrink-0`} />
+                            <span className="text-[10px] font-mono font-bold text-muted-foreground group-hover:text-foreground uppercase transition-colors">
+                              {item.shortCode}
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-0.5 font-mono leading-none">
+                            <span className="text-xs font-black text-foreground">{item.remaining}</span>
+                            <span className="text-[9px] text-muted-foreground font-semibold">/{item.total}</span>
+                            {item.cadence && (
+                              <span className="text-[8px] font-mono text-muted-foreground/60 uppercase ml-0.5">
+                                {item.cadence === 'month' ? 'mo' : 'yr'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Bar filling visual style */}
+                        <div className="h-1 w-full bg-muted/90 dark:bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-300 ${colorObj.bg}`}
+                            style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-l border-border/80 pl-4 flex-shrink-0 relative z-[60]">
-            {/* Profile Pill with Avatar & Direct Hub Trigger */}
-            {(() => {
-              const googleAvatar = currentUser?.user_metadata?.avatar_url || currentUser?.user_metadata?.picture || null;
-              const effectiveAvatar = avatarUrl || googleAvatar || null;
-              const initials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'LV';
-
-              return (
-                <button 
-                  type="button"
-                  onClick={() => currentUser ? setSettingsModalOpen(true) : setAuthModalOpen(true)} 
-                  title="Settings & Profile Hub"
-                  className="flex items-center gap-2 bg-muted/60 hover:bg-muted border border-border/80 rounded-full p-1 pr-3 text-xs font-bold text-foreground transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
-                >
-                  {effectiveAvatar ? (
-                    <img src={effectiveAvatar} alt={userName} className="w-6 h-6 rounded-full object-cover border border-primary/20 flex-shrink-0" />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground font-black text-[10px] flex items-center justify-center flex-shrink-0 shadow-sm">
-                      {initials}
-                    </div>
-                  )}
-                  <span className="font-bold text-xs">{userName}</span>
-                </button>
-              );
-            })()}
-
-            <button
-              type="button"
-              onClick={handleSignOut}
-              title="Sign Out"
-              className="hidden md:flex p-2 rounded-full bg-muted/60 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground border border-border/80 transition-colors cursor-pointer"
-            >
-              <LogOut size={14} />
-            </button>
-
-            <ThemeSelector theme={theme} setTheme={setTheme} />
-          </div>
         </header>
 
         {/* Desktop Tabs */}
@@ -1796,16 +1812,45 @@ function App() {
                 <span className="bg-muted text-foreground px-1.5 py-0.5 rounded text-xs font-mono font-bold">{bookedDates.length}</span>
               </button>
             </div>
-            <button 
-              disabled 
-              className="py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground/40 opacity-50 cursor-not-allowed flex items-center gap-2 select-none"
-              title="Trip Planner is coming soon!"
-            >
-              <MapPin size={15} /> Trip Planner
-              <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground/80 border border-border/50">
-                Coming Soon
-              </span>
-            </button>
+
+            {/* User Controls placed neatly below the Leave Quotas section */}
+            <div className="flex items-center gap-3 py-1 relative z-[60]">
+              {/* Profile Pill with Avatar & Direct Hub Trigger */}
+              {(() => {
+                const googleAvatar = currentUser?.user_metadata?.avatar_url || currentUser?.user_metadata?.picture || null;
+                const effectiveAvatar = avatarUrl || googleAvatar || null;
+                const initials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'LV';
+
+                return (
+                  <button 
+                    type="button"
+                    onClick={() => currentUser ? setSettingsModalOpen(true) : setAuthModalOpen(true)} 
+                    title="Settings & Profile Hub"
+                    className="flex items-center gap-2 bg-muted/60 hover:bg-muted border border-border/80 rounded-full p-1 pr-3 text-xs font-bold text-foreground transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                  >
+                    {effectiveAvatar ? (
+                      <img src={effectiveAvatar} alt={userName} className="w-6 h-6 rounded-full object-cover border border-primary/20 flex-shrink-0" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground font-black text-[10px] flex items-center justify-center flex-shrink-0 shadow-sm">
+                        {initials}
+                      </div>
+                    )}
+                    <span className="font-bold text-xs">{userName}</span>
+                  </button>
+                );
+              })()}
+
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title="Sign Out"
+                className="flex p-2 rounded-full bg-muted/60 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground border border-border/80 transition-colors cursor-pointer"
+              >
+                <LogOut size={14} />
+              </button>
+
+              <ThemeSelector theme={theme} setTheme={setTheme} />
+            </div>
           </div>
         </div>
       </div>
@@ -1852,7 +1897,7 @@ function App() {
           
           <div 
             ref={mainScrollContainerRef} 
-            className={`flex-1 ${activeTab === 'calendar' && calendarViewMode === 'monthly' ? 'md:overflow-hidden' : 'overflow-y-auto'} p-4 md:p-6 pb-32 md:pb-0 relative flex flex-col`}
+            className={`flex-1 overflow-y-auto ${activeTab === 'calendar' && calendarViewMode === 'monthly' ? 'md:overflow-hidden' : ''} p-4 md:p-6 pb-32 md:pb-0 relative flex flex-col`}
           >
             <AnimatePresence mode="wait">
               {activeTab === 'calendar' && (
@@ -2150,8 +2195,11 @@ function App() {
                             <CompanyInput 
                               value={mobileFormCompany} 
                               onChange={(val) => setMobileFormCompany(val)} 
-                              placeholder="e.g. Siemens, ABB, Google"
+                              placeholder="e.g. Nykaa, nykaa.com, Google..."
                             />
+                            <p className="text-[10px] text-muted-foreground font-medium">
+                              Type name or domain (e.g. Nykaa, nykaa.com) to fetch brand icon.
+                            </p>
                           </div>
                         </div>
 
@@ -2270,42 +2318,24 @@ function App() {
 
                   {/* Pinned Tab Switcher */}
                   <div className="px-4 pt-2.5 pb-1 flex-shrink-0">
-                    <div className="flex bg-muted p-1 rounded-2xl border border-border/80 gap-1 overflow-x-auto no-scrollbar">
-                      {[
+                    <SegmentedPolicyTabs
+                      tabs={[
                         { id: 'quotas', label: 'Quotas', icon: SlidersHorizontal },
                         { id: 'holidays', label: 'Public Holidays', icon: Clock },
                         { id: 'backup', label: 'Backups', icon: FileText }
-                      ].map(tab => {
-                        const Icon = tab.icon;
-                        const isActive = mobileSettingsTab === tab.id;
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => setMobileSettingsTab(tab.id)}
-                            className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all flex-shrink-0 cursor-pointer ${
-                              isActive ? 'bg-background shadow-apple-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            <Icon size={13} className={isActive ? 'text-primary' : ''} />
-                            <span className="whitespace-nowrap">{tab.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                      ]}
+                      activeTab={mobileSettingsTab}
+                      onChange={setMobileSettingsTab}
+                      layoutId="mobile-settings-tab-pill"
+                      size="sm"
+                    />
                   </div>
 
                   {/* Scrollable Tab Content Body */}
                   <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2.5 flex flex-col gap-3 no-scrollbar overscroll-contain">
-                    <AnimatePresence mode="wait">
+                    <MorphingTabContent activeKey={mobileSettingsTab}>
                       {mobileSettingsTab === 'quotas' ? (
-                        <motion.div
-                          key="quotas"
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          transition={{ duration: 0.18, ease: "easeInOut" }}
-                          className="flex flex-col gap-3"
-                        >
+                        <div className="flex flex-col gap-3">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Leave Quotas, Colors & Custom Names</span>
                           
                           {/* 2x2 Grid Layout with AppleWheelPicker Tumbler Scroll */}
@@ -2382,31 +2412,17 @@ function App() {
                               })}
                             </select>
                           </div>
-                        </motion.div>
+                        </div>
                       ) : mobileSettingsTab === 'holidays' ? (
-                        <motion.div
-                          key="holidays"
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          transition={{ duration: 0.18, ease: "easeInOut" }}
-                          className="flex flex-col gap-2 min-h-[340px]"
-                        >
+                        <div className="flex flex-col gap-2 min-h-[340px]">
                           <HolidayManager 
                             showTitle={false} 
                             initialHolidays={currentHolidays}
                             onStagingChange={setMobileHolidaysStagingState} 
                           />
-                        </motion.div>
+                        </div>
                       ) : (
-                        <motion.div
-                          key="backup"
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          transition={{ duration: 0.18, ease: "easeInOut" }}
-                          className="flex flex-col gap-3.5"
-                        >
+                        <div className="flex flex-col gap-3.5">
                           {/* Export Account Data Section */}
                           <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
                             <div>
@@ -2485,10 +2501,10 @@ function App() {
                                 disabled={isImportingMobile} 
                               />
                             </label>
+                            </div>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                        )}
+                    </MorphingTabContent>
 
                     {/* Toast Message */}
                     {mobileToast && (
@@ -2597,7 +2613,12 @@ function App() {
                         <span className="text-[10px] font-mono text-muted-foreground mt-0.5">{currentUser?.email || 'Guest Account'}</span>
                       </div>
                     </div>
-                    <button onClick={() => setIsMobileMenuOpen(false)} className="p-1.5 text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted rounded-full transition-colors cursor-pointer">
+                    <button 
+                      data-testid="mobile-drawer-close"
+                      aria-label="Close"
+                      onClick={() => setIsMobileMenuOpen(false)} 
+                      className="p-1.5 text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted rounded-full transition-colors cursor-pointer"
+                    >
                       <X size={16} />
                     </button>
                   </div>
@@ -2680,48 +2701,24 @@ function App() {
                         </span>
                         
                         {/* Segmented Tier Tabs */}
-                        <div className="flex p-0.5 bg-muted/80 border border-border/80 rounded-xl gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setMobileMenuTierTab('annual')}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                              mobileMenuTierTab === 'annual'
-                                ? 'bg-primary text-primary-foreground font-black shadow-xs'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            Annual
-                          </button>
-                          {specialTrackerEntries.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setMobileMenuTierTab('special')}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                                mobileMenuTierTab === 'special'
-                                  ? 'bg-primary text-primary-foreground font-black shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              Special
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setMobileMenuTierTab('remote')}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                              mobileMenuTierTab === 'remote'
-                                ? 'bg-primary text-primary-foreground font-black shadow-xs'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            Remote
-                          </button>
-                        </div>
+                        <SegmentedPolicyTabs
+                          tabs={[
+                            { id: 'annual', label: 'Annual' },
+                            ...(specialTrackerEntries.length > 0 ? [{ id: 'special', label: 'Special' }] : []),
+                            { id: 'remote', label: 'Remote' }
+                          ]}
+                          activeTab={mobileMenuTierTab}
+                          onChange={setMobileMenuTierTab}
+                          layoutId="mobile-drawer-tier-pill"
+                          className="w-auto p-0.5"
+                        />
                       </div>
 
-                      {/* Tier 1: Annual Leave Bank */}
-                      {mobileMenuTierTab === 'annual' && (
-                        <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+                      {/* Morphing Tab Viewport */}
+                      <MorphingTabContent activeKey={mobileMenuTierTab}>
+                        {/* Tier 1: Annual Leave Bank */}
+                        {mobileMenuTierTab === 'annual' && (
+                        <div className="flex flex-col gap-2">
                           <div className="p-2.5 bg-card border border-border/80 rounded-2xl flex items-center justify-between text-xs font-mono shadow-2xs">
                             <span className="text-muted-foreground font-medium">Total Vacation Bank</span>
                             <span className="font-black text-foreground">
@@ -2735,7 +2732,12 @@ function App() {
                               const colorObj = getLeaveColor(item.color || 'blue');
                               const pct = item.total > 0 ? (item.remaining / item.total) * 100 : 0;
                               return (
-                                <div key={item.id} className="p-2.5 bg-card/60 border border-border/70 rounded-2xl flex flex-col gap-1.5 shadow-2xs">
+                                <div 
+                                  key={item.id} 
+                                  data-surface="mobile-drawer-balances"
+                                  data-leave-id={item.id}
+                                  className="p-2.5 bg-card/60 border border-border/70 rounded-2xl flex flex-col gap-1.5 shadow-2xs"
+                                >
                                   <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <span className={`w-2 h-2 rounded-full ${colorObj.bg} flex-shrink-0`} />
@@ -2763,7 +2765,7 @@ function App() {
 
                       {/* Tier 2: Special Benefits */}
                       {mobileMenuTierTab === 'special' && (
-                        <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+                        <div className="flex flex-col gap-2">
                           <span className="text-[10px] text-muted-foreground leading-tight">
                             Independent company benefits that do not deduct from your annual vacation bank.
                           </span>
@@ -2773,7 +2775,12 @@ function App() {
                               const colorObj = getLeaveColor(item.color || 'pink');
                               const pct = item.total > 0 ? (item.remaining / item.total) * 100 : 0;
                               return (
-                                <div key={item.id} className="p-2.5 bg-card/60 border border-border/70 rounded-2xl flex flex-col gap-1.5 shadow-2xs">
+                                <div 
+                                  key={item.id} 
+                                  data-surface="mobile-drawer-balances"
+                                  data-leave-id={item.id}
+                                  className="p-2.5 bg-card/60 border border-border/70 rounded-2xl flex flex-col gap-1.5 shadow-2xs"
+                                >
                                   <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <div className={`w-6 h-6 rounded-lg ${colorObj.bg}/15 ${colorObj.text} flex items-center justify-center flex-shrink-0`}>
@@ -2806,14 +2813,18 @@ function App() {
 
                       {/* Tier 3: Remote / WFH */}
                       {mobileMenuTierTab === 'remote' && (
-                        <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+                        <div className="flex flex-col gap-2">
                           {(() => {
                             const isWfhOverQuota = remoteTrackerEntry.used >= remoteTrackerEntry.total;
                             const wfhOverAmount = remoteTrackerEntry.used - remoteTrackerEntry.total;
                             const pct = Math.min(100, (remoteTrackerEntry.remaining / remoteTrackerEntry.total) * 100);
 
                             return (
-                              <div className="p-3 bg-card border border-border/80 rounded-2xl flex flex-col gap-2 shadow-2xs">
+                              <div 
+                                data-surface="mobile-drawer-balances"
+                                data-leave-id={remoteTrackerEntry.id}
+                                className="p-3 bg-card border border-border/80 rounded-2xl flex flex-col gap-2 shadow-2xs"
+                              >
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold font-mono text-foreground">
@@ -2841,6 +2852,7 @@ function App() {
                           })()}
                         </div>
                       )}
+                      </MorphingTabContent>
                     </div>
                   </div>
 
@@ -2940,49 +2952,140 @@ function App() {
                         );
                       })()}
 
-                      <div>
-                        <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-2 block">Leave Type</label>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                          {(Array.isArray(leaveConfigs) ? leaveConfigs.filter(c => c.enabled) : [
-                            { id: 'pl', name: 'Planned', shortCode: 'PL', color: 'blue' },
-                            { id: 'el', name: 'Emergency', shortCode: 'EL', color: 'orange' },
-                            { id: 'rh', name: 'Restricted', shortCode: 'RH', color: 'green' },
-                            { id: 'wfh', name: 'WFH', shortCode: 'WFH', color: 'cyan' }
-                          ]).map(item => {
-                            const isActive = mobileLeaveType === item.id;
-                            const remaining = item.id === 'wfh'
-                              ? `${Math.max(0, (item.quota || 10) - bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(getTodayStr().substring(0, 7))).length)}/mo`
-                              : item.cadence === 'month'
-                                ? `${Math.max(0, (item.quota || 1) - (leaves[item.id]?.used || 0))}/mo`
-                                : `${Math.max(0, (item.quota || leaves[item.id]?.total || 10) - (leaves[item.id]?.used || 0))} left`;
+                      {(() => {
+                        const annualModalConfigs = Array.isArray(leaveConfigs)
+                          ? leaveConfigs.filter(c => c.tier === 'annual' && c.enabled)
+                          : [
+                              { id: 'pl', name: 'Planned Leave', shortCode: 'PL', color: 'blue', tier: 'annual', allowsHalfDay: true },
+                              { id: 'el', name: 'Emergency Leave', shortCode: 'EL', color: 'orange', tier: 'annual', allowsHalfDay: true, constraints: { maxConsecutive: 2 } },
+                              { id: 'rh', name: 'Restricted Leave', shortCode: 'RH', color: 'green', tier: 'annual', allowsHalfDay: false, constraints: { maxConsecutive: 1 } }
+                            ];
+                        const specialModalConfigs = Array.isArray(leaveConfigs)
+                          ? leaveConfigs.filter(c => c.tier === 'special' && c.enabled)
+                          : [];
+                        const remoteModalConfigs = Array.isArray(leaveConfigs)
+                          ? leaveConfigs.filter(c => (c.tier === 'monthly' || c.tier === 'remote' || c.id === 'wfh') && c.enabled)
+                          : [
+                              { id: 'wfh', name: 'Work From Home', shortCode: 'WFH', color: 'cyan', tier: 'monthly', quota: 10, cadence: 'month' }
+                            ];
 
-                            const theme = getLeaveTheme(item.color || 'blue');
-                            return (
-                              <button
-                                key={item.id}
-                                id={item.id === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
-                                type="button"
-                                onClick={() => {
-                                  setMobileLeaveType(item.id);
-                                  if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
-                                }}
-                                className={`py-2.5 px-1.5 rounded-xl border-2 transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                                  isActive
-                                    ? `${theme.border} bg-muted/70 dark:bg-slate-900/90 text-foreground shadow-md ring-2 ring-primary/20 scale-[1.03]`
-                                    : 'border-border/70 bg-card/60 text-muted-foreground opacity-75 hover:opacity-100 hover:text-foreground'
-                                }`}
-                              >
-                                <span className="text-[11px] font-black uppercase tracking-wider leading-none font-mono">
-                                  {item.shortCode || getShortform(item.name)}
-                                </span>
-                                <span className="text-[8px] font-bold opacity-80 leading-none truncate font-mono">
-                                  {remaining}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                        const modalTabs = [
+                          { id: 'annual', label: 'Annual Bank', count: annualModalConfigs.length },
+                          ...(specialModalConfigs.length > 0 ? [{ id: 'special', label: 'Special', count: specialModalConfigs.length }] : []),
+                          { id: 'remote', label: 'Remote / WFH' }
+                        ];
+
+                        const currentTabConfigs = mobileModalTierTab === 'annual'
+                          ? annualModalConfigs
+                          : (mobileModalTierTab === 'special' ? specialModalConfigs : remoteModalConfigs);
+
+                        const workingLeaves = previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
+
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest block">Leave Type</label>
+                              <span className="text-[9px] font-mono font-bold text-muted-foreground/80">3-Tier Policy</span>
+                            </div>
+
+                            <SegmentedPolicyTabs
+                              tabs={modalTabs}
+                              activeTab={mobileModalTierTab}
+                              onChange={(newTab) => {
+                                setMobileModalTierTab(newTab);
+                                const targetList = newTab === 'annual' ? annualModalConfigs : (newTab === 'special' ? specialModalConfigs : remoteModalConfigs);
+                                const isAlreadyInTab = targetList.some(c => c.id === mobileLeaveType);
+                                if (!isAlreadyInTab && targetList.length > 0) {
+                                  setMobileLeaveType(targetList[0].id);
+                                }
+                              }}
+                              layoutId="mobile-confirm-modal-tier-pill"
+                              size="xs"
+                              className="w-full"
+                            />
+
+                            <MorphingTabContent activeKey={mobileModalTierTab}>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-0.5">
+                                {currentTabConfigs.map(item => {
+                                  const isActive = mobileLeaveType === item.id;
+                                  const curBal = item.id === 'wfh'
+                                    ? Math.max(0, (item.quota || 10) - bookedDates.filter(b => b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(getTodayStr().substring(0, 7))).reduce((s, b) => s + (b.duration || 1), 0))
+                                    : item.cadence === 'month'
+                                      ? Math.max(0, (item.quota || 1) - (leaves[item.id]?.used || 0))
+                                      : Math.max(0, (item.quota || leaves[item.id]?.total || 10) - (leaves[item.id]?.used || 0));
+
+                                  const displayRemaining = item.id === 'wfh'
+                                    ? `${curBal}/mo`
+                                    : item.cadence === 'month'
+                                      ? `${curBal}/mo`
+                                      : `${curBal} left`;
+
+                                  const minReq = (previewDates.length === 1 && item.allowsHalfDay !== false) ? 0.5 : workingLeaves;
+                                  const maxConsecutive = item.constraints?.maxConsecutive;
+                                  const isInsufficient = curBal < minReq;
+                                  const isConsecutiveExceeded = Boolean(maxConsecutive && workingLeaves > maxConsecutive);
+                                  const isRhOverLimit = item.id === 'rh' && workingLeaves > 1;
+
+                                  const isDisabled = !isTutorialActive && (
+                                    (workingLeaves > 0 && isInsufficient) ||
+                                    isConsecutiveExceeded ||
+                                    isRhOverLimit
+                                  );
+
+                                  let disableReason = null;
+                                  if (isDisabled) {
+                                    if (workingLeaves > 0 && isInsufficient) disableReason = 'Low Balance';
+                                    else if (isRhOverLimit) disableReason = 'Max 1 Day';
+                                    else if (isConsecutiveExceeded) disableReason = `Max ${maxConsecutive}d`;
+                                  }
+
+                                  const theme = getLeaveTheme(item.color || 'blue');
+                                  const colorObj = getLeaveColor(item.color || 'blue');
+
+                                  return (
+                                    <button
+                                      key={item.id}
+                                      id={item.id === 'pl' ? 'tutorial-step-category-pl-mobile' : undefined}
+                                      data-surface="booking-category-item"
+                                      data-leave-id={item.id}
+                                      type="button"
+                                      disabled={isDisabled}
+                                      onClick={() => {
+                                        if (!isDisabled) {
+                                          setMobileLeaveType(item.id);
+                                          if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
+                                        }
+                                      }}
+                                      className={`py-2.5 px-2 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 relative ${
+                                        isDisabled
+                                          ? 'opacity-35 cursor-not-allowed pointer-events-none bg-muted/20 border-dashed border-border/50 text-muted-foreground'
+                                          : isActive
+                                            ? `${theme.border} bg-muted/70 dark:bg-slate-900/90 text-foreground shadow-md ring-2 ring-primary/20 scale-[1.02] cursor-pointer`
+                                            : 'border-border/70 bg-card/60 text-muted-foreground opacity-80 hover:opacity-100 hover:text-foreground cursor-pointer'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1.5 leading-none">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${colorObj.bg} flex-shrink-0`} />
+                                        <span className="text-[11px] font-black uppercase tracking-wider font-mono">
+                                          {item.shortCode || getShortform(item.name)}
+                                        </span>
+                                      </div>
+                                      <span className="text-[8px] font-bold opacity-80 leading-none truncate font-mono">
+                                        {displayRemaining}
+                                      </span>
+                                      {disableReason && (
+                                        <span className="text-[8px] font-bold font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20 leading-none mt-0.5">
+                                          {disableReason}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </MorphingTabContent>
+                          </div>
+                        );
+                      })()}
 
                       {/* Universal Policy & Continuous Constraints Warning */}
                       {(() => {
@@ -3042,10 +3145,7 @@ function App() {
                       </button>
                       <button 
                         id="tutorial-step-modal-apply-btn-mobile"
-                        onClick={() => {
-                          handleMobileApply();
-                          if (isTutorialActive && tutorialStepIndex === 5) setTutorialStepIndex(6);
-                        }} 
+                        onClick={handleMobileApply} 
                         className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition-all"
                       >
                         Confirm & Apply <Check size={14} strokeWidth={3} />
@@ -3210,6 +3310,7 @@ function App() {
                 </button>
 
                 <button 
+                  data-testid="mobile-nav-tracker"
                   onClick={() => setActiveTab('tracker')} 
                   className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-colors ${activeTab === 'tracker' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                 >
@@ -3220,7 +3321,7 @@ function App() {
                   <span className="text-[9px] font-bold tracking-wide">Tracker</span>
                 </button>
 
-                <button onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground hover:text-foreground">
+                <button data-testid="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground hover:text-foreground">
                   <Menu size={20} className="mb-1"/>
                   <span className="text-[9px] font-bold tracking-wide">Menu</span>
                 </button>
@@ -3296,6 +3397,7 @@ function App() {
                 setPreviewDates([]);
                 setSelectionStart(null);
                 setSuggestedPlanName(null);
+                setActiveTab('tracker');
                 return;
               }
               if (planName) setTutorialCustomName(planName);

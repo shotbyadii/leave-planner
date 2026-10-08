@@ -8,7 +8,7 @@ const CompanyInput = ({
   onChange, 
   onSelectCompany, 
   onOpenChange,
-  placeholder = 'Select or type company name...',
+  placeholder = 'e.g. Nykaa, nykaa.com, Google...',
   className = '' 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -110,7 +110,7 @@ const CompanyInput = ({
             className="absolute left-0 right-0 top-full mt-1.5 z-[150] bg-card border border-border rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-0.5 max-h-56 overflow-y-auto no-scrollbar"
           >
             <div className="px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center justify-between border-b border-border/60 mb-0.5">
-              <span>{value ? 'Matching Companies' : 'Popular Workspaces'}</span>
+              <span>{value ? 'Matching Companies' : 'Popular Workspaces (or type nykaa.com)'}</span>
               <Search size={10} />
             </div>
 
@@ -126,18 +126,24 @@ const CompanyInput = ({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    {company.isCustom ? (
-                      <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 flex items-center justify-center flex-shrink-0">
-                        <PlusCircle size={14} />
-                      </div>
-                    ) : (
+                    {company.logoUrl ? (
                       <img 
                         src={company.logoUrl} 
                         alt={company.name} 
                         className="w-6 h-6 rounded-lg object-contain border border-border bg-card p-0.5 flex-shrink-0 group-hover:scale-105 transition-transform"
-                        onError={(e) => { e.target.style.display = 'none'; }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const fallback = e.target.nextElementSibling;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
                       />
-                    )}
+                    ) : null}
+                    <div 
+                      className={`w-6 h-6 rounded-lg ${company.isCustom ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-500' : 'bg-primary/10 border border-primary/20 text-primary'} flex items-center justify-center flex-shrink-0 text-[10px] font-mono font-bold`}
+                      style={{ display: company.logoUrl ? 'none' : 'flex' }}
+                    >
+                      {company.isCustom ? <PlusCircle size={14} /> : getCompanyInitials(company.name)}
+                    </div>
                     
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs font-bold text-foreground truncate">

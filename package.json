@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "sync:emails": "node scripts/sync-email-templates.js",
     "push:attendance": "node scripts/send-attendance-reminders.js",
+    "test:audit": "node scripts/run-audit.js",
+    "test:e2e": "playwright test",
     "push": "git add . && git commit -m \"UI/UX refinements and calendar revert\" && git push origin main"
   },
   "dependencies": {
@@ -28,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -38,6 +41,7 @@
     "globals": "^17.5.0",
     "postcss": "^8.5.12",
     "tailwindcss": "^3.4.19",
+    "typescript": "^7.0.2",
     "vite": "^8.0.10"
   }
 }

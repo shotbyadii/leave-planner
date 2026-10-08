@@ -14,6 +14,8 @@ import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
 import { COLOR_PALETTE } from '../utils/colorUtils';
 import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from '../utils/specialBenefitUtils';
+import { SegmentedPolicyTabs, MorphingTabContent } from './SegmentedPolicyTabs';
+import ConsecutiveLimitControl from './ConsecutiveLimitControl';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 import { 
   subscribeUserToPush, 
@@ -631,8 +633,11 @@ const SettingsModal = ({
                       <CompanyInput
                         value={companyName}
                         onChange={(val) => setCompanyName(val)}
-                        placeholder="e.g. Siemens, ABB, Google"
+                        placeholder="e.g. Nykaa, nykaa.com, Google..."
                       />
+                      <p className="text-[11px] text-muted-foreground font-medium">
+                        Type a company name or website domain (e.g. <span className="font-mono text-foreground font-bold">Nykaa</span> or <span className="font-mono text-foreground font-bold">nykaa.com</span>) to automagically fetch its brand icon.
+                      </p>
                     </div>
 
                   </div>
@@ -823,54 +828,35 @@ const SettingsModal = ({
                     className="flex flex-col gap-4"
                   >
                     {/* 3-Tier Segmented Sub-Tab Switcher */}
-                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted/60 border border-border/80 rounded-2xl">
-                      <button
-                        type="button"
-                        onClick={() => setQuotasTierTab('annual')}
-                        className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          quotasTierTab === 'annual'
-                            ? 'bg-card text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        <span>🏖️ Annual Bank</span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
-                          {annualConfigs.length}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setQuotasTierTab('remote')}
-                        className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          quotasTierTab === 'remote'
-                            ? 'bg-card text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        <span>🏠 Remote</span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
-                          {wfhConfig.enabled ? `${wfhConfig.quota}/mo` : 'Off'}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setQuotasTierTab('special')}
-                        className={`py-2 px-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          quotasTierTab === 'special'
-                            ? 'bg-card text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        <span>🌸 Special</span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
-                          {specialConfigs.filter(c => c.enabled).length}
-                        </span>
-                      </button>
-                    </div>
+                    <SegmentedPolicyTabs
+                      tabs={[
+                        {
+                          id: 'annual',
+                          label: 'Annual Bank',
+                          count: annualConfigs.length
+                        },
+                        {
+                          id: 'remote',
+                          label: 'Remote / WFH',
+                          count: wfhConfig.enabled ? `${wfhConfig.quota}/mo` : 'Off',
+                          dotColor: wfhConfig.enabled ? 'bg-cyan-500' : 'bg-muted-foreground/40'
+                        },
+                        {
+                          id: 'special',
+                          label: 'Special Benefits',
+                          count: specialConfigs.filter(c => c.enabled).length
+                        }
+                      ]}
+                      activeTab={quotasTierTab}
+                      onChange={setQuotasTierTab}
+                      layoutId="settings-policy-tier-pill"
+                    />
 
-                    {/* ─── TIER 1: ANNUAL LEAVE BANK ─── */}
-                    {quotasTierTab === 'annual' && (
-                      <div className="flex flex-col gap-3">
+                    {/* Morphing Tab Viewport */}
+                    <MorphingTabContent activeKey={quotasTierTab}>
+                      {/* ─── TIER 1: ANNUAL LEAVE BANK ─── */}
+                      {quotasTierTab === 'annual' && (
+                        <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between px-1">
                           <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
                             <SlidersHorizontal size={14} className="text-cyan-500" /> Tier 1: Annual Vacation Bank
@@ -919,21 +905,11 @@ const SettingsModal = ({
                                     exit={{ opacity: 0, height: 0 }}
                                     className="flex flex-col gap-2 pt-2 border-t border-border/50"
                                   >
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[11px] font-medium text-muted-foreground font-mono">Max Consecutive Days</span>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        max="30"
-                                        placeholder="None"
-                                        value={c.constraints?.maxConsecutive || ''}
-                                        onChange={(e) => {
-                                          const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                                          updateConfig(c.id, { constraints: { maxConsecutive: val } });
-                                        }}
-                                        className="w-20 bg-muted border border-border rounded-xl px-2.5 py-1 text-xs font-mono font-bold text-foreground text-right"
-                                      />
-                                    </div>
+                                    <ConsecutiveLimitControl
+                                      value={c.constraints?.maxConsecutive}
+                                      onChange={(val) => updateConfig(c.id, { constraints: { ...(c.constraints || {}), maxConsecutive: val } })}
+                                      defaultLimit={2}
+                                    />
                                     <div className="flex items-center justify-between">
                                       <span className="text-[11px] font-medium text-muted-foreground font-mono">Require Note / Document</span>
                                       <button
@@ -1043,20 +1019,12 @@ const SettingsModal = ({
                                   Show an alert if user exceeds consecutive WFH days without coming into the office.
                                 </p>
                               </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-foreground font-mono">Max Consecutive Days</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="15"
-                                  value={wfhConfig.constraints?.maxConsecutive || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                                    updateConfig('wfh', { constraints: { maxConsecutive: val } });
-                                  }}
-                                  className="w-20 bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-foreground text-right"
-                                />
-                              </div>
+                              <ConsecutiveLimitControl
+                                value={wfhConfig.constraints?.maxConsecutive}
+                                onChange={(val) => updateConfig('wfh', { constraints: { ...(wfhConfig.constraints || {}), maxConsecutive: val } })}
+                                defaultLimit={3}
+                                max={15}
+                              />
                             </div>
                           </div>
                         )}
@@ -1390,6 +1358,7 @@ const SettingsModal = ({
                         )}
                       </div>
                     )}
+                    </MorphingTabContent>
 
                   {/* Daily Attendance Check-in Prompt Preference */}
                   <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex items-center justify-between">

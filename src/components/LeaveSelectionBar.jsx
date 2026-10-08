@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AppleBalanceTicker from './AppleBalanceTicker';
 import { getShortform, getLeaveColor, getLeaveTheme } from '../utils/colorUtils';
 import { DEFAULT_LEAVE_CONFIGS, checkLeaveConstraints, buildInitialLeaveConfigs } from '../services/leaveConfigService';
+import SegmentedPolicyTabs, { MorphingTabContent } from './SegmentedPolicyTabs';
 
 const LeaveSelectionBar = ({ 
   selectionStart, 
@@ -237,6 +238,7 @@ const LeaveSelectionBar = ({
       <AnimatePresence>
         {isExpanded && (
           <motion.div 
+            id="leave-modal-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -250,6 +252,7 @@ const LeaveSelectionBar = ({
         {isExpanded ? (
           <motion.div 
             key="expanded-modal"
+            id="leave-creation-modal"
             layout
             initial={{ opacity: 0, scale: 0.95, y: '-45%', x: '-50%' }}
             animate={{ opacity: 1, scale: 1, y: '-50%', x: '-50%' }}
@@ -339,6 +342,7 @@ const LeaveSelectionBar = ({
                     <div>
                       <label className="text-xs font-bold text-foreground mb-1.5 block">Plan Name</label>
                       <input
+                        id="tutorial-step-plan-name"
                         type="text"
                         value={planName}
                         onChange={(e) => setPlanName(e.target.value)}
@@ -354,59 +358,26 @@ const LeaveSelectionBar = ({
                         <span className="text-[10px] font-mono font-bold text-muted-foreground">3-Tier System</span>
                       </div>
 
-                      <div className="flex p-1 bg-muted/70 border border-border/80 rounded-2xl gap-1 mb-3">
-                        {annualConfigs.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTierTab('annual');
-                              if (annualConfigs.length > 0) setSelectedType(annualConfigs[0].id);
-                            }}
-                            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              activeTierTab === 'annual' 
-                                ? 'bg-primary text-primary-foreground font-black shadow-sm ring-1 ring-border/50' 
-                                : 'text-muted-foreground hover:text-foreground font-medium'
-                            }`}
-                          >
-                            Annual Bank
-                          </button>
-                        )}
-                        {specialConfigs.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTierTab('special');
-                              if (specialConfigs.length > 0) setSelectedType(specialConfigs[0].id);
-                            }}
-                            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              activeTierTab === 'special' 
-                                ? 'bg-primary text-primary-foreground font-black shadow-sm ring-1 ring-border/50' 
-                                : 'text-muted-foreground hover:text-foreground font-medium'
-                            }`}
-                          >
-                            Special Benefits
-                          </button>
-                        )}
-                        {monthlyConfigs.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTierTab('monthly');
-                              if (monthlyConfigs.length > 0) setSelectedType(monthlyConfigs[0].id);
-                            }}
-                            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              activeTierTab === 'monthly' 
-                                ? 'bg-primary text-primary-foreground font-black shadow-sm ring-1 ring-border/50' 
-                                : 'text-muted-foreground hover:text-foreground font-medium'
-                            }`}
-                          >
-                            Remote / WFH
-                          </button>
-                        )}
-                      </div>
+                      <SegmentedPolicyTabs
+                        tabs={[
+                          ...(annualConfigs.length > 0 ? [{ id: 'annual', label: 'Annual Bank', count: annualConfigs.length }] : []),
+                          ...(specialConfigs.length > 0 ? [{ id: 'special', label: 'Special Benefits', count: specialConfigs.length }] : []),
+                          ...(monthlyConfigs.length > 0 ? [{ id: 'monthly', label: 'Remote / WFH' }] : [])
+                        ]}
+                        activeTab={activeTierTab}
+                        onChange={(newTab) => {
+                          setActiveTierTab(newTab);
+                          const targetConfigs = newTab === 'annual' ? annualConfigs : (newTab === 'special' ? specialConfigs : monthlyConfigs);
+                          if (targetConfigs.length > 0) setSelectedType(targetConfigs[0].id);
+                        }}
+                        layoutId="leave-modal-tier-tab-pill"
+                        size="sm"
+                        className="mb-3"
+                      />
 
-                      {/* Category Options List for Active Tier */}
-                      <div className="flex flex-col gap-2">
+                      {/* Category Options List for Active Tier with Smooth Morphing Container */}
+                      <MorphingTabContent activeKey={activeTierTab}>
+                        <div className="flex flex-col gap-2 p-1.5">
                         {(activeTierTab === 'annual' ? annualConfigs : (activeTierTab === 'special' ? specialConfigs : monthlyConfigs)).map(config => {
                           const confTheme = getLeaveTheme(config.color || 'blue');
                           const isSelected = selectedType === config.id;
@@ -419,7 +390,17 @@ const LeaveSelectionBar = ({
                           return (
                             <div key={config.id} className="flex flex-col gap-1.5">
                               <label
-                                onClick={() => !isDisabled && setSelectedType(config.id)}
+                                id={config.id === 'pl' ? 'tutorial-step-category-pl' : undefined}
+                                data-surface="booking-category-item"
+                                data-leave-id={config.id}
+                                onClick={() => {
+                                  if (!isDisabled) {
+                                    setSelectedType(config.id);
+                                    if (isTutorialMode && config.id === 'pl' && tutorialStepIndex === 4 && onAdvanceTutorial) {
+                                      onAdvanceTutorial();
+                                    }
+                                  }
+                                }}
                                 className={`flex items-center justify-between p-3.5 border-2 rounded-2xl cursor-pointer transition-all duration-150 ${
                                   isSelected 
                                     ? `${confTheme.activeBoxBorder} bg-muted/70 dark:bg-slate-900/90 shadow-md ring-2 ring-primary/25 scale-[1.01]` 
@@ -492,7 +473,8 @@ const LeaveSelectionBar = ({
                           );
                         })}
                       </div>
-                    </div>
+                    </MorphingTabContent>
+                  </div>
 
                     {/* Dynamic Policy & Constraint Warning Banner */}
                     {constraintWarnings.length > 0 && (
@@ -538,6 +520,7 @@ const LeaveSelectionBar = ({
                       Cancel
                     </button>
                     <button
+                      id="tutorial-step-modal-apply-btn"
                       onClick={handleApply}
                       disabled={!isTutorialMode && (effectiveBalances[selectedType] ?? 0) < leavesNeeded}
                       className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl text-xs font-bold transition-colors disabled:opacity-40 shadow-sm flex-[1.5] cursor-pointer"
@@ -553,12 +536,13 @@ const LeaveSelectionBar = ({
           /* Desktop Collapsed Floating Pill */
           <motion.div
             key="collapsed-pill"
+            id="tutorial-step-selection-bar"
             layout
             initial={{ opacity: 0, y: 50, x: "-50%" }}
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: 50, x: "-50%" }}
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            className="hidden md:flex fixed bottom-8 left-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-4 rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[60] overflow-hidden items-center justify-between gap-6"
+            className="hidden md:flex fixed bottom-8 left-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-4 rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[9992] overflow-visible items-center justify-between gap-6"
           >
             <motion.div layout className="flex items-center gap-3 flex-1">
               {selectionStart && previewDates.length === 0 ? (
@@ -600,6 +584,7 @@ const LeaveSelectionBar = ({
               )}
               {previewDates.length > 0 && (
                 <button 
+                  id="tutorial-step-confirm-plan-btn"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsExpanded(true);

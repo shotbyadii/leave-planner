@@ -14,6 +14,8 @@ import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../services/aiAssi
 import { DEFAULT_LEAVE_CONFIGS, deriveShortCode, buildInitialLeaveConfigs } from '../services/leaveConfigService';
 import { COLOR_PALETTE } from '../utils/colorUtils';
 import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from '../utils/specialBenefitUtils';
+import { SegmentedPolicyTabs, MorphingTabContent } from './SegmentedPolicyTabs';
+import ConsecutiveLimitControl from './ConsecutiveLimitControl';
 
 const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveConfigs: propLeaveConfigs = null }) => {
   const [step, setStep] = useState(1);
@@ -182,7 +184,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
         <div className="absolute top-[57px] inset-x-0 h-6 bg-gradient-to-b from-card via-card/80 to-transparent pointer-events-none z-20" />
 
         {/* Scrollable Step Content */}
-        <div className="p-6 overflow-y-auto flex-1 no-scrollbar flex flex-col justify-center min-h-[440px]">
+        <div className="p-6 overflow-y-auto flex-1 no-scrollbar flex flex-col justify-start min-h-[440px]">
           <AnimatePresence mode="wait">
             
             {/* STEP 1: Feature Showcase */}
@@ -283,7 +285,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                       value={companyName}
                       onChange={(val) => setCompanyName(val)}
                       onOpenChange={(isOpen) => setIsCompanySearching(isOpen)}
-                      placeholder="Search company (e.g. Google, Microsoft...)"
+                      placeholder="e.g. Nykaa, nykaa.com, Google..."
                     />
                     <motion.p 
                       animate={{ 
@@ -293,7 +295,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                       transition={{ duration: 0.2 }}
                       className="text-[11px] text-muted-foreground text-left mt-1 overflow-hidden"
                     >
-                      Auto-detects and displays your official company logo in the header.
+                      Type a company name or website domain (e.g. Nykaa or nykaa.com) to automagically fetch its brand icon.
                     </motion.p>
                   </motion.div>
                 </div>
@@ -319,49 +321,35 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                 </div>
 
                 {/* 3-Tier Segmented Header Tabs */}
-                <div className="flex p-1 bg-muted/60 border border-border/80 rounded-2xl gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setOnboardingTierTab('annual')}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      onboardingTierTab === 'annual' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <span>Annual Bank</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
-                      {leaveConfigs.filter(c => c.tier === 'annual').length}
-                    </span>
-                  </button>
+                <SegmentedPolicyTabs
+                  tabs={[
+                    {
+                      id: 'annual',
+                      label: 'Annual Bank',
+                      count: leaveConfigs.filter(c => c.tier === 'annual').length
+                    },
+                    {
+                      id: 'wfh',
+                      label: 'Work From Home',
+                      dotColor: leaveConfigs.find(c => c.id === 'wfh')?.enabled !== false ? 'bg-cyan-500' : 'bg-muted-foreground/40'
+                    },
+                    {
+                      id: 'special',
+                      label: 'Special Benefits',
+                      count: leaveConfigs.filter(c => c.tier === 'special' && c.enabled).length
+                    }
+                  ]}
+                  activeTab={onboardingTierTab}
+                  onChange={setOnboardingTierTab}
+                  layoutId="onboarding-tier-pill"
+                />
 
-                  <button
-                    type="button"
-                    onClick={() => setOnboardingTierTab('wfh')}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      onboardingTierTab === 'wfh' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <span>Work From Home</span>
-                    <span className={`w-2 h-2 rounded-full ${leaveConfigs.find(c => c.id === 'wfh')?.enabled ? 'bg-cyan-500' : 'bg-muted-foreground/40'}`} />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOnboardingTierTab('special')}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      onboardingTierTab === 'special' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <span>Special Benefits</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-muted rounded-full">
-                      {leaveConfigs.filter(c => c.tier === 'special' && c.enabled).length}
-                    </span>
-                  </button>
-                </div>
-
-                {/* TIER 1: Annual Leave Bank */}
-                {onboardingTierTab === 'annual' && (
-                  <div className="flex flex-col gap-3 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between px-1">
+                {/* Morphing Tab Viewport */}
+                <MorphingTabContent activeKey={onboardingTierTab}>
+                  {/* TIER 1: Annual Leave Bank */}
+                  {onboardingTierTab === 'annual' && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between px-1">
                       <span className="text-xs font-bold text-muted-foreground">
                         Annual Vacation Bank (Deducts from core quota)
                       </span>
@@ -420,16 +408,12 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                               className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                             />
                           </div>
-                          <div>
-                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Max in a row (Continuous)</label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={30}
-                              placeholder="Unlimited"
-                              value={newAnnualMaxConsecutive}
-                              onChange={(e) => setNewAnnualMaxConsecutive(e.target.value)}
-                              className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          <div className="flex flex-col justify-end">
+                            <ConsecutiveLimitControl
+                              value={newAnnualMaxConsecutive ? parseInt(newAnnualMaxConsecutive, 10) : null}
+                              onChange={(val) => setNewAnnualMaxConsecutive(val ? String(val) : '')}
+                              compact={true}
+                              defaultLimit={2}
                             />
                           </div>
                         </div>
@@ -549,15 +533,24 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                 </p>
                               </div>
                             </div>
-                            <input
-                              type="checkbox"
-                              checked={wfhConf.enabled !== false}
-                              onChange={(e) => {
-                                const isChecked = e.target.checked;
-                                setLeaveConfigs(prev => prev.map(c => c.id === 'wfh' ? { ...c, enabled: isChecked } : c));
+                            <button
+                              type="button"
+                              role="checkbox"
+                              aria-checked={wfhConf.enabled !== false}
+                              data-testid="wfh-toggle-checkbox"
+                              onClick={() => {
+                                const nextVal = wfhConf.enabled === false;
+                                setLeaveConfigs(prev => prev.map(c => c.id === 'wfh' ? { ...c, enabled: nextVal } : c));
                               }}
-                              className="w-5 h-5 accent-cyan-500 cursor-pointer"
-                            />
+                              className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
+                                wfhConf.enabled !== false
+                                  ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30 scale-100'
+                                  : 'bg-card border-slate-400 dark:border-slate-500 hover:border-primary text-transparent'
+                              }`}
+                              title={wfhConf.enabled !== false ? 'WFH Enabled (Click to disable)' : 'WFH Disabled (Click to enable)'}
+                            >
+                              <Check size={13} strokeWidth={3.5} className={wfhConf.enabled !== false ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} />
+                            </button>
                           </div>
 
                           {wfhConf.enabled !== false && (
@@ -965,6 +958,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                     </div>
                   </div>
                 )}
+                </MorphingTabContent>
               </motion.div>
             )}
 

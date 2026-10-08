@@ -7,6 +7,7 @@ import {
 import { extractHolidaysFromFile } from '../services/holidayExtractionService';
 import { defaultPublicHolidays, saveStoredHolidays, getStoredHolidays, deduplicateHolidays } from '../data/holidays';
 import { getStoredGeminiApiKey, setStoredGeminiApiKey, hasGeminiApiKey } from '../services/aiAssistantService';
+import SegmentedPolicyTabs from './SegmentedPolicyTabs';
 
 const MONTH_SHORT_NAMES = [
   'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 
@@ -608,47 +609,18 @@ export default function HolidayManager({
         </motion.div>
       )}
 
-      {/* Mobile Segmented Switcher (< md) with Smooth Animated Pill */}
-      <div className="flex-shrink-0 flex md:hidden items-center p-1 bg-muted/50 border border-border rounded-xl relative">
-        <button
-          type="button"
-          onClick={() => setMobileTab('list')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 relative z-10 ${
-            mobileTab === 'list' 
-              ? 'text-foreground font-bold' 
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          {mobileTab === 'list' && (
-            <motion.div
-              layoutId="activeHolidayTabPill"
-              className="absolute inset-0 bg-card rounded-lg shadow-sm -z-10 border border-border/60"
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            />
-          )}
-          <List className="w-3.5 h-3.5" />
-          <span>List View ({activeList.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMobileTab('calendar')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 relative z-10 ${
-            mobileTab === 'calendar' 
-              ? 'text-foreground font-bold' 
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          {mobileTab === 'calendar' && (
-            <motion.div
-              layoutId="activeHolidayTabPill"
-              className="absolute inset-0 bg-card rounded-lg shadow-sm -z-10 border border-border/60"
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            />
-          )}
-          <CalendarIcon className="w-3.5 h-3.5" />
-          <span>Calendar View</span>
-        </button>
+      {/* Mobile Segmented Switcher (< md) using SegmentedPolicyTabs */}
+      <div className="flex-shrink-0 md:hidden">
+        <SegmentedPolicyTabs
+          tabs={[
+            { id: 'list', label: `List View (${activeList.length})`, icon: List },
+            { id: 'calendar', label: 'Calendar View', icon: CalendarIcon }
+          ]}
+          activeTab={mobileTab}
+          onChange={setMobileTab}
+          layoutId="mobile-holiday-tab-pill"
+          size="sm"
+        />
       </div>
 
       {/* MAIN DUAL-PANE INTERFACE */}

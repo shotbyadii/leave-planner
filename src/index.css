@@ -256,16 +256,48 @@ input[data-tutorial-target="true"],
   }
 }
 
+/* Category item target inside modals: clean outline without oversized scaling to prevent clipping */
+#tutorial-step-category-pl[data-tutorial-target="true"],
+#tutorial-step-category-pl-mobile[data-tutorial-target="true"] {
+  outline: 2.5px solid #3b82f6 !important;
+  outline-offset: 1px !important;
+  animation: tutorialCategoryPulse 1.6s infinite ease-in-out !important;
+  position: relative !important;
+  z-index: 9998 !important;
+  transform: none !important;
+}
+
+@keyframes tutorialCategoryPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7), 0 0 8px rgba(59, 130, 246, 0.4);
+    border-color: #3b82f6 !important;
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 0 14px rgba(59, 130, 246, 0.7);
+    border-color: #60a5fa !important;
+  }
+}
+
 /* Non-target element dimming when tutorial is active */
-body[data-tutorial-active="true"] .bg-card:not(#tutorial-step-calendar *):not(.z-\[9990\] *):not([data-tutorial-target="true"]):not(#tutorial-hint-card):not(#sandbox-demo-banner):not(#sandbox-demo-banner *),
+body[data-tutorial-active="true"] .bg-card:not(#tutorial-step-calendar *):not(#leave-creation-modal):not(#leave-creation-modal *):not(.z-\[9990\]):not(.z-\[9990\] *):not(#mobile-floating-dock):not(#mobile-floating-dock *):not([data-tutorial-target="true"]):not(#tutorial-hint-card):not(#sandbox-demo-banner):not(#sandbox-demo-banner *),
 body[data-tutorial-active="true"] .grid > [id^="month-card-"]:not([data-tutorial-target="true"]) {
   opacity: 0.35 !important;
   transition: opacity 0.3s ease !important;
 }
 
-body[data-tutorial-active="true"] #tutorial-step-calendar,
+/* Calendar is bright during steps 1-4, dimmed behind modal in steps 5-6 */
+body[data-tutorial-active="true"]:not([data-tutorial-step="5"]):not([data-tutorial-step="6"]) #tutorial-step-calendar {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Modal and focus targets are always crystal clear & fully interactive */
+body[data-tutorial-active="true"] #leave-creation-modal,
+body[data-tutorial-active="true"] #leave-creation-modal *,
 body[data-tutorial-active="true"] .z-\[9990\],
 body[data-tutorial-active="true"] .z-\[9990\] *,
+body[data-tutorial-active="true"] #mobile-floating-dock,
+body[data-tutorial-active="true"] #mobile-floating-dock *,
 body[data-tutorial-active="true"] #sandbox-demo-banner,
 body[data-tutorial-active="true"] #sandbox-demo-banner *,
 body[data-tutorial-active="true"] [data-tutorial-target="true"] {
@@ -273,14 +305,16 @@ body[data-tutorial-active="true"] [data-tutorial-target="true"] {
   filter: none !important;
 }
 
-/* Lighten dark modal backdrop during tutorial so modal stays crystal bright */
+/* Modal backdrop during tutorial */
+body[data-tutorial-active="true"] #leave-modal-backdrop,
+body[data-tutorial-active="true"] .bg-black\/75,
 body[data-tutorial-active="true"] .bg-black\/60 {
-  background-color: rgba(0, 0, 0, 0.3) !important;
-  backdrop-filter: none !important;
+  background-color: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(6px) !important;
 }
 
-/* Disable pointer events on non-target elements when tutorial is active */
-body[data-tutorial-active="true"] button:not([data-tutorial-target="true"]):not([data-tutorial-target="true"] *):not(#tutorial-hint-card *):not(#sandbox-demo-banner *),
+/* Disable pointer events on non-target background elements when tutorial is active */
+body[data-tutorial-active="true"] button:not(#leave-creation-modal *):not(#mobile-floating-dock *):not([data-tutorial-target="true"]):not([data-tutorial-target="true"] *):not(#tutorial-hint-card *):not(#sandbox-demo-banner *),
 body[data-tutorial-active="true"] [id^="date-cell-"]:not([data-tutorial-target="true"]),
 body[data-tutorial-active="true"] [id^="month-card-"]:not([data-tutorial-target="true"]) {
   pointer-events: none !important;
@@ -288,6 +322,8 @@ body[data-tutorial-active="true"] [id^="month-card-"]:not([data-tutorial-target=
 
 body[data-tutorial-active="true"] [data-tutorial-target="true"],
 body[data-tutorial-active="true"] [data-tutorial-target="true"] *,
+body[data-tutorial-active="true"] #leave-creation-modal *,
+body[data-tutorial-active="true"] #mobile-floating-dock *,
 body[data-tutorial-active="true"] #tutorial-hint-card,
 body[data-tutorial-active="true"] #tutorial-hint-card *,
 body[data-tutorial-active="true"] #sandbox-demo-banner,

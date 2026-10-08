@@ -3,7 +3,7 @@ import { isHoliday, isWeekend } from '../data/holidays';
 import { addLeave, removeLeave, createLeavePlan } from '../services/leaveService';
 import LeaveSelectionBar from './LeaveSelectionBar';
 import ExistingLeaveModal from './ExistingLeaveModal';
-import { ChevronDown, ChevronRight, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 
@@ -398,6 +398,36 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             )}
           </div>
           <div className="flex items-center gap-2">
+            {isLarge && setFocusedMonth && (
+              <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/10 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onClearAiPreview) onClearAiPreview();
+                    setFocusedMonth(Math.max(0, monthIndex - 1));
+                  }}
+                  disabled={monthIndex === 0}
+                  title="Previous Month"
+                  className={`p-1 rounded-md transition-colors ${monthIndex === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer'} ${useNavy ? 'text-white' : 'text-foreground'}`}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onClearAiPreview) onClearAiPreview();
+                    setFocusedMonth(Math.min(11, monthIndex + 1));
+                  }}
+                  disabled={monthIndex === 11}
+                  title="Next Month"
+                  className={`p-1 rounded-md transition-colors ${monthIndex === 11 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer'} ${useNavy ? 'text-white' : 'text-foreground'}`}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
             <span className={`${isLarge ? 'text-xs md:text-sm' : (isMini ? 'text-[9px]' : 'text-xs')} font-medium leading-none ${useNavy ? 'text-white/60' : 'text-muted-foreground'}`}>
               {isMini ? "'26" : year}
             </span>

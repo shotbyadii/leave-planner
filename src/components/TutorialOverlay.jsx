@@ -12,18 +12,24 @@ const TutorialOverlay = ({
   onExecuteStepAction
 }) => {
   const TUTORIAL_STEPS = React.useMemo(() => getTutorialSteps(), []);
-  const currentStep = TUTORIAL_STEPS[currentStepIndex];
+  const safeStepIndex = Math.min(Math.max(0, currentStepIndex), TUTORIAL_STEPS.length - 1);
+  const currentStep = TUTORIAL_STEPS[safeStepIndex];
 
-  // Enable body data attribute for non-target dimming
+  // Enable body data attribute for non-target dimming & step-specific styling
   useEffect(() => {
     document.body.setAttribute('data-tutorial-active', 'true');
     return () => {
       document.body.removeAttribute('data-tutorial-active');
+      document.body.removeAttribute('data-tutorial-step');
       document.querySelectorAll('[data-tutorial-target="true"]').forEach(el => {
         el.removeAttribute('data-tutorial-target');
       });
     };
   }, []);
+
+  useEffect(() => {
+    document.body.setAttribute('data-tutorial-step', String(currentStepIndex + 1));
+  }, [currentStepIndex]);
 
   const lastExecutedRef = React.useRef(-1);
 

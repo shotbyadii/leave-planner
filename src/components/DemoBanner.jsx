@@ -6,7 +6,7 @@ export const DemoBanner = ({ onRestartDemo, onExitDemo }) => {
   return (
     <div 
       id="sandbox-demo-banner" 
-      className="fixed top-0 left-0 right-0 h-10 bg-background/95 backdrop-blur-xl border-b border-amber-500/30 z-[100000] px-3 sm:px-4 flex items-center justify-between shadow-lg shadow-black/10 select-none pointer-events-auto"
+      className="fixed top-0 left-0 right-0 h-10 bg-background/95 backdrop-blur-xl border-b border-amber-500/30 z-[45] px-3 sm:px-4 flex items-center justify-between shadow-lg shadow-black/10 select-none pointer-events-auto"
     >
       <div className="flex items-center gap-2 overflow-hidden flex-shrink-0">
         <div className="w-6 h-6 rounded-lg bg-amber-500/15 text-amber-500 dark:text-amber-400 flex items-center justify-center flex-shrink-0 font-mono text-xs">

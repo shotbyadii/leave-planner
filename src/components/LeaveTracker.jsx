@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown, Home, Sparkles } from 'lucide-react';
+import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown, Home, Sparkles, FileText, AlertTriangle, Shield } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import DeletePlanModal from './DeletePlanModal';
 import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 import { getSpecialBenefitIcon } from '../utils/specialBenefitUtils';
+import { countConsecutiveWorkingDays } from '../services/leaveConfigService';
+import { SegmentedPolicyTabs, MorphingTabContent } from './SegmentedPolicyTabs';
 
 export const getAllDatesInRange = (startDateStr, endDateStr) => {
   if (!startDateStr || !endDateStr) return [];
@@ -211,7 +213,47 @@ const LeaveTracker = ({
     }
   };
 
-  const sortedBookedDates = [...bookedDates].sort((a, b) => {
+  const [tableFilterTab, setTableFilterTab] = useState('all'); // 'all' | 'annual' | 'special' | 'remote'
+
+  const { filteredBookedDates, countsByTier } = useMemo(() => {
+    let annualCount = 0;
+    let specialCount = 0;
+    let remoteCount = 0;
+
+    bookedDates.forEach(leave => {
+      const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leave.type) : null;
+      if (cfg?.tier === 'special') specialCount++;
+      else if (leave.type === 'wfh' || cfg?.tier === 'remote' || cfg?.tier === 'monthly') remoteCount++;
+      else annualCount++;
+    });
+
+    const filtered = bookedDates.filter(leave => {
+      if (tableFilterTab === 'all') return true;
+      const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leave.type) : null;
+      if (tableFilterTab === 'annual') {
+        return cfg?.tier === 'annual' || (!cfg?.tier && ['pl', 'el', 'rh'].includes(leave.type));
+      }
+      if (tableFilterTab === 'special') {
+        return cfg?.tier === 'special';
+      }
+      if (tableFilterTab === 'remote') {
+        return leave.type === 'wfh' || cfg?.tier === 'remote' || cfg?.tier === 'monthly';
+      }
+      return true;
+    });
+
+    return {
+      filteredBookedDates: filtered,
+      countsByTier: {
+        all: bookedDates.length,
+        annual: annualCount,
+        special: specialCount,
+        remote: remoteCount
+      }
+    };
+  }, [bookedDates, tableFilterTab, leaveConfigs]);
+
+  const sortedBookedDates = [...filteredBookedDates].sort((a, b) => {
     let valA, valB;
     if (sortField === 'date') {
       valA = new Date(a.date).getTime();
@@ -251,35 +293,22 @@ const LeaveTracker = ({
             
             {/* Segmented Tier Tab Switcher */}
             {specialConfigs.length > 0 && (
-              <div className="flex p-0.5 bg-black/40 rounded-xl border border-white/10 gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setTrackerTierTab('annual')}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                    trackerTierTab === 'annual'
-                      ? 'bg-white text-slate-950 font-black shadow-xs'
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                >
-                  Annual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTrackerTierTab('special')}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                    trackerTierTab === 'special'
-                      ? 'bg-white text-slate-950 font-black shadow-xs'
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                >
-                  Special ({specialConfigs.length})
-                </button>
-              </div>
+              <SegmentedPolicyTabs
+                tabs={[
+                  { id: 'annual', label: 'Annual', testId: 'tracker-tier-annual' },
+                  { id: 'special', label: `Special (${specialConfigs.length})`, testId: 'tracker-tier-special' }
+                ]}
+                activeTab={trackerTierTab}
+                onChange={setTrackerTierTab}
+                layoutId="tracker-tier-tab-pill"
+                className="w-auto py-0.5 px-0.5"
+              />
             )}
           </div>
           
-          {trackerTierTab === 'annual' ? (
-            <div>
+          <MorphingTabContent activeKey={trackerTierTab}>
+            {trackerTierTab === 'annual' ? (
+              <div>
               {/* Circular Gauge */}
               <div className="relative w-36 h-36 mx-auto mb-5">
                 <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
@@ -322,7 +351,12 @@ const LeaveTracker = ({
                   const usedFmt = Number.isInteger(used) ? used : used.toFixed(1);
 
                   return (
-                    <div key={c.id} className="flex justify-between items-center text-xs">
+                    <div 
+                      key={c.id} 
+                      data-surface="tracker-dashboard"
+                      data-leave-id={c.id}
+                      className="flex justify-between items-center text-xs"
+                    >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className={`w-2 h-2 rounded-full ${colorObj.bg} flex-shrink-0`} />
                         <span className="text-white/90 font-bold truncate">
@@ -357,7 +391,12 @@ const LeaveTracker = ({
                   const colorObj = getLeaveColor(c.color || 'pink');
 
                   return (
-                    <div key={c.id} className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+                    <div 
+                      key={c.id} 
+                      data-surface="tracker-dashboard"
+                      data-leave-id={c.id}
+                      className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1.5"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-white flex-shrink-0">
@@ -387,6 +426,7 @@ const LeaveTracker = ({
               </div>
             </div>
           )}
+          </MorphingTabContent>
         </div>
 
         {/* WFH Monthly Utilization Card */}
@@ -678,21 +718,41 @@ const LeaveTracker = ({
 
         {/* All Records Table (Fits page width on mobile without horizontal scroll) */}
         <div className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm overflow-hidden">
-          <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-4 sm:p-6 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h2 className="font-bold text-foreground text-lg sm:text-xl tracking-tight">All Records</h2>
-              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Individual leave log</p>
+              <div className="flex items-center gap-2.5">
+                <h2 className="font-bold text-foreground text-lg sm:text-xl tracking-tight">All Records</h2>
+                <div className="bg-muted px-2.5 py-0.5 rounded-full text-xs font-black text-muted-foreground font-mono">
+                  {filteredBookedDates.length} of {bookedDates.length}
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">
+                Individual leave log with policy & limit tracking
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="bg-muted px-2.5 py-1 rounded-xl text-xs font-black text-muted-foreground font-mono">{bookedDates.length} entries</div>
+            
+            {/* Filter Tabs across 3 Tiers */}
+            <div className="w-full md:w-auto overflow-x-auto no-scrollbar">
+              <SegmentedPolicyTabs
+                tabs={[
+                  { id: 'all', label: 'All', count: countsByTier.all },
+                  { id: 'annual', label: 'Annual Bank', count: countsByTier.annual },
+                  ...(countsByTier.special > 0 ? [{ id: 'special', label: 'Special Benefits', count: countsByTier.special }] : []),
+                  ...(countsByTier.remote > 0 ? [{ id: 'remote', label: 'Remote / WFH', count: countsByTier.remote }] : [])
+                ]}
+                activeTab={tableFilterTab}
+                onChange={setTableFilterTab}
+                layoutId="records-table-filter-pill"
+                size="xs"
+              />
             </div>
           </div>
           
           <div className="w-full overflow-hidden">
-            {bookedDates.length === 0 ? (
+            {filteredBookedDates.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/50 italic">
                 <CalendarDays size={32} className="mb-2 opacity-20" />
-                <p className="text-sm">No leave records found.</p>
+                <p className="text-sm">No leave records found{tableFilterTab !== 'all' ? ` for ${tableFilterTab}` : ''}.</p>
               </div>
             ) : (
               <table className="w-full text-left border-collapse">
@@ -737,29 +797,76 @@ const LeaveTracker = ({
                       ? 'bg-muted text-foreground border-border' 
                       : theme.activeBadge;
                     const typeLabel = isOffice ? 'OFFICE' : (cfg?.shortCode || getShortform(cfg?.name || leaveNames?.[leave.type] || leave.type.toUpperCase(), leave.type.toUpperCase()));
+                    const typeFullName = isOffice ? 'Office Day' : (cfg?.name || leaveNames?.[leave.type] || leave.type.toUpperCase());
+
+                    // Policy & Consecutive Limit Tracking
+                    const maxConsecutive = cfg?.constraints?.maxConsecutive;
+                    const isConsecutiveLimited = Boolean(maxConsecutive && maxConsecutive > 0);
+                    const streakCount = isConsecutiveLimited 
+                      ? countConsecutiveWorkingDays([leave.date], leave.type, bookedDates)
+                      : 0;
+                    const isLimitExceeded = isConsecutiveLimited && streakCount > maxConsecutive;
+
+                    const tierLabel = cfg?.tier === 'special'
+                      ? 'Special'
+                      : (leave.type === 'wfh' || cfg?.tier === 'remote' || cfg?.tier === 'monthly' ? 'Remote' : 'Annual');
 
                     return (
-                      <tr key={idx} className="hover:bg-muted/20 transition-colors group select-none">
+                      <tr 
+                        key={idx} 
+                        data-surface="records-table-row"
+                        data-leave-id={leave.type}
+                        className="hover:bg-muted/20 transition-colors group select-none"
+                      >
                         <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <span className="font-black text-foreground text-xs sm:text-sm tracking-tight whitespace-nowrap">
                             {dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                           </span>
                         </td>
                         <td className="px-2 sm:px-6 py-3 sm:py-4 text-center sm:text-left">
-                          <span className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black uppercase tracking-wider inline-flex items-center justify-center ${cls}`}>
-                            {typeLabel}{isHalfDay && ' ½'}
-                          </span>
+                          <div className="flex flex-col sm:flex-row items-center gap-1.5">
+                            <span 
+                              title={typeFullName}
+                              className={`px-2 sm:px-2.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black uppercase tracking-wider inline-flex items-center justify-center ${cls}`}
+                            >
+                              {typeLabel}{isHalfDay && ' ½'}
+                            </span>
+                            <span className="text-[9px] font-mono text-muted-foreground/70 hidden sm:inline-block">
+                              {tierLabel}
+                            </span>
+                          </div>
                         </td>
                         <td className="hidden sm:table-cell px-6 py-4">
-                          <div className="flex items-center gap-1.5 whitespace-nowrap">
-                            <div className={`w-1.5 h-1.5 rounded-full ${isHalfDay ? 'bg-amber-400' : 'bg-foreground'}`} />
-                            <span className="text-xs font-bold text-foreground/80">{isHalfDay ? 'Half Day' : 'Full Day'}</span>
+                          <div className="flex flex-col gap-1 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-1.5 h-1.5 rounded-full ${isHalfDay ? 'bg-amber-400' : 'bg-foreground'}`} />
+                              <span className="text-xs font-bold text-foreground/80">{isHalfDay ? 'Half Day' : 'Full Day'}</span>
+                            </div>
+                            {isLimitExceeded && (
+                              <span 
+                                title={`Consecutive streak of ${streakCount} days exceeds policy limit of ${maxConsecutive} days`}
+                                className="inline-flex items-center gap-1 text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md w-fit"
+                              >
+                                <AlertTriangle size={10} /> Streak &gt; {maxConsecutive}d
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-3 sm:px-6 py-3 sm:py-4">
-                          <span className="text-xs sm:text-sm font-black text-foreground/80 uppercase font-mono tracking-tight truncate max-w-[110px] sm:max-w-[200px] block">
-                            {leave.plan_name || '—'}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs sm:text-sm font-black text-foreground/80 uppercase font-mono tracking-tight truncate max-w-[110px] sm:max-w-[200px] block">
+                              {leave.plan_name || '—'}
+                            </span>
+                            {leave.note && (
+                              <span 
+                                title={leave.note}
+                                className="text-[10px] text-muted-foreground font-mono flex items-center gap-1 truncate max-w-[110px] sm:max-w-[200px]"
+                              >
+                                <FileText size={10} className="text-primary flex-shrink-0" />
+                                <span className="truncate">{leave.note}</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-2 sm:px-6 py-3 sm:py-4 text-right">
                           <button
