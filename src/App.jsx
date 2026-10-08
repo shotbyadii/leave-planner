@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock, FileSpreadsheet } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend, getStoredHolidays, loadHolidaysFromSupabase } from './data/holidays';
@@ -29,6 +29,7 @@ import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import AppleBalanceTicker from './components/AppleBalanceTicker';
 import { getLeaveColor, getLeaveTheme, getShortform, COLOR_PALETTE } from './utils/colorUtils';
+import { getSpecialBenefitIcon } from './utils/specialBenefitUtils';
 import { buildInitialLeaveConfigs, checkLeaveConstraints } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
@@ -247,6 +248,79 @@ function App() {
   const [calendarStyle, setCalendarStyle] = useState(localStorage.getItem('calendar_cell_style') || 'capsule');
   const [focusedCellHeight, setFocusedCellHeight] = useState(Number(localStorage.getItem('dev_focused_cell_height') || 56));
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
+  const [topbarTierTab, setTopbarTierTab] = useState('annual'); // 'annual' | 'special' | 'remote'
+  const [mobileMenuTierTab, setMobileMenuTierTab] = useState('annual'); // 'annual' | 'special' | 'remote'
+
+  const annualTrackerEntries = useMemo(() => {
+    if (Array.isArray(leaveConfigs) && leaveConfigs.length > 0) {
+      return leaveConfigs.filter(c => c.tier === 'annual' && c.enabled).map(c => {
+        const data = leaves[c.id] || { total: c.quota, used: 0, label: c.name };
+        const total = data.total ?? c.quota ?? 0;
+        const used = data.used ?? 0;
+        const rem = Math.max(0, total - used);
+        return {
+          id: c.id,
+          shortCode: c.shortCode || getShortform(c.name, c.id.toUpperCase()),
+          name: c.name,
+          color: c.color || 'blue',
+          total,
+          used,
+          remaining: Number.isInteger(rem) ? rem : rem.toFixed(1)
+        };
+      });
+    }
+    return ['pl', 'el', 'rh'].map(k => {
+      const data = leaves[k] || { total: 10, used: 0, label: k };
+      const rem = Math.max(0, data.total - data.used);
+      return {
+        id: k,
+        shortCode: k.toUpperCase(),
+        name: leaveNames[k] || data.label,
+        color: leaveColors[k] || 'blue',
+        total: data.total,
+        used: data.used,
+        remaining: Number.isInteger(rem) ? rem : rem.toFixed(1)
+      };
+    });
+  }, [leaveConfigs, leaves, leaveNames, leaveColors]);
+
+  const specialTrackerEntries = useMemo(() => {
+    if (Array.isArray(leaveConfigs) && leaveConfigs.length > 0) {
+      return leaveConfigs.filter(c => c.tier === 'special' && c.enabled).map(c => {
+        const data = leaves[c.id] || { total: c.quota, used: 0, label: c.name };
+        const total = data.total ?? c.quota ?? 1;
+        const used = data.used ?? 0;
+        const rem = Math.max(0, total - used);
+        return {
+          id: c.id,
+          shortCode: c.shortCode || getShortform(c.name, c.id.toUpperCase()),
+          name: c.name,
+          color: c.color || 'pink',
+          cadence: c.cadence || 'month',
+          total,
+          used,
+          remaining: Number.isInteger(rem) ? rem : rem.toFixed(1)
+        };
+      });
+    }
+    return [];
+  }, [leaveConfigs, leaves]);
+
+  const remoteTrackerEntry = useMemo(() => {
+    const curMonthKey = new Date().toISOString().substring(0, 7);
+    const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(curMonthKey)).length;
+    const maxWfh = parseInt(localStorage.getItem('quota_wfh') || '10', 10);
+    const rem = Math.max(0, maxWfh - wfhUsedThisMonth);
+    return {
+      id: 'wfh',
+      shortCode: 'WFH',
+      name: leaveNames.wfh || 'Work From Home',
+      color: leaveColors.wfh || 'cyan',
+      total: maxWfh,
+      used: wfhUsedThisMonth,
+      remaining: rem
+    };
+  }, [bookedDates, leaveNames.wfh, leaveColors.wfh]);
   useEffect(() => {
     localStorage.setItem('theme', theme);
     const root = document.documentElement;
@@ -1593,28 +1667,82 @@ function App() {
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-5 overflow-x-auto hide-scrollbar flex-1 min-w-0 justify-end">
-            {Object.entries(leaves).map(([key, data]) => {
-              const percentage = ((data.total - data.used) / data.total) * 100;
-              const remaining = data.total - data.used;
-              const remainingFmt = Number.isInteger(remaining) ? remaining : remaining.toFixed(1);
-              const usedFmt = Number.isInteger(data.used) ? data.used : data.used.toFixed(1);
-              return (
-                <div key={key} className="flex flex-col w-28 flex-shrink-0">
-                  <div className="flex justify-between items-end mb-0.5">
-                    <span className="text-[10px] font-semibold font-mono text-muted-foreground uppercase">{getShortform(leaveNames[key] || data.label, key)} <span className={`ml-1 text-[9px] font-sans lowercase px-1 rounded ${data.badge}`}>{leaveNames[key] || data.label}</span></span>
+          {/* Redesigned Compact Desktop Tracker */}
+          <div className="hidden lg:flex items-center gap-3 flex-1 min-w-0 justify-end">
+            {/* Segmented Tier Tabs */}
+            <div className="flex items-center p-0.5 bg-muted/70 border border-border/80 rounded-xl gap-0.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setTopbarTierTab('annual')}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                  topbarTierTab === 'annual'
+                    ? 'bg-card text-foreground shadow-xs font-black'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Annual Leave Bank"
+              >
+                Annual <span className="opacity-70 font-semibold ml-0.5">({annualTrackerEntries.reduce((s, e) => s + (typeof e.remaining === 'number' ? e.remaining : parseFloat(e.remaining) || 0), 0)})</span>
+              </button>
+              {specialTrackerEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTopbarTierTab('special')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                    topbarTierTab === 'special'
+                      ? 'bg-card text-foreground shadow-xs font-black'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  title="Special Benefits"
+                >
+                  Special <span className="opacity-70 font-semibold ml-0.5">({specialTrackerEntries.length})</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setTopbarTierTab('remote')}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                  topbarTierTab === 'remote'
+                    ? 'bg-card text-foreground shadow-xs font-black'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Work From Home / Remote"
+              >
+                Remote <span className="opacity-70 font-semibold ml-0.5">({remoteTrackerEntry.remaining})</span>
+              </button>
+            </div>
+
+            {/* Active Tier Items Compact Capsules */}
+            <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
+              {(topbarTierTab === 'annual' 
+                ? annualTrackerEntries 
+                : topbarTierTab === 'special' 
+                  ? specialTrackerEntries 
+                  : [remoteTrackerEntry]
+              ).map(item => {
+                const colorObj = getLeaveColor(item.color || 'blue');
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-1.5 bg-muted/40 hover:bg-muted/70 border border-border/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs group flex-shrink-0 select-none cursor-default"
+                    title={`${item.name}: ${item.used} used, ${item.remaining} left`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${colorObj.bg} flex-shrink-0`} />
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground group-hover:text-foreground uppercase transition-colors">
+                      {item.shortCode}
+                    </span>
+                    <div className="flex items-baseline gap-0.5 font-mono">
+                      <span className="text-xs font-black text-foreground">{item.remaining}</span>
+                      <span className="text-[9px] text-muted-foreground font-semibold">/{item.total}</span>
+                    </div>
+                    {item.cadence && (
+                      <span className="text-[8px] font-mono text-muted-foreground/60 uppercase">
+                        {item.cadence === 'month' ? 'mo' : 'yr'}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-baseline gap-1 mb-0.5">
-                    <span className="text-xl font-bold font-mono">{remainingFmt}</span>
-                    <span className="text-xs font-mono text-muted-foreground">/ {data.total}</span>
-                  </div>
-                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-300 ${data.bg}`} style={{ width: `${percentage}%` }} />
-                  </div>
-                  <span className="text-[9px] font-mono text-muted-foreground mt-0.5">{usedFmt} used • {remainingFmt} left</span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-3 border-l border-border/80 pl-4 flex-shrink-0 relative z-[60]">
@@ -1811,6 +1939,7 @@ function App() {
                     calendarStyle={calendarStyle}
                     leaveColors={leaveColors}
                     leaveNames={leaveNames}
+                    leaveConfigs={leaveConfigs}
                     maxWfh={parseInt(localStorage.getItem('quota_wfh') || '10', 10)}
                   />
                 </motion.div>
@@ -2543,57 +2672,175 @@ function App() {
                       )}
                     </div>
 
-                    {/* Balances */}
-                    <div className="px-4 py-3 flex flex-col gap-2.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Leave & WFH Balances</span>
-                      {Object.entries(leaves).map(([key, data]) => {
-                        const rem = data.total - data.used;
-                        const remFmt = Number.isInteger(rem) ? rem : rem.toFixed(1);
-                        const usedFmt = Number.isInteger(data.used) ? data.used : data.used.toFixed(1);
-                        return (
-                          <div key={key}>
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs font-bold font-mono text-foreground">
-                                {data.label} <span className="text-muted-foreground">({getShortform(data.label, key)})</span>
-                              </span>
-                              <span className="text-sm font-bold font-mono">{remFmt}<span className="text-muted-foreground font-normal text-xs"> / {data.total}</span></span>
-                            </div>
-                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full ${data.bg}`} style={{ width: `${(rem/data.total)*100}%` }} />
-                            </div>
-                            <span className="text-[10px] font-mono text-muted-foreground">{usedFmt} used</span>
-                          </div>
-                        );
-                      })}
-                      {/* WFH Monthly Quota Row */}
-                      {(() => {
-                        const curMonthKey = new Date().toISOString().substring(0, 7);
-                        const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
-                        const maxWfh = parseInt(localStorage.getItem('quota_wfh') || '10', 10);
-                        const wfhRemaining = Math.max(0, maxWfh - wfhUsedThisMonth);
-                        const isWfhOverQuota = wfhUsedThisMonth >= maxWfh;
-                        const wfhOverAmount = wfhUsedThisMonth - maxWfh;
+                    {/* Balances Card with Segmented Tabs */}
+                    <div className="px-4 py-3 flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">
+                          Balances & Quotas
+                        </span>
+                        
+                        {/* Segmented Tier Tabs */}
+                        <div className="flex p-0.5 bg-muted/80 border border-border/80 rounded-xl gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setMobileMenuTierTab('annual')}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                              mobileMenuTierTab === 'annual'
+                                ? 'bg-primary text-primary-foreground font-black shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Annual
+                          </button>
+                          {specialTrackerEntries.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setMobileMenuTierTab('special')}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                                mobileMenuTierTab === 'special'
+                                  ? 'bg-primary text-primary-foreground font-black shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              Special
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setMobileMenuTierTab('remote')}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                              mobileMenuTierTab === 'remote'
+                                ? 'bg-primary text-primary-foreground font-black shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Remote
+                          </button>
+                        </div>
+                      </div>
 
-                        return (
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs font-bold font-mono text-foreground">
-                                {leaveNames.wfh || 'Work-From-Home'} <span className="text-muted-foreground">({getShortform(leaveNames.wfh, 'WFH')})</span>
-                              </span>
-                              <span className="text-sm font-bold font-mono">{wfhRemaining}<span className="text-muted-foreground font-normal text-xs"> / {maxWfh}</span></span>
-                            </div>
-                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full ${isWfhOverQuota ? 'bg-red-500' : 'bg-cyan-400'}`} 
-                                style={{ width: `${Math.min(100, (wfhRemaining / maxWfh) * 100)}%` }} 
-                              />
-                            </div>
-                            <span className={`text-[10px] font-mono ${isWfhOverQuota ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>
-                              {isWfhOverQuota ? `+${wfhOverAmount} day${wfhOverAmount === 1 ? '' : 's'} over monthly quota` : `${wfhUsedThisMonth} used this month`}
+                      {/* Tier 1: Annual Leave Bank */}
+                      {mobileMenuTierTab === 'annual' && (
+                        <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+                          <div className="p-2.5 bg-card border border-border/80 rounded-2xl flex items-center justify-between text-xs font-mono shadow-2xs">
+                            <span className="text-muted-foreground font-medium">Total Vacation Bank</span>
+                            <span className="font-black text-foreground">
+                              {annualTrackerEntries.reduce((s, e) => s + (typeof e.remaining === 'number' ? e.remaining : parseFloat(e.remaining) || 0), 0)}
+                              <span className="text-muted-foreground font-normal"> / {annualTrackerEntries.reduce((s, e) => s + e.total, 0)} days</span>
                             </span>
                           </div>
-                        );
-                      })()}
+
+                          <div className="grid grid-cols-1 gap-2">
+                            {annualTrackerEntries.map((item) => {
+                              const colorObj = getLeaveColor(item.color || 'blue');
+                              const pct = item.total > 0 ? (item.remaining / item.total) * 100 : 0;
+                              return (
+                                <div key={item.id} className="p-2.5 bg-card/60 border border-border/70 rounded-2xl flex flex-col gap-1.5 shadow-2xs">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className={`w-2 h-2 rounded-full ${colorObj.bg} flex-shrink-0`} />
+                                      <span className="text-xs font-bold font-mono text-foreground truncate">
+                                        {item.name} <span className="text-muted-foreground">({item.shortCode})</span>
+                                      </span>
+                                    </div>
+                                    <span className="text-xs font-bold font-mono text-foreground flex-shrink-0">
+                                      {item.remaining}<span className="text-muted-foreground font-normal text-[10px]"> / {item.total}</span>
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${colorObj.bg}`} style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                                    <span>{item.used} used</span>
+                                    <span>{item.remaining} left</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tier 2: Special Benefits */}
+                      {mobileMenuTierTab === 'special' && (
+                        <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+                          <span className="text-[10px] text-muted-foreground leading-tight">
+                            Independent company benefits that do not deduct from your annual vacation bank.
+                          </span>
+                          <div className="grid grid-cols-1 gap-2">
+                            {specialTrackerEntries.map((item) => {
+                              const Icon = getSpecialBenefitIcon(item);
+                              const colorObj = getLeaveColor(item.color || 'pink');
+                              const pct = item.total > 0 ? (item.remaining / item.total) * 100 : 0;
+                              return (
+                                <div key={item.id} className="p-2.5 bg-card/60 border border-border/70 rounded-2xl flex flex-col gap-1.5 shadow-2xs">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className={`w-6 h-6 rounded-lg ${colorObj.bg}/15 ${colorObj.text} flex items-center justify-center flex-shrink-0`}>
+                                        <Icon size={13} />
+                                      </div>
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="text-xs font-bold text-foreground truncate">{item.name}</span>
+                                        <span className="text-[9px] font-mono text-muted-foreground">
+                                          {item.cadence === 'month' ? 'Per Calendar Month' : item.cadence === 'year' ? 'Per Year' : 'Per Occurrence'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span className="text-xs font-bold font-mono text-foreground flex-shrink-0">
+                                      {item.remaining}<span className="text-muted-foreground font-normal text-[10px]"> / {item.total}</span>
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${colorObj.bg}`} style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                                    <span>{item.used} used</span>
+                                    <span>{item.remaining} remaining</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tier 3: Remote / WFH */}
+                      {mobileMenuTierTab === 'remote' && (
+                        <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+                          {(() => {
+                            const isWfhOverQuota = remoteTrackerEntry.used >= remoteTrackerEntry.total;
+                            const wfhOverAmount = remoteTrackerEntry.used - remoteTrackerEntry.total;
+                            const pct = Math.min(100, (remoteTrackerEntry.remaining / remoteTrackerEntry.total) * 100);
+
+                            return (
+                              <div className="p-3 bg-card border border-border/80 rounded-2xl flex flex-col gap-2 shadow-2xs">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold font-mono text-foreground">
+                                      {remoteTrackerEntry.name} <span className="text-muted-foreground">({remoteTrackerEntry.shortCode})</span>
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-bold font-mono text-foreground">
+                                    {remoteTrackerEntry.remaining}<span className="text-muted-foreground font-normal text-[10px]"> / {remoteTrackerEntry.total}</span>
+                                  </span>
+                                </div>
+                                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full ${isWfhOverQuota ? 'bg-red-500' : 'bg-cyan-400'}`} 
+                                    style={{ width: `${pct}%` }} 
+                                  />
+                                </div>
+                                <div className="flex justify-between text-[10px] font-mono">
+                                  <span className="text-muted-foreground">{remoteTrackerEntry.used} used this month</span>
+                                  <span className={isWfhOverQuota ? 'text-red-400 font-bold' : 'text-muted-foreground'}>
+                                    {isWfhOverQuota ? `+${wfhOverAmount}d over quota` : `${remoteTrackerEntry.remaining} days left`}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
 
