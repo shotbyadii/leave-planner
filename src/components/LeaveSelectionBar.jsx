@@ -354,7 +354,7 @@ const LeaveSelectionBar = ({
                         <span className="text-[10px] font-mono font-bold text-muted-foreground">3-Tier System</span>
                       </div>
 
-                      <div className="flex p-1 bg-muted/50 border border-border/80 rounded-2xl gap-1 mb-3">
+                      <div className="flex p-1 bg-muted/70 border border-border/80 rounded-2xl gap-1 mb-3">
                         {annualConfigs.length > 0 && (
                           <button
                             type="button"
@@ -362,8 +362,10 @@ const LeaveSelectionBar = ({
                               setActiveTierTab('annual');
                               if (annualConfigs.length > 0) setSelectedType(annualConfigs[0].id);
                             }}
-                            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              activeTierTab === 'annual' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeTierTab === 'annual' 
+                                ? 'bg-primary text-primary-foreground font-black shadow-sm ring-1 ring-border/50' 
+                                : 'text-muted-foreground hover:text-foreground font-medium'
                             }`}
                           >
                             Annual Bank
@@ -376,8 +378,10 @@ const LeaveSelectionBar = ({
                               setActiveTierTab('special');
                               if (specialConfigs.length > 0) setSelectedType(specialConfigs[0].id);
                             }}
-                            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              activeTierTab === 'special' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeTierTab === 'special' 
+                                ? 'bg-primary text-primary-foreground font-black shadow-sm ring-1 ring-border/50' 
+                                : 'text-muted-foreground hover:text-foreground font-medium'
                             }`}
                           >
                             Special Benefits
@@ -390,8 +394,10 @@ const LeaveSelectionBar = ({
                               setActiveTierTab('monthly');
                               if (monthlyConfigs.length > 0) setSelectedType(monthlyConfigs[0].id);
                             }}
-                            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              activeTierTab === 'monthly' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                            className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeTierTab === 'monthly' 
+                                ? 'bg-primary text-primary-foreground font-black shadow-sm ring-1 ring-border/50' 
+                                : 'text-muted-foreground hover:text-foreground font-medium'
                             }`}
                           >
                             Remote / WFH
@@ -414,31 +420,42 @@ const LeaveSelectionBar = ({
                             <div key={config.id} className="flex flex-col gap-1.5">
                               <label
                                 onClick={() => !isDisabled && setSelectedType(config.id)}
-                                className={`flex items-center justify-between p-3 border rounded-2xl cursor-pointer transition-all ${
+                                className={`flex items-center justify-between p-3.5 border-2 rounded-2xl cursor-pointer transition-all duration-150 ${
                                   isSelected 
-                                    ? `${confTheme.activeBoxBorder} ${confTheme.activeBoxBg} ring-1 ${confTheme.activeBoxBorder} shadow-xs` 
-                                    : 'border-border/80 hover:border-foreground/30 bg-card'
-                                } ${isDisabled ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
+                                    ? `${confTheme.activeBoxBorder} bg-muted/70 dark:bg-slate-900/90 shadow-md ring-2 ring-primary/25 scale-[1.01]` 
+                                    : 'border-border/70 hover:border-foreground/30 bg-card/60 opacity-75 hover:opacity-100'
+                                } ${isDisabled ? 'opacity-30 pointer-events-none cursor-not-allowed' : ''}`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                                    isSelected ? confTheme.activeBoxBorder : 'border-muted-foreground/40'
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                    isSelected 
+                                      ? 'border-primary bg-primary text-primary-foreground shadow-xs' 
+                                      : 'border-slate-400 dark:border-slate-600 bg-transparent'
                                   }`}>
-                                    {isSelected && <div className={`w-2 h-2 rounded-full ${confTheme.bg}`} />}
+                                    {isSelected && <Check size={12} strokeWidth={3.5} />}
                                   </div>
                                   <div className="flex flex-col">
-                                    <span className={`font-bold text-xs ${isSelected ? confTheme.activeText : 'text-foreground'}`}>
-                                      {config.shortCode || getShortform(config.name, config.id.toUpperCase())} — {config.name}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black border transition-all ${
+                                        isSelected ? confTheme.badge : 'bg-muted text-muted-foreground border-border/60'
+                                      }`}>
+                                        {config.shortCode || getShortform(config.name, config.id.toUpperCase())}
+                                      </span>
+                                      <span className={`text-xs transition-colors ${
+                                        isSelected ? 'font-black text-foreground' : 'font-bold text-foreground/80'
+                                      }`}>
+                                        {config.name}
+                                      </span>
+                                    </div>
                                     {config.tier === 'special' && (
-                                      <span className="text-[10px] text-muted-foreground font-medium">
+                                      <span className="text-[10px] text-muted-foreground font-medium mt-0.5">
                                         Non-deductible benefit
                                       </span>
                                     )}
                                   </div>
                                 </div>
-                                <span className={`text-[11px] font-bold font-mono border px-2.5 py-1 rounded-xl ${
-                                  isSelected ? confTheme.activeBadge : 'bg-muted/40 border-border text-muted-foreground'
+                                <span className={`text-[11px] font-bold font-mono border px-2.5 py-1 rounded-xl transition-all ${
+                                  isSelected ? `${confTheme.activeBadge} font-black shadow-xs` : 'bg-muted/40 border-border/60 text-muted-foreground'
                                 }`}>
                                   {curBal} {config.cadence === 'month' ? '/ mo left' : 'left'}
                                 </span>

@@ -2719,10 +2719,10 @@ function App() {
                                   setMobileLeaveType(item.id);
                                   if (isTutorialActive && tutorialStepIndex === 4) setTutorialStepIndex(5);
                                 }}
-                                className={`py-2.5 px-1.5 rounded-xl border transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                                className={`py-2.5 px-1.5 rounded-xl border-2 transition-all flex flex-col items-center gap-1 cursor-pointer ${
                                   isActive
-                                    ? `${theme.activeBoxBg} ${theme.activeBoxBorder} ${theme.activeText} shadow-sm ring-1 ring-inset ring-black/5`
-                                    : 'border-border bg-card text-muted-foreground opacity-70 hover:opacity-100'
+                                    ? `${theme.border} bg-muted/70 dark:bg-slate-900/90 text-foreground shadow-md ring-2 ring-primary/20 scale-[1.03]`
+                                    : 'border-border/70 bg-card/60 text-muted-foreground opacity-75 hover:opacity-100 hover:text-foreground'
                                 }`}
                               >
                                 <span className="text-[11px] font-black uppercase tracking-wider leading-none font-mono">
