@@ -5,7 +5,7 @@ import {
   LogIn, LogOut, Download, Upload, Table, AlertCircle, ShieldCheck, 
   RotateCw, Trash2, AlertTriangle, ChevronRight, Camera, Building2, 
   Globe, Image as ImageIcon, Clock, Sparkles, Key, ExternalLink, Eye, EyeOff, Loader2, Bell,
-  Plus, ChevronDown, ChevronUp, Shield, Info
+  Plus, ChevronDown, ChevronUp, Shield, Info, Check, Edit3, Heart, Moon, Umbrella, Baby, BookOpen, HandHeart, Activity
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -13,6 +13,7 @@ import HolidayManager from './HolidayManager';
 import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
 import { COLOR_PALETTE } from '../utils/colorUtils';
+import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from '../utils/specialBenefitUtils';
 import { exportUserDataToJson, importUserDataFromJson, exportUserDataToCsv } from '../utils/dataMigration';
 import { 
   subscribeUserToPush, 
@@ -79,6 +80,12 @@ const SettingsModal = ({
   const [expandedConfigId, setExpandedConfigId] = useState(null);
   const [newAnnualCategoryName, setNewAnnualCategoryName] = useState('');
   const [newSpecialCategoryName, setNewSpecialCategoryName] = useState('');
+  const [newSpecialQuota, setNewSpecialQuota] = useState('1');
+  const [newSpecialCadence, setNewSpecialCadence] = useState('month');
+  const [newSpecialSubtitle, setNewSpecialSubtitle] = useState('');
+  const [newSpecialIcon, setNewSpecialIcon] = useState('heart');
+  const [newSpecialColor, setNewSpecialColor] = useState('pink');
+  const [editingSpecialId, setEditingSpecialId] = useState(null);
   const [showAddAnnualForm, setShowAddAnnualForm] = useState(false);
   const [showAddSpecialForm, setShowAddSpecialForm] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -148,21 +155,26 @@ const SettingsModal = ({
       name: nameTrim,
       shortCode,
       tier: 'special',
-      color: 'pink',
-      quota: 1,
-      cadence: 'month',
+      color: newSpecialColor || 'pink',
+      icon: newSpecialIcon || 'sparkles',
+      quota: Math.max(1, parseInt(newSpecialQuota, 10) || 1),
+      cadence: newSpecialCadence || 'month',
+      subtitle: newSpecialSubtitle.trim() || 'Company benefit allowance',
       deductsFromAnnual: false,
       enabled: true,
       isSystem: false,
       allowsHalfDay: true,
       constraints: {
-        maxConsecutive: 1,
+        maxConsecutive: null,
         requiresNote: false,
         warningMessage: null,
       }
     };
     setCurrentConfigs(prev => [...prev, newConfig]);
     setNewSpecialCategoryName('');
+    setNewSpecialQuota('1');
+    setNewSpecialSubtitle('');
+    setNewSpecialIcon('heart');
     setShowAddSpecialForm(false);
   };
 
@@ -1057,118 +1069,313 @@ const SettingsModal = ({
                         <div className="p-3 bg-pink-500/10 border border-pink-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-pink-600 dark:text-pink-400">
                           <Info size={16} className="flex-shrink-0 mt-0.5" />
                           <span>
-                            <strong>Independent Balances:</strong> Special benefits (Menstrual, Mental Health, Bereavement, Parental) do <strong>NOT</strong> deduct from your annual vacation bank.
+                            <strong>Independent Balances:</strong> Special benefits do <strong>NOT</strong> deduct from your annual vacation bank and follow their own monthly or yearly allowance.
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {specialConfigs.map((c) => (
-                            <div key={c.id} className="p-3.5 bg-card border border-border/80 rounded-2xl flex flex-col gap-2.5 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center font-mono text-xs font-black text-foreground border border-border">
-                                    {c.shortCode}
-                                  </span>
-                                  <div>
-                                    <input
-                                      type="text"
-                                      value={c.name}
-                                      onChange={(e) => updateConfig(c.id, { name: e.target.value, shortCode: deriveShortCode(e.target.value) })}
-                                      className="text-xs font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none"
-                                    />
-                                    <div className="text-[10px] text-muted-foreground font-mono">
-                                      {c.cadence === 'month' ? 'Per Calendar Month' : c.cadence === 'year' ? 'Per Year' : 'Per Occurrence'}
+                        <div className="flex flex-col gap-2.5">
+                          {specialConfigs.map((c) => {
+                            const Icon = getSpecialBenefitIcon(c);
+                            const isEditing = editingSpecialId === c.id;
+                            const isAnotherEditing = editingSpecialId !== null && !isEditing;
+
+                            return (
+                              <div
+                                key={c.id}
+                                className={`p-3.5 rounded-2xl border transition-all duration-200 flex flex-col gap-3 ${
+                                  isEditing 
+                                    ? 'bg-card border-primary/60 shadow-xl ring-2 ring-primary/20 scale-[1.01] z-10' 
+                                    : isAnotherEditing
+                                      ? 'opacity-25 pointer-events-none filter grayscale-[30%] scale-[0.99]'
+                                      : c.enabled 
+                                        ? 'bg-card border-border/80 shadow-xs' 
+                                        : 'bg-muted/20 border-border/40 opacity-80'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                      c.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                      <Icon size={16} />
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5 truncate">
+                                        {c.name}
+                                        <span className="text-[10px] font-mono text-muted-foreground font-medium">
+                                          ({c.cadence === 'month' ? `${c.quota}d / mo` : c.cadence === 'year' ? `${c.quota}d / yr` : `${c.quota} days`})
+                                        </span>
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground truncate">
+                                        {c.subtitle || (c.cadence === 'month' ? 'Monthly health and wellness allowance' : 'Company benefit allowance')}
+                                      </span>
                                     </div>
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateConfig(c.id, { enabled: !c.enabled })}
-                                    className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
-                                      c.enabled ? 'bg-primary' : 'bg-muted border border-border'
-                                    }`}
-                                  >
-                                    <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-all ${
-                                      c.enabled ? 'left-4.5' : 'left-0.5'
-                                    }`} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeConfig(c.id)}
-                                    className="p-1 text-muted-foreground hover:text-red-500 rounded-md transition-colors cursor-pointer"
-                                    title="Remove Benefit"
-                                  >
-                                    <X size={13} />
-                                  </button>
-                                </div>
-                              </div>
 
-                              {c.enabled && (
-                                <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-                                  <span className="text-[11px] font-bold text-muted-foreground font-mono">Allowance Quota</span>
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-2.5 flex-shrink-0">
+                                    {c.enabled && !isEditing && (
+                                      <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
+                                        <button
+                                          type="button"
+                                          onClick={() => updateConfig(c.id, { quota: Math.max(1, (parseInt(c.quota, 10) || 1) - 1) })}
+                                          className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors cursor-pointer"
+                                        >
+                                          -
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={90}
+                                          value={c.quota ?? ''}
+                                          onChange={(e) => {
+                                            const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
+                                            updateConfig(c.id, { quota: val });
+                                          }}
+                                          onBlur={() => {
+                                            if (!c.quota || c.quota < 1) updateConfig(c.id, { quota: 1 });
+                                          }}
+                                          className="w-9 text-center text-xs font-bold font-mono bg-transparent text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => updateConfig(c.id, { quota: (parseInt(c.quota, 10) || 1) + 1 })}
+                                          className="w-5 h-5 rounded-lg bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors cursor-pointer"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* High-Contrast Rounded Checkbox */}
                                     <button
                                       type="button"
-                                      onClick={() => updateConfig(c.id, { quota: Math.max(1, (parseInt(c.quota, 10) || 1) - 1) })}
-                                      className="w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center text-xs font-black cursor-pointer hover:bg-muted/80"
+                                      role="checkbox"
+                                      aria-checked={c.enabled}
+                                      onClick={() => updateConfig(c.id, { enabled: !c.enabled })}
+                                      className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
+                                        c.enabled
+                                          ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30 scale-100'
+                                          : 'bg-slate-900/90 dark:bg-slate-950 border-slate-400 dark:border-slate-500 hover:border-primary text-transparent'
+                                      }`}
+                                      title={c.enabled ? 'Active benefit (Click to disable)' : 'Inactive benefit (Click to enable)'}
                                     >
-                                      -
+                                      <Check size={13} strokeWidth={3.5} className={c.enabled ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} />
                                     </button>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={90}
-                                      value={c.quota ?? ''}
-                                      onChange={(e) => {
-                                        const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
-                                        updateConfig(c.id, { quota: val });
-                                      }}
-                                      onBlur={() => {
-                                        if (!c.quota || c.quota < 1) updateConfig(c.id, { quota: 1 });
-                                      }}
-                                      className="w-10 text-center text-xs font-mono font-black text-foreground bg-transparent border border-border/40 rounded py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => updateConfig(c.id, { quota: (parseInt(c.quota, 10) || 1) + 1 })}
-                                      className="w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center text-xs font-black cursor-pointer hover:bg-muted/80"
-                                    >
-                                      +
-                                    </button>
+
+                                    {/* Save Button when Editing, Edit button when Idle */}
+                                    {isEditing ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingSpecialId(null)}
+                                        className="px-3 py-1 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-sm hover:bg-primary/90 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                        title="Save changes"
+                                      >
+                                        <Check size={12} strokeWidth={3} /> Save
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingSpecialId(c.id)}
+                                        className="p-1.5 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted/80 border border-border/60 transition-colors cursor-pointer"
+                                        title="Edit details"
+                                      >
+                                        <Edit3 size={13} />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+
+                                {/* Inline Editor Drawer for Benefit */}
+                                {isEditing && (
+                                  <div className="pt-3 border-t border-border/50 flex flex-col gap-3 animate-in fade-in duration-150">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Title</label>
+                                        <input
+                                          type="text"
+                                          value={c.name}
+                                          onChange={(e) => updateConfig(c.id, { name: e.target.value, shortCode: deriveShortCode(e.target.value) })}
+                                          className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Days Quota</label>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={90}
+                                          value={c.quota ?? ''}
+                                          onChange={(e) => {
+                                            const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
+                                            updateConfig(c.id, { quota: val });
+                                          }}
+                                          onBlur={() => {
+                                            if (!c.quota || c.quota < 1) updateConfig(c.id, { quota: 1 });
+                                          }}
+                                          className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Cadence</label>
+                                        <select
+                                          value={c.cadence}
+                                          onChange={(e) => updateConfig(c.id, { cadence: e.target.value })}
+                                          className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                                        >
+                                          <option value="month">Per Calendar Month</option>
+                                          <option value="year">Per Year</option>
+                                          <option value="event">Per Occurrence / Total</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Subtitle / Description</label>
+                                      <input
+                                        type="text"
+                                        value={c.subtitle || ''}
+                                        onChange={(e) => updateConfig(c.id, { subtitle: e.target.value })}
+                                        placeholder="Brief benefit description..."
+                                        className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                      />
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          removeConfig(c.id);
+                                          setEditingSpecialId(null);
+                                        }}
+                                        className="px-2.5 py-1.5 text-red-500 hover:bg-red-500/10 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Delete benefit"
+                                      >
+                                        <Trash2 size={12} /> Remove Benefit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingSpecialId(null)}
+                                        className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer"
+                                      >
+                                        <Check size={13} strokeWidth={3} /> Save Changes
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
 
                         {/* Add Custom Special Benefit */}
                         {showAddSpecialForm ? (
-                          <div className="p-3 bg-muted/40 border border-border rounded-2xl flex flex-col gap-2.5">
+                          <div className="p-3.5 bg-muted/40 border border-border rounded-2xl flex flex-col gap-3">
                             <span className="text-xs font-bold text-foreground font-mono">New Special Benefit Category</span>
-                            <div className="flex gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                              <div>
+                                <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Name</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Wellness Break, Volunteer Day"
+                                  value={newSpecialCategoryName}
+                                  onChange={(e) => setNewSpecialCategoryName(e.target.value)}
+                                  className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                  autoFocus
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Days Allowance</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={90}
+                                  value={newSpecialQuota}
+                                  onChange={(e) => setNewSpecialQuota(e.target.value)}
+                                  onBlur={() => {
+                                    const val = parseInt(newSpecialQuota, 10);
+                                    if (isNaN(val) || val < 1) setNewSpecialQuota('1');
+                                    else if (val > 90) setNewSpecialQuota('90');
+                                  }}
+                                  className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Allowance Cadence</label>
+                                <select
+                                  value={newSpecialCadence}
+                                  onChange={(e) => setNewSpecialCadence(e.target.value)}
+                                  className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                                >
+                                  <option value="month">Per Calendar Month</option>
+                                  <option value="year">Per Year</option>
+                                  <option value="event">Per Occurrence / Total</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Subtitle / Description</label>
                               <input
                                 type="text"
-                                placeholder="e.g. Wellness Break, Volunteer Day"
-                                value={newSpecialCategoryName}
-                                onChange={(e) => setNewSpecialCategoryName(e.target.value)}
-                                className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground"
-                                autoFocus
+                                placeholder="e.g. Dedicated monthly self-care allowance"
+                                value={newSpecialSubtitle}
+                                onChange={(e) => setNewSpecialSubtitle(e.target.value)}
+                                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                               />
-                              <button
-                                type="button"
-                                onClick={handleAddSpecialCategory}
-                                className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl cursor-pointer"
-                              >
-                                Add
-                              </button>
+                            </div>
+
+                            {/* Preset Icon Picker */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-bold text-muted-foreground mr-1">Icon:</span>
+                              {BENEFIT_ICON_PRESETS.map((p) => {
+                                const PIcon = p.icon;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => setNewSpecialIcon(p.id)}
+                                    className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                      newSpecialIcon === p.id
+                                        ? 'bg-primary text-primary-foreground shadow-xs scale-105'
+                                        : 'bg-muted/60 text-muted-foreground hover:text-foreground'
+                                    }`}
+                                    title={p.label}
+                                  >
+                                    <PIcon size={13} />
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Preset Color Picker */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
+                              {COLOR_PALETTE.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setNewSpecialColor(c.id)}
+                                  className={`w-4 h-4 rounded-full ${c.bg} transition-transform cursor-pointer ${
+                                    newSpecialColor === c.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                  }`}
+                                  title={c.name}
+                                />
+                              ))}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/40">
                               <button
                                 type="button"
                                 onClick={() => setShowAddSpecialForm(false)}
-                                className="px-3 py-2 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl cursor-pointer"
+                                className="px-3 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl cursor-pointer transition-colors"
                               >
                                 Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!newSpecialCategoryName.trim()}
+                                onClick={handleAddSpecialCategory}
+                                className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-xl cursor-pointer disabled:opacity-40 transition-all"
+                              >
+                                Add Benefit
                               </button>
                             </div>
                           </div>

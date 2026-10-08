@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, 
   SlidersHorizontal, Building2, Clock, Bell, ShieldCheck, Key, ExternalLink,
-  Plus, Trash2, Heart, Moon, Umbrella, Baby, X, Shield, Edit3
+  Plus, Trash2, Heart, Moon, Umbrella, Baby, X, Shield, Edit3, BookOpen, HandHeart, Activity
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -13,6 +13,7 @@ import { showAppNotification, requestNotificationPermission, isNotificationGrant
 import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../services/aiAssistantService';
 import { DEFAULT_LEAVE_CONFIGS, deriveShortCode, buildInitialLeaveConfigs } from '../services/leaveConfigService';
 import { COLOR_PALETTE } from '../utils/colorUtils';
+import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from '../utils/specialBenefitUtils';
 
 const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveConfigs: propLeaveConfigs = null }) => {
   const [step, setStep] = useState(1);
@@ -46,6 +47,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
   const [newSpecialCadence, setNewSpecialCadence] = useState('month');
   const [newSpecialSubtitle, setNewSpecialSubtitle] = useState('');
   const [newSpecialColor, setNewSpecialColor] = useState('pink');
+  const [newSpecialIcon, setNewSpecialIcon] = useState('sparkles');
   const [editingSpecialId, setEditingSpecialId] = useState(null);
 
   React.useEffect(() => {
@@ -676,7 +678,29 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                           />
                         </div>
 
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-muted-foreground mr-1">Icon:</span>
+                            {BENEFIT_ICON_PRESETS.map((p) => {
+                              const PIcon = p.icon;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => setNewSpecialIcon(p.id)}
+                                  className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                    newSpecialIcon === p.id
+                                      ? 'bg-primary text-primary-foreground shadow-xs scale-105'
+                                      : 'bg-muted/60 text-muted-foreground hover:text-foreground'
+                                  }`}
+                                  title={p.label}
+                                >
+                                  <PIcon size={13} />
+                                </button>
+                              );
+                            })}
+                          </div>
+
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
                             {COLOR_PALETTE.map((c) => (
@@ -690,6 +714,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                               />
                             ))}
                           </div>
+
                           <button
                             type="button"
                             disabled={!newSpecialName.trim()}
@@ -704,6 +729,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                 shortCode: deriveShortCode(cleanName),
                                 tier: 'special',
                                 color: newSpecialColor,
+                                icon: newSpecialIcon,
                                 quota: parsedQuota,
                                 cadence: newSpecialCadence,
                                 subtitle: newSpecialSubtitle.trim() || 'Company benefit allowance',
@@ -719,7 +745,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                               setNewSpecialSubtitle('');
                               setIsAddingSpecial(false);
                             }}
-                            className="px-4 py-1.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl shadow-xs disabled:opacity-40 cursor-pointer"
+                            className="px-4 py-1.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl shadow-xs disabled:opacity-40 cursor-pointer ml-auto"
                           >
                             Add Benefit
                           </button>
@@ -729,22 +755,21 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
 
                     <div className="flex flex-col gap-2.5">
                       {leaveConfigs.filter(c => c.tier === 'special').map(conf => {
-                        const iconMap = {
-                          menstrual: Heart,
-                          bereavement: Umbrella,
-                          mental: Moon,
-                          parental: Baby
-                        };
-                        const Icon = iconMap[conf.id] || Sparkles;
+                        const Icon = getSpecialBenefitIcon(conf);
                         const isEditing = editingSpecialId === conf.id;
+                        const isAnotherEditing = editingSpecialId !== null && !isEditing;
 
                         return (
                           <div
                             key={conf.id}
-                            className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-3 ${
-                              conf.enabled 
-                                ? 'bg-card border-border/80 shadow-xs' 
-                                : 'bg-muted/20 border-border/40 opacity-75'
+                            className={`p-3.5 rounded-2xl border transition-all duration-200 flex flex-col gap-3 ${
+                              isEditing 
+                                ? 'bg-card border-primary/60 shadow-xl ring-2 ring-primary/20 scale-[1.01] z-10' 
+                                : isAnotherEditing
+                                  ? 'opacity-25 pointer-events-none filter grayscale-[30%] scale-[0.99]'
+                                  : conf.enabled 
+                                    ? 'bg-card border-border/80 shadow-xs' 
+                                    : 'bg-muted/20 border-border/40 opacity-80'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-3">
@@ -762,13 +787,13 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                     </span>
                                   </span>
                                   <span className="text-[10px] text-muted-foreground truncate">
-                                    {conf.subtitle || (conf.cadence === 'month' ? 'Monthly benefit allowance' : 'Company benefit allowance')}
+                                    {conf.subtitle || (conf.cadence === 'month' ? 'Monthly health and wellness allowance' : 'Company benefit allowance')}
                                   </span>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {conf.enabled && (
+                              <div className="flex items-center gap-2.5 flex-shrink-0">
+                                {conf.enabled && !isEditing && (
                                   <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
                                     <button
                                       type="button"
@@ -807,16 +832,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                   </div>
                                 )}
 
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingSpecialId(isEditing ? null : conf.id)}
-                                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/60 transition-colors cursor-pointer"
-                                  title="Edit details"
-                                >
-                                  <Edit3 size={13} />
-                                </button>
-
-                                {/* Custom Rounded Slate Checkbox Button */}
+                                {/* High-Contrast Rounded Checkbox */}
                                 <button
                                   type="button"
                                   role="checkbox"
@@ -824,22 +840,43 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                   onClick={() => {
                                     setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, enabled: !c.enabled } : c));
                                   }}
-                                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
+                                  className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
                                     conf.enabled
-                                      ? 'bg-primary border-primary text-primary-foreground shadow-xs'
-                                      : 'bg-muted/40 border-border/80 hover:border-foreground/30 text-transparent'
+                                      ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30 scale-100'
+                                      : 'bg-slate-900/90 dark:bg-slate-950 border-slate-400 dark:border-slate-500 hover:border-primary text-transparent'
                                   }`}
-                                  title={conf.enabled ? 'Enabled' : 'Disabled'}
+                                  title={conf.enabled ? 'Active benefit (Click to disable)' : 'Inactive benefit (Click to enable)'}
                                 >
-                                  <Check size={12} strokeWidth={3} className={conf.enabled ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} />
+                                  <Check size={13} strokeWidth={3.5} className={conf.enabled ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} />
                                 </button>
+
+                                {/* Save Button when Editing, Edit button when Idle */}
+                                {isEditing ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingSpecialId(null)}
+                                    className="px-3 py-1 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-sm hover:bg-primary/90 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                    title="Save changes"
+                                  >
+                                    <Check size={12} strokeWidth={3} /> Save
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingSpecialId(conf.id)}
+                                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted/80 border border-border/60 transition-colors cursor-pointer"
+                                    title="Edit details"
+                                  >
+                                    <Edit3 size={13} />
+                                  </button>
+                                )}
                               </div>
                             </div>
 
                             {/* Inline Editor Drawer for Benefit */}
                             {isEditing && (
-                              <div className="pt-2.5 border-t border-border/50 flex flex-col gap-2.5 animate-in fade-in duration-150">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="pt-3 border-t border-border/50 flex flex-col gap-3 animate-in fade-in duration-150">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                   <div>
                                     <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Title</label>
                                     <input
@@ -849,7 +886,26 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                         const val = e.target.value;
                                         setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, name: val, shortCode: deriveShortCode(val) } : c));
                                       }}
-                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Days Quota</label>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={90}
+                                      value={conf.quota ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
+                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: val } : c));
+                                      }}
+                                      onBlur={() => {
+                                        if (!conf.quota || conf.quota < 1) {
+                                          setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, quota: 1 } : c));
+                                        }
+                                      }}
+                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                                     />
                                   </div>
                                   <div>
@@ -860,7 +916,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                         const val = e.target.value;
                                         setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, cadence: val } : c));
                                       }}
-                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer"
+                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
                                     >
                                       <option value="month">Per Calendar Month</option>
                                       <option value="year">Per Year</option>
@@ -868,30 +924,37 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                     </select>
                                   </div>
                                 </div>
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex-1">
-                                    <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Subtitle / Description</label>
-                                    <input
-                                      type="text"
-                                      value={conf.subtitle || ''}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, subtitle: val } : c));
-                                      }}
-                                      placeholder="Brief benefit description..."
-                                      className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20"
-                                    />
-                                  </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Subtitle / Description</label>
+                                  <input
+                                    type="text"
+                                    value={conf.subtitle || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, subtitle: val } : c));
+                                    }}
+                                    placeholder="Brief benefit description..."
+                                    className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between pt-1">
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setLeaveConfigs(prev => prev.filter(c => c.id !== conf.id));
                                       setEditingSpecialId(null);
                                     }}
-                                    className="px-2.5 py-1.5 mt-3.5 text-red-500 hover:bg-red-500/10 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                    className="px-2.5 py-1.5 text-red-500 hover:bg-red-500/10 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                                     title="Delete benefit"
                                   >
-                                    <Trash2 size={12} /> Remove
+                                    <Trash2 size={12} /> Remove Benefit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingSpecialId(null)}
+                                    className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <Check size={13} strokeWidth={3} /> Save Changes
                                   </button>
                                 </div>
                               </div>
