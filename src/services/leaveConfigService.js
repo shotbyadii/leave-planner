@@ -131,9 +131,13 @@ export const DEFAULT_LEAVE_CONFIGS = [
  */
 export const deriveShortCode = (name) => {
   if (!name) return 'LV';
+  if (/^work\s+from\s+home/i.test(name)) return 'WFH';
   const clean = name.replace(/[^a-zA-Z\s]/g, '').trim();
   const words = clean.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) {
+  if (words.length >= 3) {
+    return (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
+  }
+  if (words.length === 2) {
     return (words[0][0] + words[1][0]).toUpperCase();
   }
   return clean.substring(0, 2).toUpperCase() || 'LV';

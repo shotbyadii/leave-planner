@@ -88,8 +88,8 @@ async function run() {
     const payload = JSON.stringify({
       title: 'Daily Attendance Check-in',
       body: 'Good day! Please confirm if today is Work From Home or In-Office.',
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/app-icon-192.png',
+      badge: '/app-icon-192.png',
       tag: `wfh-checkin-${todayStr}`,
       data: { url: '/?action=attendance' }
     });

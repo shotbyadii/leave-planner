@@ -454,5 +454,152 @@ test.describe('Leave Planner Automated Verification Suite', () => {
 
     expect(pageErrors).toEqual([]);
   });
+
+  test('8. Dual-Surface Feature Parity Contract: All policy, category, and data actions must exist on both Desktop and Mobile', async ({ page }, testInfo) => {
+    const isMobile = testInfo.project.name.includes('Mobile');
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.addInitScript(getSeedScript(CANARY_LEAVE), CANARY_LEAVE);
+    await page.goto('/?demo=true', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+
+    const capabilitiesFound = {};
+
+    if (!isMobile) {
+      // ── DESKTOP CAPABILITY DISCOVERY ──
+      // Topbar Sign Out
+      const topbarSignOut = page.locator('header [data-capability="sign-out"], div.hidden.md\\:block [data-capability="sign-out"]').first();
+      capabilitiesFound['sign-out'] = await topbarSignOut.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Open Desktop Settings Modal
+      const desktopSettingsBtn = page.locator('button[title="Settings & Profile Hub"]').first();
+      await expect(desktopSettingsBtn).toBeVisible({ timeout: 3000 });
+      await desktopSettingsBtn.click();
+      await page.waitForTimeout(400);
+
+      // 1. Navigate to "Quotas & Themes" tab in Settings Modal
+      const quotasNavBtn = page.locator('nav button:has-text("Quotas & Themes"), nav button:has-text("Quotas")').first();
+      await expect(quotasNavBtn).toBeVisible({ timeout: 3000 });
+      await quotasNavBtn.click();
+      await page.waitForTimeout(400);
+
+      // Verify Annual Quota Configuration
+      const annualPolicy = page.locator('[data-capability="annual-policy-edit"]').first();
+      capabilitiesFound['annual-policy-edit'] = await annualPolicy.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Verify Add Custom Annual Category
+      const addAnnualBtn = page.locator('[data-capability="add-annual-category"]').first();
+      capabilitiesFound['add-annual-category'] = await addAnnualBtn.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Switch to Remote / WFH Tier Tab
+      const remoteTab = page.locator('[data-testid="desktop-quotas-tab-remote"]').first();
+      await expect(remoteTab).toBeVisible({ timeout: 3000 });
+      await remoteTab.click();
+      await page.waitForTimeout(400);
+      const remotePolicy = page.locator('[data-capability="remote-policy-edit"]').first();
+      capabilitiesFound['remote-policy-edit'] = await remotePolicy.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Switch to Special Tier Tab
+      const specialTab = page.locator('[data-testid="desktop-quotas-tab-special"]').first();
+      await expect(specialTab).toBeVisible({ timeout: 3000 });
+      await specialTab.click();
+      await page.waitForTimeout(400);
+      const specialPolicy = page.locator('[data-capability="special-benefits-edit"]').first();
+      capabilitiesFound['special-benefits-edit'] = await specialPolicy.isVisible({ timeout: 2000 }).catch(() => false);
+
+      const addSpecialBtn = page.locator('[data-capability="add-special-benefit"]').first();
+      capabilitiesFound['add-special-benefit'] = await addSpecialBtn.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // 2. Navigate to "Data & Backups" tab in Settings Modal
+      const backupNavBtn = page.locator('nav button:has-text("Data & Backups"), nav button:has-text("Backup")').first();
+      await expect(backupNavBtn).toBeVisible({ timeout: 3000 });
+      await backupNavBtn.click();
+      await page.waitForTimeout(400);
+
+      const exportJson = page.locator('[data-capability="export-json"]').first();
+      capabilitiesFound['export-json'] = await exportJson.isVisible({ timeout: 2000 }).catch(() => false);
+
+      const exportCsv = page.locator('[data-capability="export-csv"]').first();
+      capabilitiesFound['export-csv'] = await exportCsv.isVisible({ timeout: 2000 }).catch(() => false);
+
+    } else {
+      // ── MOBILE CAPABILITY DISCOVERY ──
+      // 1. Open Mobile Menu Drawer
+      const mobileMenuBtn = page.locator('[data-testid="mobile-menu-btn"]');
+      await expect(mobileMenuBtn).toBeVisible({ timeout: 3000 });
+      await mobileMenuBtn.click();
+      await page.waitForTimeout(400);
+
+      // Verify Sign Out Action in Mobile Drawer Footer
+      const drawerSignOut = page.locator('[data-capability="sign-out"]:visible').first();
+      capabilitiesFound['sign-out'] = await drawerSignOut.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // 2. Open Mobile Settings Subview
+      const mobileSettingsBtn = page.locator('[data-testid="mobile-settings-btn"]');
+      await expect(mobileSettingsBtn).toBeVisible({ timeout: 3000 });
+      await mobileSettingsBtn.click();
+      await page.waitForTimeout(400);
+
+      // Verify Annual Quota Configuration
+      const annualPolicy = page.locator('[data-capability="annual-policy-edit"]').first();
+      capabilitiesFound['annual-policy-edit'] = await annualPolicy.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Verify Add Custom Annual Category
+      const addAnnualBtn = page.locator('[data-capability="add-annual-category"]').first();
+      capabilitiesFound['add-annual-category'] = await addAnnualBtn.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Switch to Remote / WFH Tier Tab in Mobile Quotas
+      const remoteTab = page.locator('[data-testid="mobile-quotas-tab-remote"]').first();
+      await expect(remoteTab).toBeVisible({ timeout: 3000 });
+      await remoteTab.click();
+      await page.waitForTimeout(400);
+      const remotePolicy = page.locator('[data-capability="remote-policy-edit"]').first();
+      capabilitiesFound['remote-policy-edit'] = await remotePolicy.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // Switch to Special Tier Tab in Mobile Quotas
+      const specialTab = page.locator('[data-testid="mobile-quotas-tab-special"]').first();
+      await expect(specialTab).toBeVisible({ timeout: 3000 });
+      await specialTab.click();
+      await page.waitForTimeout(400);
+      const specialPolicy = page.locator('[data-capability="special-benefits-edit"]').first();
+      capabilitiesFound['special-benefits-edit'] = await specialPolicy.isVisible({ timeout: 2000 }).catch(() => false);
+
+      const addSpecialBtn = page.locator('[data-capability="add-special-benefit"]').first();
+      capabilitiesFound['add-special-benefit'] = await addSpecialBtn.isVisible({ timeout: 2000 }).catch(() => false);
+
+      // 3. Switch to Backup Tab in Mobile Settings
+      const backupTab = page.locator('button:has-text("Backup")').first();
+      await expect(backupTab).toBeVisible({ timeout: 3000 });
+      await backupTab.click();
+      await page.waitForTimeout(400);
+
+      const exportJson = page.locator('[data-capability="export-json"]').first();
+      capabilitiesFound['export-json'] = await exportJson.isVisible({ timeout: 2000 }).catch(() => false);
+
+      const exportCsv = page.locator('[data-capability="export-csv"]').first();
+      capabilitiesFound['export-csv'] = await exportCsv.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    // ── STRICT PARITY ASSERTION ──
+    const REQUIRED_CAPABILITIES = [
+      'annual-policy-edit',
+      'add-annual-category',
+      'remote-policy-edit',
+      'special-benefits-edit',
+      'add-special-benefit',
+      'export-json',
+      'export-csv',
+      'sign-out'
+    ];
+
+    const missingCapabilities = REQUIRED_CAPABILITIES.filter(cap => !capabilitiesFound[cap]);
+    expect(
+      missingCapabilities,
+      `🚨 [Feature Parity Violation on ${isMobile ? 'Mobile' : 'Desktop'}]: The following capabilities were missing: ${missingCapabilities.join(', ')}`
+    ).toEqual([]);
+
+    expect(pageErrors).toEqual([]);
+  });
 });
 

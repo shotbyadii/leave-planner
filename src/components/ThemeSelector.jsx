@@ -30,19 +30,22 @@ const ThemeSelector = ({ theme = 'light', setTheme, className = '', direction = 
     : 'top-full mt-1.5 origin-top-right right-0';
 
   return (
-    <div ref={dropdownRef} className={`relative ${variant === 'full' ? 'flex-1' : 'inline-block'} ${className}`}>
+    <div ref={dropdownRef} className={`relative ${variant === 'full' || variant === 'compact' ? 'flex-1' : 'inline-block'} ${className}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={
           variant === 'full'
             ? "w-full flex items-center justify-center gap-2 py-2.5 bg-muted/60 border border-border text-foreground rounded-2xl text-xs font-bold hover:bg-muted transition-colors cursor-pointer"
-            : "p-2 border border-border/80 rounded-xl bg-card hover:bg-muted transition-all active:scale-95 shadow-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer"
+            : variant === 'compact'
+              ? "w-full h-full flex items-center justify-center gap-1.5 px-2 bg-muted/60 hover:bg-muted border border-border/80 text-foreground rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-2xs cursor-pointer"
+              : "p-2 border border-border/80 rounded-xl bg-card hover:bg-muted transition-all active:scale-95 shadow-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer"
         }
         title="Change Theme"
       >
-        <CurrentIcon size={variant === 'full' ? 15 : 16} className="text-foreground" />
+        <CurrentIcon size={variant === 'compact' ? 12 : variant === 'full' ? 15 : 16} className="text-foreground" />
         {variant === 'full' && <span>{currentOption.label}</span>}
+        {variant === 'compact' && <span>{theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto'}</span>}
       </button>
 
       <AnimatePresence>

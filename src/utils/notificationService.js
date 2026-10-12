@@ -166,8 +166,8 @@ export const showAppNotification = async (title, options = {}) => {
   }
 
   const notificationOptions = {
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: options.icon || '/app-icon-192.png',
+    badge: options.badge || '/app-icon-192.png',
     vibrate: [200, 100, 200],
     renotify: true,
     tag: options.tag || 'leave-vault-attendance',

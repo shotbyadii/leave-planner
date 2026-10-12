@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Lightbulb, ChevronRight, Settings2, Sparkles, Minus, Plus, Search, X, 
   ChevronDown, SlidersHorizontal, Compass, Send, Mic, MicOff, Bot, CheckCircle2, 
-  Calendar, MapPin, Loader2, Key, Maximize2, ExternalLink, Check, Trash2, User, GripHorizontal, RotateCcw, Zap,
+  Calendar, MapPin, Loader2, Key, ExternalLink, Check, Trash2, User, GripHorizontal, RotateCcw, Zap,
   AlertTriangle, AlertCircle
 } from 'lucide-react';
 import { findOptimalWindows } from '../utils/leaveOptimizer';
@@ -15,11 +15,12 @@ import {
   queryGeminiAssistant,
   formatAiErrorMessage
 } from '../services/aiAssistantService';
+import { getBrandTheme } from '../utils/brandColorExtractor';
 import AppleBalanceTicker from './AppleBalanceTicker';
 
 const STARTER_PROMPTS = [
   { label: '🌴 4-day trip in Oct', text: 'Plan a 4-day vacation trip in October' },
-  { label: '⚡ Next long weekend', text: 'When is the next best long weekend to take off?' },
+  { label: '⚡ Upcoming long weekend', text: 'When is the next best long weekend to take off?' },
   { label: '🏠 WFH tomorrow', text: 'Mark tomorrow as Work From Home' },
   { label: '📊 Check balances', text: 'How many PL and EL leaves do I have left?' }
 ];
@@ -105,11 +106,13 @@ const OptimizerPanel = ({
   inlineOnMobile = false, 
   leaves,
   leaveNames,
+  leaveConfigs = [],
   leavePlans = [],
-  onOpenAiModal,
+  companyName = '',
   onOpenSettings,
   onExecuteAction
 }) => {
+  const brandTheme = useMemo(() => getBrandTheme(companyName), [companyName]);
   const plRem = leaves?.pl ? (leaves.pl.total - leaves.pl.used) : 15;
   const elRem = leaves?.el ? (leaves.el.total - leaves.el.used) : 10;
   const rhRem = leaves?.rh ? (leaves.rh.total - leaves.rh.used) : 1;
@@ -141,6 +144,7 @@ const OptimizerPanel = ({
   // Dynamic Vertical Resize Splitter (Percentage of panel height allocated to chat)
   const [chatSplitPercent, setChatSplitPercent] = useState(50);
   const splitContainerRef = useRef(null);
+  const suggestionsSectionRef = useRef(null);
   const isDraggingSplitRef = useRef(false);
 
   const INITIAL_WELCOME_MSG = {
@@ -356,7 +360,21 @@ const OptimizerPanel = ({
 
   const handleAgenticSubmit = (e) => {
     if (e) e.preventDefault();
-    if (!agenticText.trim()) return;
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    const scrollToResults = () => {
+      if (typeof window !== 'undefined' && (inlineOnMobile || window.innerWidth < 768)) {
+        setTimeout(() => {
+          suggestionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+      }
+    };
+
+    if (!agenticText.trim()) {
+      scrollToResults();
+      return;
+    }
     
     const parsed = parseNaturalLanguage(agenticText);
     
@@ -369,6 +387,8 @@ const OptimizerPanel = ({
     
     if (parsed.targetMonth !== null) setTargetMonth(parsed.targetMonth);
     else setTargetMonth('all');
+
+    scrollToResults();
   };
 
   const handleAgenticClear = () => {
@@ -529,7 +549,7 @@ const OptimizerPanel = ({
   const handleTriggerActionWithTicker = (msgId, action, details) => {
     const type = (details?.leaveType || 'pl').toLowerCase();
     const amount = details?.leaveDaysCost || (details?.dates?.length) || 1;
-    const leaveTypeName = leaveNames?.[type] || `${type.toUpperCase()} Leave`;
+    const leaveTypeName = leaveConfigs?.find(c => c.id === type)?.name || leaveNames?.[type] || `${type.toUpperCase()} Leave`;
 
     if (action === 'cancel_leave') {
       const curBalance = leaves && leaves[type] ? (leaves[type].total - leaves[type].used) : 10;
@@ -602,7 +622,7 @@ const OptimizerPanel = ({
 
   // Render Suggestions List Sub-component
   const renderSuggestionsList = () => (
-    <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2.5">
+    <div ref={suggestionsSectionRef} className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-2.5">
       <div className="flex items-center justify-between px-1 py-1">
         <span className="text-xs font-black uppercase tracking-wider text-foreground font-mono flex items-center gap-1.5">
           <Lightbulb size={13} className="text-amber-500" />
@@ -806,14 +826,19 @@ const OptimizerPanel = ({
 
       {/* 2. Top Bar Navigation / Mode Toggle & Compact '+' New Chat Button (Desktop only; on mobile home keep only filters and picks) */}
       {!inlineOnMobile && hasKey && (
-        <div className={`p-2.5 border-b transition-colors flex items-center justify-between gap-2 flex-shrink-0 ${
-          panelViewMode === 'ai'
-            ? 'bg-gradient-to-r from-blue-100/90 via-sky-50/80 to-indigo-100/80 dark:from-[#0b1325] dark:via-[#142d5b] dark:to-[#173ea5] border-blue-200/50 dark:border-blue-800/40 text-foreground dark:text-white'
-            : 'border-border/80 bg-muted/20 text-foreground'
-        }`}>
+        <div 
+          style={{
+            background: panelViewMode === 'ai' ? (brandTheme?.css || DEFAULT_BRAND_GRADIENT.css) : undefined
+          }}
+          className={`p-2.5 border-b transition-colors flex items-center justify-between gap-2 flex-shrink-0 ${
+            panelViewMode === 'ai'
+              ? 'border-white/10 text-white shadow-xs'
+              : 'border-border/80 bg-muted/20 text-foreground'
+          }`}
+        >
           <div className={`flex p-1 rounded-2xl border shadow-inner flex-1 ${
             panelViewMode === 'ai'
-              ? 'bg-black/5 dark:bg-white/10 border-black/5 dark:border-white/15 backdrop-blur-md'
+              ? 'bg-black/20 border-white/15 backdrop-blur-md'
               : 'bg-muted/60 border-border/60'
           }`}>
             <button
@@ -821,11 +846,11 @@ const OptimizerPanel = ({
               onClick={() => setPanelViewMode('ai')}
               className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 panelViewMode === 'ai'
-                  ? 'bg-white dark:bg-white/20 text-slate-900 dark:text-white font-black shadow-xs'
+                  ? 'bg-white/20 text-white font-black shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Sparkles size={13} className={panelViewMode === 'ai' ? 'text-blue-500 dark:text-blue-300 animate-pulse' : 'text-muted-foreground'} />
+              <Sparkles size={13} className={panelViewMode === 'ai' ? 'text-amber-300 animate-pulse' : 'text-muted-foreground'} />
               <span>Assistant</span>
             </button>
             <button
@@ -834,9 +859,7 @@ const OptimizerPanel = ({
               className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 panelViewMode === 'filters'
                   ? 'bg-card text-foreground font-black shadow-sm'
-                  : panelViewMode === 'ai'
-                  ? 'text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white'
-                  : 'text-muted-foreground hover:text-foreground'
+                  : 'text-white/70 hover:text-white'
               }`}
             >
               <SlidersHorizontal size={13} />
@@ -851,7 +874,7 @@ const OptimizerPanel = ({
               whileTap={{ scale: 0.86, rotate: 90 }}
               transition={{ type: 'spring', damping: 16, stiffness: 400 }}
               title="New Chat"
-              className="w-8 h-8 rounded-2xl bg-white/80 dark:bg-white/15 hover:bg-white dark:hover:bg-white/25 text-slate-700 dark:text-white border border-blue-200/60 dark:border-white/15 shadow-xs transition-colors flex items-center justify-center cursor-pointer flex-shrink-0 backdrop-blur-md"
+              className="w-8 h-8 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/15 shadow-xs transition-colors flex items-center justify-center cursor-pointer flex-shrink-0 backdrop-blur-md"
             >
               <Plus size={15} strokeWidth={2.5} />
             </motion.button>
@@ -879,8 +902,11 @@ const OptimizerPanel = ({
           {/* Top Resizable AI Assistant Section with Theme-Matching Focused Calendar Background */}
           <div 
             data-ai-chat="true"
-            style={{ height: `${chatSplitPercent}%` }} 
-            className="ai-chat-panel min-h-[160px] max-h-[80%] flex flex-col bg-gradient-to-br from-blue-50/95 via-sky-50/85 to-indigo-100/75 dark:from-[#0f172a] dark:via-[#1e3a6e] dark:to-[#1d4ed8] border-b border-blue-200/60 dark:border-blue-900/40 text-foreground dark:text-white overflow-hidden flex-shrink-0 relative shadow-inner"
+            style={{ 
+              height: `${chatSplitPercent}%`,
+              background: brandTheme?.css || DEFAULT_BRAND_GRADIENT.css 
+            }} 
+            className="ai-chat-panel min-h-[160px] max-h-[80%] flex flex-col border-b border-white/10 text-white overflow-hidden flex-shrink-0 relative shadow-inner"
           >
             {/* AI Messages Scroll Area with Smooth Animation */}
             <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2.5 no-scrollbar pb-2">
@@ -919,11 +945,12 @@ const OptimizerPanel = ({
                       <div
                         className={`px-3 py-2 rounded-2xl text-xs leading-relaxed ${
                           msg.role === 'user'
-                            ? 'bg-blue-600 text-white font-medium rounded-br-none shadow-xs'
+                            ? 'text-white font-medium rounded-br-none shadow-xs border border-white/20'
                             : msg.isError
                             ? 'bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-300 rounded-bl-none'
                             : 'bg-white/90 dark:bg-slate-900/85 border border-blue-200/60 dark:border-white/15 text-slate-800 dark:text-slate-100 rounded-bl-none shadow-xs backdrop-blur-md'
                         }`}
+                        style={msg.role === 'user' ? { backgroundColor: brandTheme?.primary || '#2563EB' } : undefined}
                       >
                         {msg.text}
                       </div>
@@ -1049,7 +1076,7 @@ const OptimizerPanel = ({
                                 const formatted = !isNaN(dObj.getTime())
                                   ? dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })
                                   : dStr;
-                                const leaveLabel = leaveNames?.[bType] || (bType === 'pl' ? 'Planned Leave' : bType === 'el' ? 'Emergency Leave' : bType.toUpperCase());
+                                const leaveLabel = leaveConfigs?.find(c => c.id === bType)?.name || leaveNames?.[bType] || (bType === 'pl' ? 'Planned Leave' : bType === 'el' ? 'Emergency Leave' : bType.toUpperCase());
 
                                 return (
                                   <div
@@ -1208,7 +1235,7 @@ const OptimizerPanel = ({
                               </motion.div>
                             ) : appliedActions[msg.id] ? (() => {
                               const type = (msg.details?.leaveType || 'pl').toLowerCase();
-                              const leaveTypeName = leaveNames?.[type] || `${type.toUpperCase()} Leave`;
+                              const leaveTypeName = leaveConfigs?.find(c => c.id === type)?.name || leaveNames?.[type] || `${type.toUpperCase()} Leave`;
                               const total = leaves && leaves[type] ? leaves[type].total : 15;
                               const used = leaves && leaves[type] ? leaves[type].used : 0;
                               const remaining = Math.max(0, total - used);
@@ -1334,10 +1361,11 @@ const OptimizerPanel = ({
                                 <button
                                   type="button"
                                   onClick={() => handleTriggerActionWithTicker(msg.id, msg.action, msg.details)}
+                                  style={msg.action !== 'cancel_leave' ? (brandTheme?.buttonStyle || { backgroundColor: brandTheme?.primary || '#2563EB' }) : undefined}
                                   className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-98 cursor-pointer ${
                                     msg.action === 'cancel_leave'
                                       ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
-                                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
+                                      : 'text-white shadow-xs hover:opacity-95'
                                   }`}
                                 >
                                   {msg.action === 'cancel_leave' ? (
@@ -1358,7 +1386,10 @@ const OptimizerPanel = ({
                     </div>
 
                     {msg.role === 'user' && (
-                      <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 mb-0.5 shadow-xs">
+                      <div 
+                        className="w-6 h-6 rounded-lg text-white flex items-center justify-center flex-shrink-0 mb-0.5 shadow-xs border border-white/20"
+                        style={{ backgroundColor: brandTheme?.primary || '#2563EB' }}
+                      >
                         <User size={13} />
                       </div>
                     )}
@@ -1470,7 +1501,8 @@ const OptimizerPanel = ({
                 <button
                   type="submit"
                   disabled={aiLoading || !aiInputVal.trim()}
-                  className="p-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white flex items-center justify-center shadow-md shadow-blue-600/20 active:scale-95 transition-all flex-shrink-0 cursor-pointer mb-0.5"
+                  style={brandTheme?.buttonStyle || { backgroundColor: brandTheme?.primary || '#2563EB' }}
+                  className="p-1.5 rounded-xl disabled:opacity-40 text-white flex items-center justify-center shadow-md active:scale-95 transition-all flex-shrink-0 cursor-pointer mb-0.5"
                 >
                   <Send size={13} />
                 </button>
@@ -1517,6 +1549,7 @@ const OptimizerPanel = ({
                 )}
                 <button 
                   type="submit" 
+                  onClick={handleAgenticSubmit}
                   className="p-2 bg-purple-600 hover:bg-purple-700 rounded-xl text-white transition-colors shadow-md flex items-center justify-center cursor-pointer"
                 >
                   <Search size={13} strokeWidth={3} />

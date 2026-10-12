@@ -77,50 +77,42 @@ export const extractDatesFromNaturalText = (text, todayStr = new Date().toISOStr
 
 export const AVAILABLE_MODELS = [
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
     badge: 'Recommended',
-    description: 'Balanced, fast and intelligent. Default choice for leave and trip optimization.',
+    description: 'Next-Gen Gemini multimodal flash model with ultra-fast latency and native structured JSON.',
     speed: 'Ultra Fast',
-    tier: 'Free / Pay-as-you-go'
+    tier: 'Free (15 RPM / 1,500 RPD)'
   },
   {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    badge: 'Highest Intelligence',
-    description: 'Deepest reasoning & multi-step trip planning for complex scheduling constraints.',
-    speed: 'Standard',
-    tier: 'Pay-as-you-go / Pro'
-  },
-  {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    badge: 'High RPM',
-    description: 'Lightweight & instant responses with lowest quota consumption.',
-    speed: 'Instant',
-    tier: 'Free / Pay-as-you-go'
-  },
-  {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    badge: 'Stable',
-    description: 'Proven multimodal speed and reliability across large queries.',
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    badge: 'Balanced',
+    description: 'High-throughput reasoning model for leave optimization and multi-day scheduling.',
     speed: 'Very Fast',
-    tier: 'Free / Pay-as-you-go'
+    tier: 'Free (15 RPM / 1,500 RPD)'
   },
   {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    badge: 'Fallback',
-    description: 'Reliable fallback model with high token limits and legacy support.',
-    speed: 'Fast',
-    tier: 'Free / Pay-as-you-go'
+    id: 'gemini-3.1-flash-lite',
+    name: 'Gemini 3.1 Flash Lite',
+    badge: 'High RPM',
+    description: 'Lightweight model with lowest latency & maximum request rate.',
+    speed: 'Instant',
+    tier: 'Free / High RPM'
+  },
+  {
+    id: 'gemini-3.1-pro-preview',
+    name: 'Gemini 3.1 Pro',
+    badge: 'Deep Reasoning',
+    description: 'Deepest reasoning for complex multi-month vacation planning and team constraints.',
+    speed: 'Standard',
+    tier: 'Pro'
   }
 ];
 
 export const getStoredGeminiModel = () => {
-  if (typeof window === 'undefined') return 'gemini-2.5-flash';
-  return localStorage.getItem('gemini_preferred_model') || 'gemini-2.5-flash';
+  if (typeof window === 'undefined') return 'gemini-3.8-flash';
+  return localStorage.getItem('gemini_preferred_model') || 'gemini-3.8-flash';
 };
 
 export const setStoredGeminiModel = (modelId) => {
@@ -128,8 +120,10 @@ export const setStoredGeminiModel = (modelId) => {
   localStorage.setItem('gemini_preferred_model', modelId);
 };
 
+export const DEFAULT_DEV_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+
 export const getStoredGeminiApiKey = () => {
-  if (typeof window === 'undefined') return '';
+  if (typeof window === 'undefined') return DEFAULT_DEV_KEY;
   if (localStorage.getItem('gemini_api_key_cleared') === 'true') {
     return '';
   }
@@ -137,7 +131,7 @@ export const getStoredGeminiApiKey = () => {
   if (localKey && localKey.trim()) {
     return localKey.trim();
   }
-  return '';
+  return DEFAULT_DEV_KEY;
 };
 
 export const setStoredGeminiApiKey = (key) => {
@@ -546,10 +540,38 @@ export const queryGeminiAssistant = async ({ message, history = [], context = {}
         }
       }
 
+      // Enrich bridge details if action is stage_plan or query is about bridges / long weekends
+      let resolvedBridge = parsed.bridge || null;
+      const isBridgeQuery = /(bridge|long weekend|maximize|4-day|4 day|mini vacation|extend)/i.test(message) ||
+                            (parsed.action === 'stage_plan' && (parsed.details?.planName || '').toLowerCase().includes('weekend'));
+      if (!resolvedBridge && (isBridgeQuery || parsed.action === 'stage_plan') && sanitizedDetails?.startDate) {
+        const start = sanitizedDetails.startDate;
+        const end = sanitizedDetails.endDate || start;
+        const holidaysSource = (context.holidays && context.holidays.length > 0) ? context.holidays : publicHolidays;
+        const nearbyHoliday = holidaysSource.find(h => {
+          const hTime = new Date(h.date).getTime();
+          const sTime = new Date(start).getTime();
+          const eTime = new Date(end).getTime();
+          return (hTime >= sTime - 2 * 86400000 && hTime <= eTime + 2 * 86400000);
+        });
+
+        resolvedBridge = {
+          holidayName: nearbyHoliday?.name || 'Public Holiday',
+          holidayDate: nearbyHoliday?.date || start,
+          startDate: start,
+          endDate: end,
+          dates: sanitizedDetails.dates || [start],
+          leaveType: sanitizedDetails.leaveType || 'pl',
+          consecutiveDaysOff: sanitizedDetails.totalSpanDays || 4,
+          leaveDaysCost: sanitizedDetails.leaveDaysCost || (sanitizedDetails.dates?.length || 1)
+        };
+      }
+
       return {
         reply: finalReply,
         action: parsed.action || 'none',
         details: sanitizedDetails,
+        bridge: resolvedBridge,
         holidays: resolvedHolidays,
         balances: resolvedBalances,
         bookedLeaves: bookedLeavesList,
@@ -716,7 +738,8 @@ export const queryGeminiAssistant = async ({ message, history = [], context = {}
     }
 
     // 4. TRIP PLANNING / VACATION STAGING INTENT
-    const isTripPlanIntent = /\b(plan|suggest|find|best|optimal)\s+.*(trip|vacation|getaway|weekend|days?)/i.test(message);
+    const isTripPlanIntent = /\b(plan|suggest|find|best|optimal|how is|any|looking for|windows?)\s+.*(trip|vacation|getaway|weekend|days?|october|november|december)/i.test(message) ||
+      /(trip|vacation|long weekend).*(october|november|december|january|february|march|april|may|june|july|august|september)/i.test(message);
     if (isTripPlanIntent) {
       const parsedNlp = parseNaturalLanguage(message);
       const targetMonth = parsedNlp.targetMonth !== null ? parseInt(parsedNlp.targetMonth, 10) : 'all';

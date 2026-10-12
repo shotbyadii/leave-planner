@@ -122,7 +122,57 @@ export const fetchDemoPlans = async () => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = sessionStorage.getItem(STORAGE_KEYS.PLANS);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const normalized = parsed.map(p => {
+      const rawStart = p.start_date || p.startDate;
+      const rawEnd = p.end_date || p.endDate;
+      const s = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+      const e = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : s));
+      return {
+        ...p,
+        start_date: s,
+        end_date: e,
+        startDate: s,
+        endDate: e
+      };
+    });
+
+    // Self-healing deduplication:
+    // When rapid clicks or repeated bookings create duplicate plans with the same name & dates,
+    // merge them and retain the one that has leaves attached, removing empty ghost duplicates!
+    let demoLeaves = [];
+    try {
+      const leavesRaw = sessionStorage.getItem(STORAGE_KEYS.LEAVES);
+      demoLeaves = leavesRaw ? JSON.parse(leavesRaw) : [];
+    } catch (e) {}
+
+    const planMap = new Map();
+    let hasDuplicates = false;
+
+    for (const plan of normalized) {
+      const key = `${(plan.name || '').trim().toLowerCase()}|${plan.start_date}|${plan.end_date}`;
+      const hasLeaves = demoLeaves.some(l => l.plan_id === plan.id);
+
+      if (!planMap.has(key)) {
+        planMap.set(key, { plan, hasLeaves });
+      } else {
+        hasDuplicates = true;
+        const currentBest = planMap.get(key);
+        // If currentBest has 0 leaves while this duplicate has leaves, prefer the one with leaves!
+        if (!currentBest.hasLeaves && hasLeaves) {
+          planMap.set(key, { plan, hasLeaves });
+        }
+      }
+    }
+
+    const deduplicated = Array.from(planMap.values()).map(v => v.plan);
+    if (hasDuplicates) {
+      sessionStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify(deduplicated));
+    }
+
+    return deduplicated;
   } catch (e) {
     return [];
   }
@@ -130,13 +180,28 @@ export const fetchDemoPlans = async () => {
 
 export const createDemoPlan = async (name, startDate, endDate) => {
   const plans = await fetchDemoPlans();
+  const rawStart = startDate;
+  const rawEnd = endDate;
+  const s = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+  const e = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : s));
+
+  // Check if a plan with the same name and date range already exists
+  const existing = plans.find(p => 
+    p.name?.trim().toLowerCase() === (name || '').trim().toLowerCase() &&
+    (p.start_date === s || p.startDate === s) &&
+    (p.end_date === e || p.endDate === e)
+  );
+  if (existing) {
+    return existing;
+  }
+
   const newPlan = {
     id: 'demo-plan-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
     name: name || 'Untitled Plan',
-    start_date: startDate,
-    end_date: endDate,
-    startDate,
-    endDate,
+    start_date: s,
+    end_date: e,
+    startDate: s,
+    endDate: e,
     created_at: new Date().toISOString()
   };
   plans.push(newPlan);

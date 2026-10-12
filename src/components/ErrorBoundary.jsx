@@ -1,10 +1,10 @@
 import React from 'react';
-import { RotateCw, AlertTriangle } from 'lucide-react';
+import { RotateCw, AlertTriangle, Copy, Check } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, copied: false };
   }
 
   static getDerivedStateFromError(error) {
@@ -26,10 +26,35 @@ class ErrorBoundary extends React.Component {
     window.location.href = '/';
   };
 
+  handleCopyError = () => {
+    const { error } = this.state;
+    if (!error) return;
+    const textToCopy = `Error: ${error.message || String(error)}\n\nStack Trace:\n${error.stack || 'No stack trace available'}`;
+    navigator.clipboard?.writeText(textToCopy).then(() => {
+      this.setState({ copied: true });
+      setTimeout(() => this.setState({ copied: false }), 2000);
+    }).catch(() => {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = textToCopy;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        this.setState({ copied: true });
+        setTimeout(() => this.setState({ copied: false }), 2000);
+      } catch (e) {}
+    });
+  };
+
   render() {
     if (this.state.hasError) {
+      const error = this.state.error;
+      const errorMsg = error?.message || String(error || 'Unknown error');
+      const errorStack = error?.stack || '';
+
       return (
-        <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center select-none font-sans">
+        <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center select-text font-sans">
           <div className="w-16 h-16 rounded-3xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mb-6 shadow-2xl shadow-red-500/10">
             <AlertTriangle size={32} />
           </div>
@@ -37,14 +62,44 @@ class ErrorBoundary extends React.Component {
           <p className="text-sm text-slate-400 max-w-sm mb-4 leading-relaxed">
             The application encountered an unexpected display issue. Your saved data is safe.
           </p>
-          {this.state.error && (
-            <div className="max-w-md w-full bg-red-950/40 border border-red-500/30 rounded-xl p-3 text-left mb-6 font-mono text-xs text-red-300 overflow-x-auto max-h-40">
-              <p className="font-bold mb-1 text-red-200">{this.state.error.message || String(this.state.error)}</p>
-              {this.state.error.stack && (
-                <pre className="text-[10px] text-red-400/80 whitespace-pre-wrap">{this.state.error.stack.split('\n').slice(0, 4).join('\n')}</pre>
-              )}
+
+          {error && (
+            <div className="max-w-lg w-full bg-red-950/40 border border-red-500/30 rounded-2xl p-4 text-left mb-6 font-mono text-xs text-red-300 relative shadow-lg">
+              <div className="flex items-center justify-between mb-2 pb-2 border-b border-red-500/20">
+                <span className="text-[10px] uppercase font-bold text-red-400/80 tracking-wider">
+                  Error Details & Stack Trace
+                </span>
+                <button
+                  type="button"
+                  onClick={this.handleCopyError}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 text-[11px] font-bold transition-all cursor-pointer active:scale-95"
+                  title="Copy error and stack location to clipboard"
+                >
+                  {this.state.copied ? (
+                    <>
+                      <Check size={12} className="text-emerald-400" />
+                      <span className="text-emerald-400">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} />
+                      <span>Copy Error</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="overflow-y-auto max-h-56 select-text cursor-text">
+                <p className="font-bold text-red-200 mb-2 leading-relaxed select-text">{errorMsg}</p>
+                {errorStack && (
+                  <pre className="text-[10px] text-red-400/90 whitespace-pre-wrap font-mono leading-normal bg-black/30 p-2.5 rounded-xl border border-red-500/15 select-text overflow-x-auto">
+                    {errorStack}
+                  </pre>
+                )}
+              </div>
             </div>
           )}
+
           <div className="flex gap-3">
             <button
               onClick={this.handleReload}

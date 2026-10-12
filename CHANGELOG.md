@@ -2,6 +2,35 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.3] - 2026-10-12
+### Added
+- **Desktop Header Redesign**: Compact topbar architecture with segmented policy tier switchers (`Annual`, `Special`, `Remote`), user profile dropdown, and streamlined actions.
+- **Mobile Leave Duration Selector**: Desktop-parity duration selector on mobile with quick `Full Day (1.0)` and `Half Day (0.5)` pills.
+- **Auto-Scroll for AI Suggestions**: Non-AI suggested leave picks panel on mobile automatically scrolls down smoothly upon search icon activation.
+- **Robust Error Boundary**: Copy-friendly error screen with one-click full stack trace copying and user-selectable diagnostics text.
+
+### Changed
+- **Leave Tracker WFH Balance**: Updated monthly tracker card to display remaining days (`6/10 left`) instead of utilized counts, ensuring visual consistency across desktop and mobile headers.
+- **Zero-Balance Lockout**: Prevented taking half-day leaves when quota balance is zero across mobile and desktop.
+- **Policy Selection Polish**: Removed redundant policy warning banners for a cleaner UX.
+
+### Fixed
+- **Mobile Ring Clipping**: Eliminated highlight outline clipping on segmented policy pills and mobile selection bars.
+- **Acronym Parsing**: Normalized Work From Home category short code to `WFH` (resolving `WF` fallback issue).
+- **Initialization TDZ**: Fixed `ReferenceError: Cannot access 'getTodayStr' before initialization` in `App.jsx`.
+
+---
+
+## [v0.8.2] - 2026-09-15
+### Added
+- **Dynamic Vacation Policies & Tier Grouping**: Support for categorized tiers, custom annual leave types, and company leave quotas.
+- **Push Notification & PWA Branding**: Custom application branding icon in push notifications and standalone mobile shells.
+
+### Fixed
+- **Mobile Settings Spacing**: Resolved cutoffs and excessive scroll paddings in mobile settings dialogs and quota sheets.
+
+---
+
 ## [v0.8.1] - 2026-08-22
 ### Added
 - **PWA & Standalone App Support**: Added web app manifest, custom service worker caching, and an ambient installation prompt modal (`InstallPromptModal.jsx`).

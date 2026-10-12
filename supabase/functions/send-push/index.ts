@@ -64,8 +64,8 @@ Deno.serve(async (req: Request) => {
       const testPayload = JSON.stringify({
         title: body.title || "Daily Attendance Check-in",
         body: body.body || "Web Push is working! You will receive background reminders on this device.",
-        icon: "/favicon.svg",
-        badge: "/favicon.svg",
+        icon: "/app-icon-192.png",
+        badge: "/app-icon-192.png",
         tag: "test-notification-" + Date.now(),
         data: { url: "/?action=attendance" }
       });
@@ -126,8 +126,8 @@ Deno.serve(async (req: Request) => {
         const payload = JSON.stringify({
           title: "Daily Attendance Check-in",
           body: "Good afternoon! Please confirm whether today is Work From Home or In-Office.",
-          icon: "/favicon.svg",
-          badge: "/favicon.svg",
+          icon: "/app-icon-192.png",
+          badge: "/app-icon-192.png",
           tag: `wfh-checkin-${todayStr}`,
           data: { url: "/?action=attendance" }
         });

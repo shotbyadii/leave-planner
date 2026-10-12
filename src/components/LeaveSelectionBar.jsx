@@ -476,26 +476,6 @@ const LeaveSelectionBar = ({
                     </MorphingTabContent>
                   </div>
 
-                    {/* Dynamic Policy & Constraint Warning Banner */}
-                    {constraintWarnings.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        {constraintWarnings.map((warn, i) => (
-                          <div 
-                            key={i} 
-                            className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 text-amber-800 dark:text-amber-200 rounded-2xl p-3.5 flex gap-3 items-start shadow-xs animate-in fade-in slide-in-from-top-1 duration-200"
-                          >
-                            <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={16} />
-                            <div className="text-xs">
-                              <span className="font-bold block uppercase tracking-wider text-[10px] text-amber-600 dark:text-amber-400">
-                                {warn.title || 'Policy Constraint'}
-                              </span>
-                              <p className="mt-0.5 leading-relaxed text-[11px]">{warn.message}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
                     {/* Note Input */}
                     <div>
                       <label className="text-xs font-bold text-foreground mb-1.5 block">

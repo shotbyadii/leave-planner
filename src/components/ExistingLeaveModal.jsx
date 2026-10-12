@@ -17,6 +17,7 @@ export const ExistingLeaveDetailContent = ({
   leaves,
   leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
   leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' },
+  leaveConfigs = [],
   bookedDates = [],
   maxWfh = 10,
   calendarStyle = 'classic' 
@@ -60,7 +61,9 @@ export const ExistingLeaveDetailContent = ({
     actualLeavesCount = Math.max(0, totalDays - weekendsCount - holidaysCount);
   }
 
-  const theme = getLeaveTheme(leaveColors?.[leaveType] || (leaveType === 'pl' ? 'blue' : leaveType === 'el' ? 'orange' : leaveType === 'rh' ? 'green' : 'cyan'));
+  const activeConfig = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leaveType) : null;
+  const themeColorId = activeConfig?.color || leaveColors?.[leaveType] || (leaveType === 'pl' ? 'blue' : leaveType === 'el' ? 'orange' : leaveType === 'rh' ? 'green' : 'blue');
+  const theme = getLeaveTheme(themeColorId);
   const bannerTheme = isOffice 
     ? 'bg-slate-50/60 dark:bg-slate-500/10 border-slate-200/80 dark:border-slate-500/30 text-slate-700 dark:text-slate-300'
     : `${theme.activeBoxBg} ${theme.activeBoxBorder} ${theme.activeText}`;
@@ -68,7 +71,7 @@ export const ExistingLeaveDetailContent = ({
     ? 'bg-slate-100 dark:bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-500/40'
     : theme.activeBadge;
 
-  const leaveTypeName = (leaveNames && leaveNames[leaveType]) || (leaves && leaves[leaveType] && (leaves[leaveType].name || leaves[leaveType].label)) || `${leaveType.toUpperCase()} Leave`;
+  const leaveTypeName = activeConfig?.name || (leaveNames && leaveNames[leaveType]) || (leaves && leaves[leaveType] && (leaves[leaveType].name || leaves[leaveType].label)) || `${leaveType.toUpperCase()} Leave`;
 
   const handleTriggerCancelLeave = () => {
     const type = leaveType;

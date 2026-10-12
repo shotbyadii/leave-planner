@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock, FileSpreadsheet } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock, FileSpreadsheet, Plus, Trash2, Edit3, Info, Shield, Heart } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend, getStoredHolidays, loadHolidaysFromSupabase } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
@@ -8,7 +8,6 @@ import Calendar from './components/Calendar';
 import { ExistingLeaveDetailContent } from './components/ExistingLeaveModal';
 import OptimizerPanel from './components/OptimizerPanel';
 import LeaveTracker from './components/LeaveTracker';
-import { TimePicker } from './components/TimePicker';
 import LeaveSelectionBar from './components/LeaveSelectionBar';
 import WfhCheckinModal from './components/WfhCheckinModal';
 import NotificationPromptModal from './components/NotificationPromptModal';
@@ -29,9 +28,9 @@ import DevToolsModal from './components/DevToolsModal';
 import AppleWheelPicker from './components/AppleWheelPicker';
 import AppleBalanceTicker from './components/AppleBalanceTicker';
 import SegmentedPolicyTabs, { MorphingTabContent } from './components/SegmentedPolicyTabs';
-import { getLeaveColor, getLeaveTheme, getShortform, COLOR_PALETTE } from './utils/colorUtils';
-import { getSpecialBenefitIcon } from './utils/specialBenefitUtils';
-import { buildInitialLeaveConfigs, checkLeaveConstraints } from './services/leaveConfigService';
+import { getLeaveColor, getLeaveTheme, getShortform, COLOR_PALETTE, SELECTABLE_LEAVE_PALETTE } from './utils/colorUtils';
+import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from './utils/specialBenefitUtils';
+import { buildInitialLeaveConfigs, checkLeaveConstraints, deriveShortCode } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
@@ -61,7 +60,7 @@ import {
   isNotificationGranted,
   subscribeUserToPush 
 } from './utils/notificationService';
-import AiAssistantModal, { AiAssistantChatContent } from './components/AiAssistantModal';
+import { AiAssistantChatContent } from './components/AiAssistantModal';
 import './index.css';
 
 function App() {
@@ -83,10 +82,28 @@ function App() {
   const isInitialAuthDone = useRef(false);
   const [showSplash, setShowSplash] = useState(false);
   const [activeTab, setActiveTab] = useState('calendar');
+  const [devDateStr, setDevDateStr] = useState(import.meta.env.DEV ? (localStorage.getItem('dev_date_override') || '') : '');
+
+  const getTodayDate = () => {
+    if (import.meta.env.DEV && devDateStr) {
+      const parts = devDateStr.split('-');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      }
+    }
+    return new Date();
+  };
+
+  const getTodayStr = () => {
+    if (import.meta.env.DEV && devDateStr) return devDateStr;
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
   const [wfhModalOpen, setWfhModalOpen] = useState(false);
   const [hasPromptedWfh, setHasPromptedWfh] = useState(false);
-  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [isMobileAiOpen, setIsMobileAiOpen] = useState(false);
+  const [mobileAiMode, setMobileAiMode] = useState('compact'); // 'compact' | 'expanded'
   const [isAiPreview, setIsAiPreview] = useState(false);
   const [notifModalOpen, setNotifModalOpen] = useState(false);
   const [installModalOpen, setInstallModalOpen] = useState(false);
@@ -211,6 +228,17 @@ function App() {
   const [mobileFormQuotas, setMobileFormQuotas] = useState({ pl: 15, el: 10, rh: 1, wfh: 10 });
   const [mobileFormNames, setMobileFormNames] = useState({});
   const [mobileFormColors, setMobileFormColors] = useState({});
+  const [mobileLeaveConfigs, setMobileLeaveConfigs] = useState(() => leaveConfigs);
+  const [mobileQuotasTierTab, setMobileQuotasTierTab] = useState('annual'); // 'annual' | 'remote' | 'special'
+  const [editingMobileSpecialId, setEditingMobileSpecialId] = useState(null);
+  const [showMobileAddAnnual, setShowMobileAddAnnual] = useState(false);
+  const [mobileNewAnnualName, setMobileNewAnnualName] = useState('');
+  const [showMobileAddSpecial, setShowMobileAddSpecial] = useState(false);
+  const [mobileNewSpecialName, setMobileNewSpecialName] = useState('');
+  const [mobileNewSpecialQuota, setMobileNewSpecialQuota] = useState('1');
+  const [mobileNewSpecialCadence, setMobileNewSpecialCadence] = useState('month');
+  const [mobileNewSpecialColor, setMobileNewSpecialColor] = useState('pink');
+  const [mobileNewSpecialIcon, setMobileNewSpecialIcon] = useState('heart');
   const [mobileToast, setMobileToast] = useState('');
   const [isExportingMobile, setIsExportingMobile] = useState(false);
   const [isExportingCsvMobile, setIsExportingCsvMobile] = useState(false);
@@ -235,6 +263,105 @@ function App() {
     };
     reader.readAsDataURL(file);
   };
+
+  const updateMobileConfig = (id, updates) => {
+    setMobileLeaveConfigs(prev => (prev || []).map(c => {
+      if (c.id !== id) return c;
+      const next = { ...c, ...updates };
+      if (updates.constraints) {
+        next.constraints = { ...c.constraints, ...updates.constraints };
+      }
+      return next;
+    }));
+
+    if (['pl', 'el', 'rh', 'wfh'].includes(id)) {
+      if (updates.quota !== undefined) {
+        setMobileFormQuotas(prev => ({ ...prev, [id]: updates.quota }));
+      }
+      if (updates.name !== undefined) {
+        setMobileFormNames(prev => ({ ...prev, [id]: updates.name }));
+      }
+      if (updates.color !== undefined) {
+        setMobileFormColors(prev => ({ ...prev, [id]: updates.color }));
+      }
+    }
+  };
+
+  const removeMobileConfig = (id) => {
+    setMobileLeaveConfigs(prev => (prev || []).filter(c => c.id !== id));
+    if (editingMobileSpecialId === id) setEditingMobileSpecialId(null);
+  };
+
+  const handleMobileAddAnnual = () => {
+    if (!mobileNewAnnualName.trim()) return;
+    const nameTrim = mobileNewAnnualName.trim();
+    const shortCode = deriveShortCode(nameTrim);
+    const newId = `annual_${Date.now()}`;
+    const newConf = {
+      id: newId,
+      name: nameTrim,
+      shortCode,
+      color: 'indigo',
+      quota: 5,
+      enabled: true,
+      tier: 'annual',
+      deductsFromAnnual: true,
+      cadence: 'year',
+      constraints: { maxConsecutive: 5, requiresNote: false }
+    };
+    setMobileLeaveConfigs(prev => [...(prev || []), newConf]);
+    setMobileNewAnnualName('');
+    setShowMobileAddAnnual(false);
+  };
+
+  const handleMobileAddSpecial = () => {
+    if (!mobileNewSpecialName.trim()) return;
+    const nameTrim = mobileNewSpecialName.trim();
+    const shortCode = deriveShortCode(nameTrim);
+    const quota = Math.max(1, parseInt(mobileNewSpecialQuota, 10) || 1);
+    const newId = `special_${Date.now()}`;
+    const newConf = {
+      id: newId,
+      name: nameTrim,
+      shortCode,
+      color: mobileNewSpecialColor || 'pink',
+      quota,
+      cadence: mobileNewSpecialCadence || 'month',
+      icon: mobileNewSpecialIcon || 'heart',
+      enabled: true,
+      tier: 'special',
+      deductsFromAnnual: false,
+      constraints: { maxConsecutive: 3, requiresNote: false }
+    };
+    setMobileLeaveConfigs(prev => [...(prev || []), newConf]);
+    setMobileNewSpecialName('');
+    setMobileNewSpecialQuota('1');
+    setMobileNewSpecialCadence('month');
+    setMobileNewSpecialColor('pink');
+    setMobileNewSpecialIcon('heart');
+    setShowMobileAddSpecial(false);
+  };
+
+  const mobileAnnualConfigs = useMemo(() => {
+    return (mobileLeaveConfigs || []).filter(c => c.tier === 'annual' || (!c.tier && c.id !== 'wfh'));
+  }, [mobileLeaveConfigs]);
+
+  const mobileWfhConfig = useMemo(() => {
+    return (mobileLeaveConfigs || []).find(c => c.id === 'wfh') || {
+      id: 'wfh',
+      name: mobileFormNames.wfh || 'Work From Home',
+      shortCode: 'WFH',
+      quota: mobileFormQuotas.wfh ?? 10,
+      color: mobileFormColors.wfh || 'cyan',
+      enabled: true,
+      tier: 'remote',
+      cadence: 'month'
+    };
+  }, [mobileLeaveConfigs, mobileFormNames, mobileFormQuotas, mobileFormColors]);
+
+  const mobileSpecialConfigs = useMemo(() => {
+    return (mobileLeaveConfigs || []).filter(c => c.tier === 'special');
+  }, [mobileLeaveConfigs]);
   const [selectionStart, setSelectionStart] = useState(null);
   const [mobileConfirmOpen, setMobileConfirmOpen] = useState(false);
   const [viewingLeave, setViewingLeave] = useState(null);
@@ -243,6 +370,7 @@ function App() {
   const [mobileLeaveType, setMobileLeaveType] = useState('pl');
   const [mobilePlanName, setMobilePlanName] = useState('');
   const [mobileNote, setMobileNote] = useState('');
+  const [mobileDuration, setMobileDuration] = useState(1);
   const [mobileFromHour, setMobileFromHour] = useState(9);
   const [mobileToHour, setMobileToHour] = useState(18);
   const [mobileTickerData, setMobileTickerData] = useState(null);
@@ -327,7 +455,48 @@ function App() {
     };
   }, [bookedDates, leaveNames.wfh, leaveColors.wfh]);
 
-  // Keep mobile modal active tab in sync with currently selected leave type
+  // Calculate current mobile balance and needed leave units
+  const selectedMobileBal = useMemo(() => {
+    const item = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
+    if (mobileLeaveType === 'wfh') {
+      const targetMonthKey = (previewDates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
+      const wfhUsedThisMonth = Array.isArray(bookedDates)
+        ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).reduce((s, b) => s + (b.duration || 1), 0)
+        : 0;
+      return Math.max(0, (item?.quota || 10) - wfhUsedThisMonth);
+    }
+    if (item?.cadence === 'month') {
+      return Math.max(0, (item.quota || 1) - (leaves[item.id]?.used || 0));
+    }
+    const total = item?.quota || (leaves[mobileLeaveType]?.total ?? 15);
+    const used = leaves[mobileLeaveType]?.used ?? 0;
+    return Math.max(0, total - used);
+  }, [leaveConfigs, mobileLeaveType, previewDates, bookedDates, leaves]);
+
+  const actualLeavesMobile = useMemo(() => {
+    return previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
+  }, [previewDates]);
+
+  const activeMobileConfig = useMemo(() => {
+    return Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
+  }, [leaveConfigs, mobileLeaveType]);
+
+  const allowsHalfDayMobile = activeMobileConfig ? activeMobileConfig.allowsHalfDay !== false : (mobileLeaveType === 'el' || mobileLeaveType === 'pl');
+  const isMobileHalfDay = previewDates.length === 1 && allowsHalfDayMobile && mobileDuration === 0.5;
+  const mobileLeavesNeeded = isMobileHalfDay ? 0.5 : actualLeavesMobile;
+
+  // Auto-switch mobile duration to 0.5 when balance is exactly 0.5 or less than 1
+  useEffect(() => {
+    if (previewDates.length === 1 && mobileLeaveType) {
+      if (allowsHalfDayMobile && selectedMobileBal < 1 && selectedMobileBal >= 0.5) {
+        setMobileDuration(0.5);
+      } else if (selectedMobileBal >= 1) {
+        setMobileDuration(1);
+      }
+    }
+  }, [mobileLeaveType, previewDates.length, selectedMobileBal, allowsHalfDayMobile]);
+
+  // Keep mobile modal active tab in sync and pre-select available category if current has zero balance
   useEffect(() => {
     if (mobileConfirmOpen && mobileLeaveType) {
       const curCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
@@ -338,8 +507,37 @@ function App() {
       } else if (mobileLeaveType === 'wfh') {
         setMobileModalTierTab('remote');
       }
+
+      if (previewDates.length === 1) {
+        if (allowsHalfDayMobile && selectedMobileBal < 1 && selectedMobileBal >= 0.5) {
+          setMobileDuration(0.5);
+        } else {
+          setMobileDuration(1);
+        }
+      }
+
+      // If currently selected leave has zero balance, try to find an available category
+      if (selectedMobileBal <= 0 && Array.isArray(leaveConfigs)) {
+        const available = leaveConfigs.find(c => {
+          if (!c.enabled) return false;
+          if (c.id === 'wfh') {
+            const targetMonthKey = (previewDates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
+            const wfhUsed = Array.isArray(bookedDates)
+              ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).reduce((s, b) => s + (b.duration || 1), 0)
+              : 0;
+            return ((c.quota || 10) - wfhUsed) > 0;
+          }
+          const tot = c.quota || (leaves[c.id]?.total ?? 10);
+          const u = leaves[c.id]?.used ?? 0;
+          return (tot - u) > 0;
+        });
+        if (available) {
+          setMobileLeaveType(available.id);
+          if (available.tier) setMobileModalTierTab(available.tier === 'monthly' ? 'remote' : available.tier);
+        }
+      }
     }
-  }, [mobileConfirmOpen, mobileLeaveType, leaveConfigs]);
+  }, [mobileConfirmOpen, mobileLeaveType, leaveConfigs, selectedMobileBal, allowsHalfDayMobile, previewDates, bookedDates, leaves]);
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -378,23 +576,6 @@ function App() {
     }
   }, [theme]);
   const [isLeavesLoaded, setIsLeavesLoaded] = useState(false);
-  const [devDateStr, setDevDateStr] = useState(import.meta.env.DEV ? (localStorage.getItem('dev_date_override') || '') : '');
-
-  const getTodayDate = () => {
-    if (import.meta.env.DEV && devDateStr) {
-      const parts = devDateStr.split('-');
-      if (parts.length === 3) {
-        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      }
-    }
-    return new Date();
-  };
-
-  const getTodayStr = () => {
-    if (import.meta.env.DEV && devDateStr) return devDateStr;
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  };
 
   useEffect(() => {
     loadLeaves();
@@ -554,6 +735,9 @@ function App() {
   useEffect(() => {
     if (!isMobileMenuOpen) {
       setMobileSubView(null);
+      setEditingMobileSpecialId(null);
+      setShowMobileAddAnnual(false);
+      setShowMobileAddSpecial(false);
     } else {
       setMobileFormName(userName || '');
       setMobileFormCompany(companyName || '');
@@ -565,6 +749,10 @@ function App() {
       });
       setMobileFormNames({ ...leaveNames });
       setMobileFormColors({ ...leaveColors });
+      setMobileLeaveConfigs(leaveConfigs ? JSON.parse(JSON.stringify(leaveConfigs)) : []);
+      setEditingMobileSpecialId(null);
+      setShowMobileAddAnnual(false);
+      setShowMobileAddSpecial(false);
     }
   }, [isMobileMenuOpen, mobileSubView]);
 
@@ -898,7 +1086,6 @@ function App() {
     setCompanyName('Acme Corp');
     setWfhModalOpen(false);
     setSettingsModalOpen(false);
-    setAiModalOpen(false);
     setAuthModalOpen(false);
     setOnboardingOpen(false);
     setShowSplash(true);
@@ -1077,48 +1264,93 @@ function App() {
       const planName = details.planName || 'Vacation Plan';
       const startDate = details.startDate;
       const endDate = details.endDate || startDate;
-      const leaveType = details.leaveType || 'pl';
+      const leaveType = (details.leaveType || 'pl').toLowerCase();
 
-      const sDate = new Date(startDate);
-      const eDate = new Date(endDate);
-      const dates = [];
-      for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
-        dates.push(`${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      // Determine which dates need to be booked (exclude weekends and public holidays)
+      let workingDatesToBook = [];
+      if (Array.isArray(details.dates) && details.dates.length > 0) {
+        workingDatesToBook = details.dates.filter(d => !isHoliday(d) && !isWeekend(d));
+      }
+      if (workingDatesToBook.length === 0 && startDate) {
+        const sDate = new Date(startDate);
+        const eDate = new Date(endDate);
+        for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const dStr = `${y}-${m}-${day}`;
+          if (!isHoliday(dStr) && !isWeekend(dStr)) {
+            workingDatesToBook.push(dStr);
+          }
+        }
+      }
+      if (workingDatesToBook.length === 0 && startDate) {
+        workingDatesToBook = [startDate];
       }
 
-      const lType = (leaveType || 'pl').toLowerCase();
-      const curTotal = leaves && leaves[lType] ? leaves[lType].total : 15;
-      const curUsed = leaves && leaves[lType] ? leaves[lType].used : 0;
+      const curTotal = leaves && leaves[leaveType] ? leaves[leaveType].total : 15;
+      const curUsed = leaves && leaves[leaveType] ? leaves[leaveType].used : 0;
       const curRemaining = Math.max(0, curTotal - curUsed);
-      const requiredDays = details.leaveDaysCost || dates.length || 1;
+      const requiredDays = workingDatesToBook.length;
 
       if (curRemaining < requiredDays) {
-        alert(`Cannot book leave: Insufficient ${leaveNames[lType] || lType.toUpperCase()} quota (only ${curRemaining} remaining, but ${requiredDays} required).`);
+        alert(`Cannot book leave: Insufficient ${leaveNames[leaveType] || leaveType.toUpperCase()} quota (only ${curRemaining} remaining, but ${requiredDays} required).`);
         return;
       }
 
-      await createLeavePlan(planName, dates, leaveType, details.note || planName, currentUser?.id);
+      let planId = null;
+      const existingPlan = (leavePlans || []).find(p => 
+        (p.name?.trim().toLowerCase() === planName.trim().toLowerCase()) &&
+        (p.start_date === startDate || p.startDate === startDate) &&
+        (p.end_date === endDate || p.endDate === endDate)
+      );
+
+      if (existingPlan) {
+        planId = existingPlan.id;
+      } else {
+        try {
+          const plan = await createLeavePlan(planName, startDate, endDate, currentUser?.id);
+          planId = plan?.id || null;
+        } catch (err) {
+          console.error('Failed to create leave plan in database:', err);
+        }
+      }
+
+      for (const d of workingDatesToBook) {
+        await addLeave(d, leaveType, details.note || planName, planId, 1, currentUser?.id);
+      }
       await loadLeaves();
-      setAiModalOpen(false);
     } else if (action === 'stage_leave') {
       const lType = (details.leaveType || 'pl').toLowerCase();
+      const rawDates = Array.isArray(details.dates) && details.dates.length > 0
+        ? details.dates
+        : (details.startDate ? [details.startDate] : []);
+      const datesToBook = rawDates.filter(d => !isHoliday(d) && !isWeekend(d));
+      const finalDates = datesToBook.length > 0 ? datesToBook : rawDates;
+
       const curTotal = leaves && leaves[lType] ? leaves[lType].total : 15;
       const curUsed = leaves && leaves[lType] ? leaves[lType].used : 0;
       const curRemaining = Math.max(0, curTotal - curUsed);
-      const requiredDays = details.dates?.length || 1;
+      const requiredDays = finalDates.length;
 
       if (curRemaining < requiredDays) {
         alert(`Cannot book leave: Insufficient ${leaveNames[lType] || lType.toUpperCase()} quota (only ${curRemaining} remaining, but ${requiredDays} required).`);
         return;
       }
 
-      await addLeave(details.startDate, details.leaveType || 'pl', details.note || 'Leave', null, 1, currentUser?.id);
+      for (const d of finalDates) {
+        await addLeave(d, lType, details.note || 'Leave', null, 1, currentUser?.id);
+      }
       await loadLeaves();
-      setAiModalOpen(false);
     } else if (action === 'log_wfh') {
-      await addLeave(details.startDate, 'wfh', 'Work From Home', null, 1, currentUser?.id);
+      const datesToBook = Array.isArray(details.dates) && details.dates.length > 0
+        ? details.dates
+        : (details.startDate ? [details.startDate] : []);
+
+      for (const d of datesToBook) {
+        await addLeave(d, 'wfh', details.note || 'Work From Home', null, 1, currentUser?.id);
+      }
       await loadLeaves();
-      setAiModalOpen(false);
     } else if (action === 'cancel_leave' || action === 'delete_leave') {
       const datesToCancel = details.dates || (details.startDate ? [details.startDate] : []);
       for (const d of datesToCancel) {
@@ -1133,7 +1365,6 @@ function App() {
         }
       }
       await loadLeaves();
-      setAiModalOpen(false);
     }
 
     // Clear AI preview & focused highlight from calendar so it returns to normal state
@@ -1511,8 +1742,7 @@ function App() {
     const type = (mobileLeaveType || 'pl').toLowerCase();
     const activeConfig = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
     const allowsHalf = activeConfig ? activeConfig.allowsHalfDay !== false : (type === 'el' || type === 'pl');
-    const elDiffHours = mobileToHour > mobileFromHour ? mobileToHour - mobileFromHour : 0;
-    const isHalfDay = allowsHalf && dates.length === 1 && elDiffHours > 0 && elDiffHours < 4.5;
+    const isHalfDay = allowsHalf && dates.length === 1 && mobileDuration === 0.5;
     const durationPerDay = isHalfDay ? 0.5 : 1;
     const leavesNeeded = isHalfDay ? 0.5 : actualLeaves;
 
@@ -1523,7 +1753,7 @@ function App() {
     if (type === 'wfh') {
       const targetMonthKey = (dates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
       const wfhUsedThisMonth = Array.isArray(bookedDates)
-        ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).length
+        ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).reduce((s, b) => s + (b.duration || 1), 0)
         : 0;
       total = maxWfh;
       curBalance = Math.max(0, maxWfh - wfhUsedThisMonth);
@@ -1531,6 +1761,11 @@ function App() {
       const used = leaves[type]?.used || 0;
       curBalance = Math.max(0, total - used);
     }
+
+    if (!isTutorialActive && (curBalance < leavesNeeded || curBalance <= 0)) {
+      return;
+    }
+
     const targetBalance = Math.max(0, curBalance - leavesNeeded);
     const chosenColor = activeConfig?.color || (leaveColors && leaveColors[type]) || (type === 'el' ? 'orange' : type === 'rh' ? 'green' : type === 'wfh' ? 'cyan' : 'blue');
 
@@ -1842,6 +2077,7 @@ function App() {
 
               <button
                 type="button"
+                data-capability="sign-out"
                 onClick={handleSignOut}
                 title="Sign Out"
                 className="flex p-2 rounded-full bg-muted/60 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground border border-border/80 transition-colors cursor-pointer"
@@ -1873,7 +2109,8 @@ function App() {
               leaves={leaves}
               leaveNames={leaveNames}
               leavePlans={leavePlans}
-              onOpenAiModal={() => setAiModalOpen(true)}
+              leaveConfigs={leaveConfigs}
+              companyName={companyName}
               onOpenSettings={(tab = 'profile') => { setSettingsInitialTab(tab); setSettingsModalOpen(true); }}
               onExecuteAction={handleExecuteAiAction}
             />
@@ -1884,14 +2121,28 @@ function App() {
 
         <div className={`flex-1 flex flex-col bg-background md:bg-card md:rounded-t-2xl md:rounded-b-none md:border-t md:border-x md:border-b-0 border-border md:shadow-apple-sm overflow-hidden h-full relative ${activeTab === 'calendar' ? 'z-30' : 'z-10'}`}>
           {activeTab === 'calendar' && (
-            <div className="hidden md:flex p-4 border-b border-border gap-6 items-center bg-muted/30 overflow-x-auto whitespace-nowrap hide-scrollbar">
-              <span className="text-sm font-medium text-muted-foreground">Legend:</span>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-muted border border-border"></div> Weekend</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className="w-3 h-3 rounded-full bg-purple-200"></div> Holiday</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-3 h-3 rounded-full ${getLeaveColor(leaveColors.pl || 'blue').bg}`}></div> {getShortform(leaveNames.pl, 'PL')}</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-3 h-3 rounded-full ${getLeaveColor(leaveColors.el || 'orange').bg}`}></div> {getShortform(leaveNames.el, 'EL')}</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-3 h-3 rounded-full ${getLeaveColor(leaveColors.rh || 'green').bg}`}></div> {getShortform(leaveNames.rh, 'RH')}</div>
-              <div className="flex items-center gap-2 text-sm text-foreground font-normal"><div className={`w-2 h-2 rounded-full ${getLeaveColor(leaveColors.wfh || 'cyan').bg}`}></div> {getShortform(leaveNames.wfh, 'WFH')}</div>
+            <div className="hidden md:flex p-3.5 border-b border-border gap-5 items-center bg-muted/30 overflow-x-auto whitespace-nowrap hide-scrollbar">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono">Legend:</span>
+              <div className="flex items-center gap-1.5 text-xs text-foreground font-normal">
+                <div className="w-2.5 h-2.5 rounded-full bg-muted border border-border"></div> Weekend
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-foreground font-normal">
+                <div className="w-2.5 h-2.5 rounded-full bg-purple-400"></div> Holiday
+              </div>
+              {(Array.isArray(leaveConfigs) && leaveConfigs.length > 0 ? leaveConfigs.filter(c => c.enabled) : [
+                { id: 'pl', name: leaveNames.pl || 'Planned Leave', shortCode: 'PL', color: leaveColors.pl || 'blue' },
+                { id: 'el', name: leaveNames.el || 'Emergency Leave', shortCode: 'EL', color: leaveColors.el || 'orange' },
+                { id: 'rh', name: leaveNames.rh || 'Restricted Leave', shortCode: 'RH', color: leaveColors.rh || 'green' },
+                { id: 'wfh', name: leaveNames.wfh || 'Work From Home', shortCode: 'WFH', color: leaveColors.wfh || 'cyan' }
+              ]).map(c => {
+                const colorObj = getLeaveColor(c.color || leaveColors?.[c.id] || 'blue');
+                return (
+                  <div key={c.id} className="flex items-center gap-1.5 text-xs text-foreground font-normal">
+                    <div className={`w-2.5 h-2.5 rounded-full ${colorObj.bg}`}></div>
+                    <span>{c.shortCode || getShortform(c.name, c.id.toUpperCase())}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
           
@@ -1937,6 +2188,7 @@ function App() {
                     setViewingLeave={setViewingLeave}
                     leaveColors={leaveColors}
                     leaveNames={leaveNames}
+                    leaveConfigs={leaveConfigs}
                     onClearAiPreview={handleClearAiPreview}
                   />
                   <AnimatePresence mode="wait" initial={false}>
@@ -1958,7 +2210,7 @@ function App() {
                         leaves={leaves}
                         leaveNames={leaveNames}
                         leavePlans={leavePlans}
-                        onOpenAiModal={() => setAiModalOpen(true)}
+                        companyName={companyName}
                         onOpenSettings={(tab = 'profile') => { setSettingsInitialTab(tab); setSettingsModalOpen(true); }}
                         onExecuteAction={handleExecuteAiAction}
                       />
@@ -2006,9 +2258,9 @@ function App() {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/95 via-background/70 to-transparent" />
       </div>
 
-      {/* Backdrop when mobile menu, confirmation modal, viewing leave, or AI assistant open */}
+      {/* Backdrop when mobile menu, confirmation modal, viewing leave, or AI assistant in expanded mode */}
       <AnimatePresence>
-        {(isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null || isMobileAiOpen) && (
+        {(isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null || (isMobileAiOpen && mobileAiMode === 'expanded')) && (
           <motion.div
             key="mobile-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -2017,7 +2269,7 @@ function App() {
               setIsMobileMenuOpen(false);
               setMobileConfirmOpen(false);
               setViewingLeave(null);
-              setIsMobileAiOpen(false);
+              if (isMobileAiOpen) setMobileAiMode('compact');
             }}
           />
         )}
@@ -2036,11 +2288,13 @@ function App() {
           layout="size"
           transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
           className={`pointer-events-auto overflow-hidden border border-border/80 backdrop-blur-2xl transition-[border-radius,background-color,box-shadow,width,max-width] duration-200 shadow-[0_12px_40px_-5px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.95)] ${
-            isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null || isMobileAiOpen
+            isMobileMenuOpen || mobileConfirmOpen || viewingLeave !== null || (isMobileAiOpen && mobileAiMode === 'expanded')
               ? 'w-full rounded-[28px] bg-card/95 dark:bg-card/95 flex flex-col'
-              : (selectionStart !== null || previewDates.length > 0)
-                ? 'w-full rounded-[28px] bg-slate-900 dark:bg-slate-950 text-white border border-slate-800 shadow-2xl'
-                : 'w-full max-w-sm rounded-[28px] bg-card/95 dark:bg-card/95'
+              : (isMobileAiOpen && mobileAiMode === 'compact')
+                ? 'w-full max-w-md rounded-[28px] bg-card/95 dark:bg-card/95 flex flex-col shadow-2xl'
+                : (selectionStart !== null || previewDates.length > 0)
+                  ? 'w-full rounded-[28px] bg-slate-900 dark:bg-slate-950 text-white border border-slate-800 shadow-2xl'
+                  : 'w-full max-w-sm rounded-[28px] bg-card/95 dark:bg-card/95'
           }`}
         >
           <AnimatePresence mode="wait">
@@ -2103,7 +2357,7 @@ function App() {
               <motion.div key="menu"
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.18, ease: "easeInOut" }}
-                className="max-h-[min(82dvh,calc(100dvh-4rem-env(safe-area-inset-bottom,0px)))] flex flex-col overflow-hidden"
+                className="max-h-[min(88dvh,calc(100dvh-2.5rem-env(safe-area-inset-bottom,0px)))] flex flex-col overflow-hidden"
               >
                 {/* Handle */}
                 <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
@@ -2332,97 +2586,564 @@ function App() {
                   </div>
 
                   {/* Scrollable Tab Content Body */}
-                  <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2.5 flex flex-col gap-3 no-scrollbar overscroll-contain">
-                    <MorphingTabContent activeKey={mobileSettingsTab}>
-                      {mobileSettingsTab === 'quotas' ? (
-                        <div className="flex flex-col gap-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono">Annual Leave Quotas, Colors & Custom Names</span>
-                          
-                          {/* 2x2 Grid Layout with AppleWheelPicker Tumbler Scroll */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <AppleWheelPicker
-                              code="PL"
-                              label="Planned Leave"
-                              value={mobileFormQuotas.pl ?? leaves.pl.total}
-                              onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, pl: val }))}
-                              min={0} max={30}
-                              customName={mobileFormNames.pl !== undefined ? mobileFormNames.pl : (leaveNames.pl || '')}
-                              onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, pl: val }))}
-                              color={mobileFormColors.pl || leaveColors.pl || 'blue'}
-                              onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, pl: val }))}
-                            />
-                            <AppleWheelPicker
-                              code="EL"
-                              label="Emergency Leave"
-                              value={mobileFormQuotas.el ?? leaves.el.total}
-                              onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, el: val }))}
-                              min={0} max={20}
-                              customName={mobileFormNames.el !== undefined ? mobileFormNames.el : (leaveNames.el || '')}
-                              onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, el: val }))}
-                              color={mobileFormColors.el || leaveColors.el || 'orange'}
-                              onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, el: val }))}
-                            />
-                            <AppleWheelPicker
-                              code="RH"
-                              label="Extra Leave"
-                              value={mobileFormQuotas.rh ?? leaves.rh.total}
-                              onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, rh: val }))}
-                              min={0} max={10}
-                              customName={mobileFormNames.rh !== undefined ? mobileFormNames.rh : (leaveNames.rh || '')}
-                              onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, rh: val }))}
-                              color={mobileFormColors.rh || leaveColors.rh || 'green'}
-                              onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, rh: val }))}
-                            />
-                            <AppleWheelPicker
-                              code="WFH"
-                              label="Monthly WFH"
-                              value={mobileFormQuotas.wfh ?? (parseInt(localStorage.getItem('quota_wfh') || '10', 10))}
-                              onChange={(val) => setMobileFormQuotas(prev => ({ ...prev, wfh: val }))}
-                              min={0} max={20}
-                              customName={mobileFormNames.wfh !== undefined ? mobileFormNames.wfh : (leaveNames.wfh || '')}
-                              onCustomNameChange={(val) => setMobileFormNames(prev => ({ ...prev, wfh: val }))}
-                              color={mobileFormColors.wfh || leaveColors.wfh || 'cyan'}
-                              onColorChange={(val) => setMobileFormColors(prev => ({ ...prev, wfh: val }))}
-                            />
-                          </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2.5 pb-4 flex flex-col gap-3 no-scrollbar overscroll-contain">
+                    <AnimatePresence mode="wait">
+                      {mobileSettingsTab === 'quotas' && (
+                        <motion.div
+                          key="tab-quotas"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex flex-col gap-3"
+                        >
+                          {/* Policy Tier Selector */}
+                          <SegmentedPolicyTabs
+                            tabs={[
+                              { 
+                                id: 'annual', 
+                                label: 'Annual Bank', 
+                                shortLabel: 'Annual',
+                                testId: 'mobile-quotas-tab-annual',
+                                count: mobileAnnualConfigs.length 
+                              },
+                              { 
+                                id: 'remote', 
+                                label: 'Remote / WFH', 
+                                shortLabel: 'Remote',
+                                testId: 'mobile-quotas-tab-remote'
+                              },
+                              { 
+                                id: 'special', 
+                                label: 'Special Benefits', 
+                                shortLabel: 'Special',
+                                testId: 'mobile-quotas-tab-special',
+                                count: mobileSpecialConfigs.filter(c => c.enabled !== false).length 
+                              }
+                            ]}
+                            activeTab={mobileQuotasTierTab}
+                            onChange={setMobileQuotasTierTab}
+                            layoutId="mobile-quotas-tier-pill"
+                            size="xs"
+                          />
 
-                          {/* Attendance Check-in Prompt Preference */}
-                          <div className="p-2.5 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center mt-1">
-                            <div className="flex flex-col min-w-0 pr-2">
-                              <span className="text-xs font-bold text-foreground truncate">Check-in Prompt Time</span>
-                              <span className="text-[10px] text-muted-foreground truncate">Daily WFH vs Office prompt</span>
-                            </div>
-                            <select
-                              value={wfhPromptHour}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setWfhPromptHour(val);
-                                localStorage.setItem('wfh_prompt_hour', val);
-                              }}
-                              className="bg-card border border-border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
-                            >
-                              {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
-                                const period = h >= 12 ? 'PM' : 'AM';
-                                const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-                                return (
-                                  <option key={h} value={h}>
-                                    {displayH}:00 {period}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-                        </div>
-                      ) : mobileSettingsTab === 'holidays' ? (
-                        <div className="flex flex-col gap-2 min-h-[340px]">
+                          {/* Tier Viewport */}
+                          <AnimatePresence mode="wait">
+                            {/* TIER 1: ANNUAL LEAVE BANK */}
+                            {mobileQuotasTierTab === 'annual' && (
+                              <motion.div
+                                key="tier-annual"
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.15 }}
+                                data-capability="annual-policy-edit"
+                                className="flex flex-col gap-3"
+                              >
+                                <div className="flex items-center justify-between px-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                                    <SlidersHorizontal size={13} className="text-cyan-500" /> Tier 1: Annual Leave Bank
+                                  </span>
+                                  <span className="text-[9px] font-mono text-muted-foreground">
+                                    Deducts from vacation balance
+                                  </span>
+                                </div>
+
+                                {/* Dynamic Annual Categories Grid */}
+                                <div className="grid grid-cols-2 gap-2">
+                                  {mobileAnnualConfigs.map(c => (
+                                    <AppleWheelPicker
+                                      key={c.id}
+                                      code={c.shortCode || getShortform(c.name, c.id)}
+                                      label={c.name}
+                                      value={c.quota}
+                                      onChange={(val) => updateMobileConfig(c.id, { quota: val })}
+                                      min={0}
+                                      max={60}
+                                      customName={c.name}
+                                      onCustomNameChange={(val) => updateMobileConfig(c.id, { name: val, shortCode: deriveShortCode(val) })}
+                                      color={c.color || 'blue'}
+                                      onColorChange={(val) => updateMobileConfig(c.id, { color: val })}
+                                      onRemove={mobileAnnualConfigs.length > 1 && !['pl', 'el', 'rh'].includes(c.id) ? () => removeMobileConfig(c.id) : null}
+                                    />
+                                  ))}
+                                </div>
+
+                                {/* Add Custom Annual Category */}
+                                {showMobileAddAnnual ? (
+                                  <div className="p-3 bg-muted/40 border border-border rounded-xl flex flex-col gap-2">
+                                    <span className="text-[11px] font-bold text-foreground font-mono">New Annual Leave Category</span>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Sabbatical, Floating"
+                                        value={mobileNewAnnualName}
+                                        onChange={(e) => setMobileNewAnnualName(e.target.value)}
+                                        className="flex-1 bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                        autoFocus
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={handleMobileAddAnnual}
+                                        className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer active:scale-95 transition-all"
+                                      >
+                                        Add
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowMobileAddAnnual(false)}
+                                        className="px-2.5 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-lg cursor-pointer"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    data-capability="add-annual-category"
+                                    onClick={() => setShowMobileAddAnnual(true)}
+                                    className="w-full py-2.5 border border-dashed border-border/80 hover:border-foreground/40 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98"
+                                  >
+                                    <Plus size={14} /> Add Custom Annual Category
+                                  </button>
+                                )}
+                              </motion.div>
+                            )}
+
+                            {/* TIER 2: REMOTE / WFH */}
+                            {mobileQuotasTierTab === 'remote' && (
+                              <motion.div
+                                key="tier-remote"
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.15 }}
+                                data-capability="remote-policy-edit"
+                                className="flex flex-col gap-3"
+                              >
+                                {/* WFH Enable Toggle */}
+                                <div className="flex items-center justify-between p-3 bg-muted/30 border border-border/60 rounded-2xl">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-foreground">Enable Remote / WFH</span>
+                                    <span className="text-[10px] text-muted-foreground font-medium">
+                                      Track monthly Work From Home
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateMobileConfig('wfh', { enabled: !mobileWfhConfig.enabled })}
+                                    className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                                      mobileWfhConfig.enabled !== false ? 'bg-cyan-500' : 'bg-muted border border-border'
+                                    }`}
+                                  >
+                                    <span className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-all ${
+                                      mobileWfhConfig.enabled !== false ? 'left-4.5' : 'left-0.5'
+                                    }`} />
+                                  </button>
+                                </div>
+
+                                {mobileWfhConfig.enabled !== false && (
+                                  <div className="grid grid-cols-1 gap-2">
+                                    <AppleWheelPicker
+                                      code="WFH"
+                                      label="Monthly WFH"
+                                      value={mobileWfhConfig.quota ?? (parseInt(localStorage.getItem('quota_wfh') || '10', 10))}
+                                      onChange={(val) => updateMobileConfig('wfh', { quota: val })}
+                                      min={0}
+                                      max={31}
+                                      customName={mobileWfhConfig.name || (leaveNames.wfh || 'Work From Home')}
+                                      onCustomNameChange={(val) => updateMobileConfig('wfh', { name: val, shortCode: deriveShortCode(val) })}
+                                      color={mobileWfhConfig.color || leaveColors.wfh || 'cyan'}
+                                      onColorChange={(val) => updateMobileConfig('wfh', { color: val })}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Attendance Check-in Prompt Preference */}
+                                <div className="p-2.5 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center">
+                                  <div className="flex flex-col min-w-0 pr-2">
+                                    <span className="text-xs font-bold text-foreground truncate">Check-in Prompt Time</span>
+                                    <span className="text-[10px] text-muted-foreground truncate">Daily WFH vs Office prompt</span>
+                                  </div>
+                                  <select
+                                    value={wfhPromptHour}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setWfhPromptHour(val);
+                                      localStorage.setItem('wfh_prompt_hour', val);
+                                    }}
+                                    className="bg-card border border-border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                                  >
+                                    {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(h => {
+                                      const period = h >= 12 ? 'PM' : 'AM';
+                                      const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+                                      return (
+                                        <option key={h} value={h}>
+                                          {displayH}:00 {period}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
+                              </motion.div>
+                            )}
+
+                            {/* TIER 3: SPECIAL BENEFITS */}
+                            {mobileQuotasTierTab === 'special' && (
+                              <motion.div
+                                key="tier-special"
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -4 }}
+                                transition={{ duration: 0.15 }}
+                                data-capability="special-benefits-edit"
+                                className="flex flex-col gap-3"
+                              >
+                                <div className="p-2.5 bg-pink-500/10 border border-pink-500/30 rounded-xl flex items-start gap-2 text-[11px] text-pink-600 dark:text-pink-400">
+                                  <Info size={14} className="flex-shrink-0 mt-0.5" />
+                                  <span>
+                                    <strong>Independent Balances:</strong> Special benefits do <strong>NOT</strong> deduct from your annual vacation bank.
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                  {mobileSpecialConfigs.map((c) => {
+                                    const Icon = getSpecialBenefitIcon(c);
+                                    const isEditing = editingMobileSpecialId === c.id;
+                                    const colorTheme = getLeaveColor(c.color || 'pink');
+
+                                    return (
+                                      <div
+                                        key={c.id}
+                                        className={`p-3 rounded-xl border transition-all flex flex-col gap-2.5 ${
+                                          isEditing
+                                            ? 'bg-card border-primary/60 shadow-lg ring-1 ring-primary/20'
+                                            : c.enabled !== false
+                                              ? 'bg-card border-border/80 shadow-xs'
+                                              : 'bg-muted/20 border-border/40 opacity-70'
+                                        }`}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            <div
+                                              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                                                c.enabled !== false ? colorTheme.badge : 'bg-muted text-muted-foreground'
+                                              }`}
+                                              style={c.enabled !== false ? { color: colorTheme.hex } : undefined}
+                                            >
+                                              <Icon size={15} />
+                                            </div>
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span
+                                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                                  style={{ backgroundColor: colorTheme.hex }}
+                                                />
+                                                <span className="text-xs font-bold text-foreground truncate">
+                                                  {c.name}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-muted-foreground font-medium">
+                                                  ({c.cadence === 'month' ? `${c.quota}d/mo` : c.cadence === 'year' ? `${c.quota}d/yr` : `${c.quota}d`})
+                                                </span>
+                                              </div>
+                                              {c.subtitle && (
+                                                <span className="text-[10px] text-muted-foreground truncate">
+                                                  {c.subtitle}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-2 flex-shrink-0">
+                                            {c.enabled !== false && !isEditing && (
+                                              <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/60">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => updateMobileConfig(c.id, { quota: Math.max(1, (parseInt(c.quota, 10) || 1) - 1) })}
+                                                  className="w-5 h-5 rounded bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors cursor-pointer"
+                                                >
+                                                  -
+                                                </button>
+                                                <input
+                                                  type="number"
+                                                  min={1}
+                                                  max={90}
+                                                  value={c.quota ?? ''}
+                                                  onChange={(e) => {
+                                                    const val = e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10));
+                                                    updateMobileConfig(c.id, { quota: val });
+                                                  }}
+                                                  onBlur={() => {
+                                                    if (!c.quota || c.quota < 1) updateMobileConfig(c.id, { quota: 1 });
+                                                  }}
+                                                  className="w-7 text-center text-xs font-bold font-mono bg-transparent text-foreground focus:outline-none"
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => updateMobileConfig(c.id, { quota: (parseInt(c.quota, 10) || 1) + 1 })}
+                                                  className="w-5 h-5 rounded bg-card hover:bg-muted text-foreground flex items-center justify-center text-xs font-bold font-mono transition-colors cursor-pointer"
+                                                >
+                                                  +
+                                                </button>
+                                              </div>
+                                            )}
+
+                                            {/* Enable Toggle Checkbox */}
+                                            <button
+                                              type="button"
+                                              role="checkbox"
+                                              aria-checked={c.enabled !== false}
+                                              onClick={() => updateMobileConfig(c.id, { enabled: c.enabled === false })}
+                                              className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 ${
+                                                c.enabled !== false
+                                                  ? 'bg-primary border-primary text-primary-foreground shadow-xs'
+                                                  : 'bg-muted border-slate-400 dark:border-slate-600 text-transparent'
+                                              }`}
+                                              title={c.enabled !== false ? 'Active benefit' : 'Inactive benefit'}
+                                            >
+                                              <Check size={12} strokeWidth={3.5} className={c.enabled !== false ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} />
+                                            </button>
+
+                                            {/* Edit / Done Button */}
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingMobileSpecialId(isEditing ? null : c.id)}
+                                              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                                                isEditing
+                                                  ? 'bg-primary text-primary-foreground border-primary'
+                                                  : 'text-muted-foreground hover:text-foreground border-border/60 hover:bg-muted'
+                                              }`}
+                                              title={isEditing ? 'Close editor' : 'Edit details'}
+                                            >
+                                              {isEditing ? <Check size={12} strokeWidth={3} /> : <Edit3 size={12} />}
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Inline Editor Drawer for Special Benefit */}
+                                        {isEditing && (
+                                          <div className="pt-2.5 border-t border-border/50 flex flex-col gap-2.5 animate-in fade-in duration-150">
+                                            <div className="grid grid-cols-2 gap-2">
+                                              <div>
+                                                <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Title</label>
+                                                <input
+                                                  type="text"
+                                                  value={c.name}
+                                                  onChange={(e) => updateMobileConfig(c.id, { name: e.target.value, shortCode: deriveShortCode(e.target.value) })}
+                                                  className="w-full bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Cadence</label>
+                                                <select
+                                                  value={c.cadence || 'month'}
+                                                  onChange={(e) => updateMobileConfig(c.id, { cadence: e.target.value })}
+                                                  className="w-full bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                                                >
+                                                  <option value="month">Per Month</option>
+                                                  <option value="year">Per Year</option>
+                                                  <option value="event">Per Occurrence</option>
+                                                </select>
+                                              </div>
+                                            </div>
+
+                                            <div>
+                                              <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Description / Note</label>
+                                              <input
+                                                type="text"
+                                                value={c.subtitle || ''}
+                                                onChange={(e) => updateMobileConfig(c.id, { subtitle: e.target.value })}
+                                                placeholder="Benefit description..."
+                                                className="w-full bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                              />
+                                            </div>
+
+                                            {/* Color and Icon Row */}
+                                            <div className="flex flex-col gap-2 pt-1 border-t border-border/40">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-muted-foreground">Color:</span>
+                                                <div className="flex items-center gap-1.5">
+                                                  {SELECTABLE_LEAVE_PALETTE.map((pal) => (
+                                                    <button
+                                                      key={pal.id}
+                                                      type="button"
+                                                      onClick={() => updateMobileConfig(c.id, { color: pal.id })}
+                                                      className={`w-4 h-4 rounded-full ${pal.bg} transition-transform cursor-pointer ${
+                                                        (c.color || 'pink') === pal.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                                      }`}
+                                                      title={pal.name}
+                                                    />
+                                                  ))}
+                                                </div>
+                                              </div>
+
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-muted-foreground">Icon:</span>
+                                                <div className="flex items-center gap-1">
+                                                  {BENEFIT_ICON_PRESETS.map((p) => {
+                                                    const PIcon = p.icon;
+                                                    return (
+                                                      <button
+                                                        key={p.id}
+                                                        type="button"
+                                                        onClick={() => updateMobileConfig(c.id, { icon: p.id })}
+                                                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                                          (c.icon || 'sparkles') === p.id
+                                                            ? 'bg-primary text-primary-foreground shadow-xs scale-105'
+                                                            : 'bg-muted/60 text-muted-foreground hover:text-foreground'
+                                                        }`}
+                                                        title={p.label}
+                                                      >
+                                                        <PIcon size={12} />
+                                                      </button>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => removeMobileConfig(c.id)}
+                                                className="px-2 py-1 text-red-500 hover:bg-red-500/10 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                              >
+                                                <Trash2 size={12} /> Remove
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setEditingMobileSpecialId(null)}
+                                                className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer"
+                                              >
+                                                Done
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Add Custom Special Benefit */}
+                                {showMobileAddSpecial ? (
+                                  <div className="p-3 bg-muted/40 border border-border rounded-xl flex flex-col gap-2.5">
+                                    <span className="text-[11px] font-bold text-foreground font-mono">New Special Benefit</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Name</label>
+                                        <input
+                                          type="text"
+                                          placeholder="e.g. Wellness Break"
+                                          value={mobileNewSpecialName}
+                                          onChange={(e) => setMobileNewSpecialName(e.target.value)}
+                                          className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                          autoFocus
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Days Allowance</label>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={90}
+                                          value={mobileNewSpecialQuota}
+                                          onChange={(e) => setMobileNewSpecialQuota(e.target.value)}
+                                          className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Cadence</label>
+                                        <select
+                                          value={mobileNewSpecialCadence}
+                                          onChange={(e) => setMobileNewSpecialCadence(e.target.value)}
+                                          className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                                        >
+                                          <option value="month">Per Month</option>
+                                          <option value="year">Per Year</option>
+                                          <option value="event">Per Occurrence</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Color</label>
+                                        <div className="flex items-center gap-1.5 h-8">
+                                          {SELECTABLE_LEAVE_PALETTE.slice(0, 5).map((pal) => (
+                                            <button
+                                              key={pal.id}
+                                              type="button"
+                                              onClick={() => setMobileNewSpecialColor(pal.id)}
+                                              className={`w-4 h-4 rounded-full ${pal.bg} transition-transform cursor-pointer ${
+                                                mobileNewSpecialColor === pal.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                              }`}
+                                            />
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={handleMobileAddSpecial}
+                                        className="flex-1 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer active:scale-95 transition-all"
+                                      >
+                                        Add Benefit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowMobileAddSpecial(false)}
+                                        className="px-3 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-lg cursor-pointer"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    data-capability="add-special-benefit"
+                                    onClick={() => setShowMobileAddSpecial(true)}
+                                    className="w-full py-2.5 border border-dashed border-border/80 hover:border-foreground/40 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98"
+                                  >
+                                    <Plus size={14} /> Add Special Benefit
+                                  </button>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      )}
+
+                      {mobileSettingsTab === 'holidays' && (
+                        <motion.div
+                          key="tab-holidays"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex flex-col gap-2"
+                        >
                           <HolidayManager 
                             showTitle={false} 
                             initialHolidays={currentHolidays}
                             onStagingChange={setMobileHolidaysStagingState} 
                           />
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-3.5">
+                        </motion.div>
+                      )}
+
+                      {mobileSettingsTab === 'backup' && (
+                        <motion.div
+                          key="tab-backup"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex flex-col gap-3.5"
+                        >
                           {/* Export Account Data Section */}
                           <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
                             <div>
@@ -2434,6 +3155,7 @@ function App() {
                             <div className="flex gap-2">
                               <button
                                 type="button"
+                                data-capability="export-json"
                                 onClick={async () => {
                                   setIsExportingMobile(true);
                                   const res = await exportUserDataToJson(currentUser?.id);
@@ -2450,6 +3172,7 @@ function App() {
 
                               <button
                                 type="button"
+                                data-capability="export-csv"
                                 onClick={async () => {
                                   setIsExportingCsvMobile(true);
                                   const res = await exportUserDataToCsv(currentUser?.id);
@@ -2501,10 +3224,10 @@ function App() {
                                 disabled={isImportingMobile} 
                               />
                             </label>
-                            </div>
                           </div>
-                        )}
-                    </MorphingTabContent>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Toast Message */}
                     {mobileToast && (
@@ -2560,7 +3283,9 @@ function App() {
                               companyName: mobileFormCompany,
                               quotas: mobileFormQuotas,
                               names: mobileFormNames,
-                              colors: mobileFormColors
+                              colors: mobileFormColors,
+                              leaveConfigs: mobileLeaveConfigs,
+                              wfhPromptHour: wfhPromptHour
                             });
                             setMobileToast('Settings Saved!');
                             setTimeout(() => {
@@ -2646,6 +3371,7 @@ function App() {
                         </button>
 
                         <button 
+                          data-testid="mobile-settings-btn"
                           onClick={() => { setMobileSubView('settings'); setMobileSettingsTab('quotas'); }}
                           className="flex items-center gap-2.5 p-2.5 bg-card hover:bg-muted/60 border border-border rounded-2xl text-left transition-all active:scale-[0.98] shadow-sm cursor-pointer"
                         >
@@ -2859,7 +3585,7 @@ function App() {
                   {/* Pinned Action Footer */}
                   <div className="px-4 pt-2.5 pb-3.5 border-t border-border bg-card/95 backdrop-blur-md flex gap-2.5 flex-shrink-0">
                     <ThemeSelector theme={theme} setTheme={setTheme} direction="up" variant="full" />
-                    <button onClick={handleSignOut} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold hover:bg-red-500/20 active:scale-98 transition-all cursor-pointer">
+                    <button data-capability="sign-out" onClick={handleSignOut} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold hover:bg-red-500/20 active:scale-98 transition-all cursor-pointer">
                       <LogOut size={15}/> <span>Sign Out</span>
                     </button>
                   </div>
@@ -2935,22 +3661,17 @@ function App() {
                         />
                       </div>
 
-                      {(() => {
-                        const actualLeaves = previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
-                        return (
-                          <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border/50">
-                            <div className="flex flex-col">
-                              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Leaves needed</span>
-                              <span className="text-sm font-bold text-foreground leading-none">{actualLeaves}</span>
-                            </div>
-                            <div className="w-px h-6 bg-border/50" />
-                            <div className="flex flex-col items-end">
-                              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Total days</span>
-                              <span className="text-sm font-bold text-foreground leading-none">{previewDates.length}</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border/50">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Leaves needed</span>
+                          <span className="text-sm font-bold text-foreground leading-none">{mobileLeavesNeeded}</span>
+                        </div>
+                        <div className="w-px h-6 bg-border/50" />
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Total days</span>
+                          <span className="text-sm font-bold text-foreground leading-none">{previewDates.length}</span>
+                        </div>
+                      </div>
 
                       {(() => {
                         const annualModalConfigs = Array.isArray(leaveConfigs)
@@ -3005,7 +3726,7 @@ function App() {
                             />
 
                             <MorphingTabContent activeKey={mobileModalTierTab}>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-0.5">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-1.5 pb-2">
                                 {currentTabConfigs.map(item => {
                                   const isActive = mobileLeaveType === item.id;
                                   const curBal = item.id === 'wfh'
@@ -3060,14 +3781,14 @@ function App() {
                                         isDisabled
                                           ? 'opacity-35 cursor-not-allowed pointer-events-none bg-muted/20 border-dashed border-border/50 text-muted-foreground'
                                           : isActive
-                                            ? `${theme.border} bg-muted/70 dark:bg-slate-900/90 text-foreground shadow-md ring-2 ring-primary/20 scale-[1.02] cursor-pointer`
+                                            ? `${theme.border} bg-muted/70 dark:bg-slate-900/90 text-foreground shadow-md ring-2 ring-primary/20 scale-[1.01] cursor-pointer`
                                             : 'border-border/70 bg-card/60 text-muted-foreground opacity-80 hover:opacity-100 hover:text-foreground cursor-pointer'
                                       }`}
                                     >
                                       <div className="flex items-center gap-1.5 leading-none">
                                         <span className={`w-1.5 h-1.5 rounded-full ${colorObj.bg} flex-shrink-0`} />
                                         <span className="text-[11px] font-black uppercase tracking-wider font-mono">
-                                          {item.shortCode || getShortform(item.name)}
+                                          {item.id === 'wfh' ? 'WFH' : (item.shortCode || getShortform(item.name))}
                                         </span>
                                       </div>
                                       <span className="text-[8px] font-bold opacity-80 leading-none truncate font-mono">
@@ -3087,44 +3808,41 @@ function App() {
                         );
                       })()}
 
-                      {/* Universal Policy & Continuous Constraints Warning */}
-                      {(() => {
-                        const activeCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
-                        const workingPreview = previewDates.filter(d => !isHoliday(d) && !isWeekend(d));
-                        const warnings = activeCfg ? checkLeaveConstraints(workingPreview, activeCfg, bookedDates, 1) : [];
-                        if (warnings.length === 0) return null;
-                        return (
-                          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                            {warnings.map((w, idx) => (
-                              <div key={idx} className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-2xl p-3.5 flex gap-3 items-start shadow-sm">
-                                <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={18} />
-                                <div className="text-xs">
-                                  <span className="font-black block mb-0.5 uppercase tracking-wider text-[10px] font-mono">{w.title || 'Policy Notice'}</span>
-                                  <p className="leading-relaxed">{w.message}</p>
-                                </div>
-                              </div>
-                            ))}
+                      {/* Desktop-like Duration Selector for Single-Day Bookings */}
+                      {allowsHalfDayMobile && previewDates.length === 1 && (
+                        <div className="p-3 bg-muted/40 border border-border/80 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-foreground">Booking Duration</span>
+                            <span className="text-[10px] font-mono text-muted-foreground">Select leave duration</span>
                           </div>
-                        );
-                      })()}
-
-                      {(() => {
-                        const activeCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
-                        const allowsHalf = activeCfg ? activeCfg.allowsHalfDay !== false : (mobileLeaveType === 'el' || mobileLeaveType === 'pl');
-                        return allowsHalf && previewDates.length === 1 && (
-                          <div className="p-3 bg-muted/40 border border-border/80 rounded-2xl flex flex-col gap-3">
-                            <div className="flex items-center gap-2 text-foreground text-xs font-bold font-mono">
-                              <Sparkles size={14} className="text-cyan-500" />
-                              <span>Partial Day Hours (Select &lt; 4.5 hrs for Half-Day)</span>
-                            </div>
-                            <TimePicker
-                              fromHour={mobileFromHour}
-                              toHour={mobileToHour}
-                              onChange={(f, t) => { setMobileFromHour(f); setMobileToHour(t); }}
-                            />
+                          <div className="flex items-center gap-1 bg-card p-1 rounded-xl border border-border/80">
+                            <button
+                              type="button"
+                              onClick={() => setMobileDuration(1)}
+                              disabled={selectedMobileBal < 1}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                                mobileDuration === 1 
+                                  ? 'bg-primary text-primary-foreground shadow-xs' 
+                                  : 'text-muted-foreground hover:text-foreground'
+                              } ${selectedMobileBal < 1 ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+                            >
+                              Full Day (1.0)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMobileDuration(0.5)}
+                              disabled={selectedMobileBal < 0.5}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                                mobileDuration === 0.5 
+                                  ? 'bg-primary text-primary-foreground shadow-xs' 
+                                  : 'text-muted-foreground hover:text-foreground'
+                              } ${selectedMobileBal < 0.5 ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+                            >
+                              Half Day (0.5)
+                            </button>
                           </div>
-                        );
-                      })()}
+                        </div>
+                      )}
 
                       <div>
                         <label className="text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest mb-1.5 block">Note (Optional)</label>
@@ -3146,7 +3864,12 @@ function App() {
                       <button 
                         id="tutorial-step-modal-apply-btn-mobile"
                         onClick={handleMobileApply} 
-                        className="flex-[2] py-3 bg-primary text-primary-foreground rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition-all"
+                        disabled={!isTutorialActive && (selectedMobileBal < mobileLeavesNeeded || selectedMobileBal <= 0)}
+                        className={`flex-[2] py-3 rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2 transition-all ${
+                          !isTutorialActive && (selectedMobileBal < mobileLeavesNeeded || selectedMobileBal <= 0)
+                            ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed pointer-events-none'
+                            : 'bg-primary text-primary-foreground cursor-pointer active:scale-98'
+                        }`}
                       >
                         Confirm & Apply <Check size={14} strokeWidth={3} />
                       </button>
@@ -3203,27 +3926,30 @@ function App() {
             </motion.div>
           )}
 
-          {/* ── AI ASSISTANT MORPHING DOCK STATE ── */}
+          {/* ── AI ASSISTANT MORPHING AMBIENT CHATBAR DOCK STATE ── */}
           {isMobileAiOpen && !isMobileMenuOpen && !mobileConfirmOpen && viewingLeave === null && (
             <motion.div
               key="mobile-ai-dock"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, ease: "easeInOut" }}
-              className="max-h-[85vh] flex flex-col overflow-hidden bg-card rounded-[28px]"
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+              className={`flex flex-col overflow-hidden rounded-[28px] transition-all duration-300 shadow-2xl border border-white/10 ${
+                mobileAiMode === 'compact' ? 'h-[50vh] max-h-[50vh]' : 'h-[85vh] max-h-[88vh]'
+              }`}
             >
-              {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1 bg-card">
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-              </div>
               <AiAssistantChatContent
-                onClose={() => setIsMobileAiOpen(false)}
+                onClose={() => {
+                  setIsMobileAiOpen(false);
+                  setMobileAiMode('compact');
+                }}
                 context={{
                   leaves,
                   leaveNames,
+                  leaveConfigs,
                   bookedDates,
                   leavePlans,
+                  holidays: currentHolidays,
                   todayStr: getTodayStr()
                 }}
                 onExecuteAction={handleExecuteAiAction}
@@ -3237,6 +3963,10 @@ function App() {
                   handlePreviewRange(range, `Vacation (${start} → ${end})`);
                 }}
                 isMorphedDock={true}
+                isMobileChatbar={true}
+                mobileChatbarMode={mobileAiMode}
+                onToggleMobileExpand={() => setMobileAiMode(m => m === 'compact' ? 'expanded' : 'compact')}
+                companyName={companyName}
               />
             </motion.div>
           )}
@@ -3296,6 +4026,7 @@ function App() {
                 </button>
 
                 <button 
+                  data-testid="mobile-nav-ai"
                   onClick={() => setIsMobileAiOpen(true)} 
                   className="flex flex-col items-center py-2 px-3 rounded-2xl text-muted-foreground hover:text-foreground transition-all active:scale-95 cursor-pointer relative"
                   title="Gemini AI Vacation & Leave Assistant"
@@ -3467,28 +4198,6 @@ function App() {
         onInstalled={() => setIsStandaloneApp(true)}
       />
 
-      {/* Gemini AI Assistant & Vacation Planner Modal */}
-      <AiAssistantModal
-        isOpen={aiModalOpen && !isTutorialActive && !onboardingOpen && !showSplash}
-        onClose={() => setAiModalOpen(false)}
-        context={{
-          leaves,
-          leaveNames,
-          bookedDates,
-          leavePlans,
-          todayStr: getTodayStr()
-        }}
-        onExecuteAction={handleExecuteAiAction}
-        onPreviewRange={(start, end) => {
-          const sDate = new Date(start);
-          const eDate = new Date(end);
-          const range = [];
-          for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
-            range.push(`${2026}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-          }
-          handlePreviewRange(range, `Vacation (${start} → ${end})`);
-        }}
-      />
 
       {/* Unified Settings & Account Hub Modal */}
       <AnimatePresence>

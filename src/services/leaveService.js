@@ -58,12 +58,28 @@ export const fetchLeavePlans = async (userId = null) => {
     console.error('Supabase fetch leave_plans error:', error);
     return [];
   }
-  return data;
+  return (data || []).map(p => {
+    const rawStart = p.start_date || p.startDate;
+    const rawEnd = p.end_date || p.endDate;
+    const s = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+    const e = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : s));
+    return {
+      ...p,
+      start_date: s,
+      end_date: e,
+      startDate: s,
+      endDate: e
+    };
+  });
 };
 
 export const createLeavePlan = async (name, startDate, endDate, userId = null) => {
+  const rawStart = startDate;
+  const rawEnd = endDate;
+  const s = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+  const e = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : s));
   if (isDemoModeActive()) {
-    return await createDemoPlan(name, startDate, endDate);
+    return await createDemoPlan(name, s, e);
   }
   if (!isConfigured) return null;
   let targetUserId = userId;
@@ -71,7 +87,20 @@ export const createLeavePlan = async (name, startDate, endDate, userId = null) =
     const { data: { session } } = await supabase.auth.getSession();
     targetUserId = session?.user?.id || null;
   }
-  const payload = { name, start_date: startDate, end_date: endDate };
+
+  // Check if a plan with the same name & date range already exists
+  try {
+    let checkQuery = supabase.from('leave_plans').select('*').eq('name', name).eq('start_date', s).eq('end_date', e);
+    if (targetUserId) checkQuery = checkQuery.eq('user_id', targetUserId);
+    const { data: existing } = await checkQuery;
+    if (existing && existing.length > 0) {
+      return existing[0];
+    }
+  } catch (err) {
+    // proceed to insert
+  }
+
+  const payload = { name, start_date: s, end_date: e };
   if (targetUserId) payload.user_id = targetUserId;
 
   const { data, error } = await supabase

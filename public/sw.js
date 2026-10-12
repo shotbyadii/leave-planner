@@ -7,6 +7,7 @@ self.addEventListener('install', (event) => {
       return cache.addAll([
         '/',
         '/favicon.svg',
+        '/app-icon-192.png',
         '/manifest.webmanifest'
       ]).catch(() => {});
     })
@@ -40,8 +41,8 @@ self.addEventListener('push', (event) => {
   let payload = {
     title: 'Daily Attendance Check-in',
     body: 'Please confirm whether today is Work From Home or In-Office.',
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
     tag: 'wfh-checkin',
     data: { url: '/?action=attendance' },
     renotify: true,
@@ -69,8 +70,8 @@ self.addEventListener('push', (event) => {
 
   const notificationOptions = {
     body: payload.body,
-    icon: payload.icon || '/favicon.svg',
-    badge: payload.badge || '/favicon.svg',
+    icon: payload.icon || '/app-icon-192.png',
+    badge: payload.badge || '/app-icon-192.png',
     tag: payload.tag || 'leave-vault-attendance',
     data: payload.data || { url: '/?action=attendance' },
     renotify: payload.renotify ?? true,

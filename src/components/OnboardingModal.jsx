@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, CalendarDays, MapPin, Home, ArrowRight, Check, User, 
   SlidersHorizontal, Building2, Clock, Bell, ShieldCheck, Key, ExternalLink,
-  Plus, Trash2, Heart, Moon, Umbrella, Baby, X, Shield, Edit3, BookOpen, HandHeart, Activity
+  Plus, Trash2, Heart, Moon, Umbrella, Baby, X, Shield, Edit3, BookOpen, HandHeart, Activity,
+  Palmtree
 } from 'lucide-react';
 import AppleWheelPicker from './AppleWheelPicker';
 import CompanyInput from './CompanyInput';
@@ -12,7 +13,8 @@ import { getStoredHolidays, saveStoredHolidays } from '../data/holidays';
 import { showAppNotification, requestNotificationPermission, isNotificationGranted } from '../utils/notificationService';
 import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../services/aiAssistantService';
 import { DEFAULT_LEAVE_CONFIGS, deriveShortCode, buildInitialLeaveConfigs } from '../services/leaveConfigService';
-import { COLOR_PALETTE } from '../utils/colorUtils';
+import { APP_CONFIG } from '../constants/brand';
+import { COLOR_PALETTE, SELECTABLE_LEAVE_PALETTE, getLeaveColor } from '../utils/colorUtils';
 import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from '../utils/specialBenefitUtils';
 import { SegmentedPolicyTabs, MorphingTabContent } from './SegmentedPolicyTabs';
 import ConsecutiveLimitControl from './ConsecutiveLimitControl';
@@ -158,7 +160,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
       <div className="absolute inset-0 bg-black/80 backdrop-blur-lg animate-in fade-in duration-300" />
 
       {/* Modal Container */}
-      <div className="relative bg-card w-full max-w-4xl mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+      <div className={`relative bg-card w-full ${step === 1 ? 'max-w-5xl' : 'max-w-4xl'} mx-auto rounded-[32px] border border-border shadow-[0_30px_70px_rgba(0,0,0,0.95)] overflow-hidden z-10 animate-in zoom-in-95 duration-300 max-h-[92vh] flex flex-col transition-all duration-300`}>
         
         {/* Step Progress Header */}
         <div className="px-6 py-4 border-b border-border bg-muted/30 flex justify-between items-center relative z-30">
@@ -184,10 +186,10 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
         <div className="absolute top-[57px] inset-x-0 h-6 bg-gradient-to-b from-card via-card/80 to-transparent pointer-events-none z-20" />
 
         {/* Scrollable Step Content */}
-        <div className="p-6 overflow-y-auto flex-1 no-scrollbar flex flex-col justify-start min-h-[440px]">
+        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto flex-1 no-scrollbar flex flex-col justify-start min-h-0 sm:min-h-[460px]">
           <AnimatePresence mode="wait">
             
-            {/* STEP 1: Feature Showcase */}
+            {/* STEP 1: Feature Showcase (Left Info + Right Direct App Components) */}
             {step === 1 && (
               <motion.div 
                 key="step1"
@@ -195,31 +197,237 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-6 max-w-xl mx-auto w-full my-auto"
+                className="w-full md:my-auto py-0.5 sm:py-1"
               >
-                <div className="text-center flex flex-col items-center">
-                  <div className="w-16 h-16 rounded-3xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-3 shadow-inner">
-                    <Sparkles size={32} />
-                  </div>
-                  <h2 className="text-2xl font-black text-foreground tracking-tight">{slides[0].title}</h2>
-                  <p className="text-xs text-muted-foreground mt-1 font-medium">{slides[0].subtitle}</p>
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 md:gap-8 lg:gap-10 items-start">
+                  
+                  {/* Left Column: Brand, Welcome & Value Pillars (Top-Aligned with Right Panel) */}
+                  <div className="md:col-span-5 flex flex-col items-start text-left justify-start pt-0 md:pt-1">
+                    {/* App Logo */}
+                    <div className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl md:rounded-3xl bg-primary/10 border border-primary/20 p-2 sm:p-2.5 md:p-3 flex items-center justify-center mb-2 sm:mb-3.5 shadow-inner">
+                      <img src={APP_CONFIG.logo} alt={APP_CONFIG.name} className="w-full h-full object-contain rounded-lg sm:rounded-xl" />
+                    </div>
 
-                <div className="flex flex-col gap-3">
-                  {slides[0].highlights.map((h, i) => {
-                    const IconComp = h.icon;
-                    return (
-                      <div key={i} className="flex items-start gap-3.5 bg-muted/40 border border-border/60 p-4 rounded-2xl">
-                        <div className="p-2.5 bg-primary/10 text-primary rounded-xl mt-0.5">
-                          <IconComp size={20} />
+                    {/* Version / Quick Intro Badge */}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[9px] sm:text-[10px] font-bold font-mono uppercase tracking-wider mb-1.5 sm:mb-2">
+                      <Sparkles size={11} className="text-primary" /> Personalized Workspace
+                    </div>
+
+                    {/* Main Title */}
+                    <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-foreground tracking-tight leading-tight">
+                      Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-foreground via-foreground to-primary">Leave Vault</span>
+                    </h2>
+
+                    {/* Subtitle */}
+                    <p className="text-xs md:text-sm text-muted-foreground mt-1 sm:mt-1.5 md:mt-3 leading-relaxed font-medium">
+                      Your intelligent annual leave planner & attendance tracker. Maximize long weekends, track hybrid quotas, and streamline team time off.
+                    </p>
+
+                    {/* Desktop Pillars / Quick Value Chips */}
+                    <div className="hidden md:flex flex-col gap-2.5 mt-6 pt-5 border-t border-border/60 w-full">
+                      <div className="flex items-center gap-2.5 text-xs font-semibold text-foreground">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+                        <span>Smart bridge day recommendations</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-xs font-semibold text-foreground">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
+                        <span>Annual leave & remote allowance tracking</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-xs font-semibold text-foreground">
+                        <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-sm shadow-cyan-500/50" />
+                        <span>Automated daily hybrid attendance</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Sleek Abstracted Feature Showcases (Top 2 on Mobile, All 3 on Desktop) */}
+                  <div className="md:col-span-7 flex flex-col gap-2.5 sm:gap-3 md:gap-3.5 w-full select-none pointer-events-none">
+                    
+                    {/* Feature 1: Holiday & Bridge Optimizer Showcase */}
+                    <div className="bg-gradient-to-b from-card/90 to-card/50 dark:from-white/[0.04] dark:to-white/[0.01] border border-border/70 dark:border-white/[0.08] rounded-2xl p-3 sm:p-3.5 md:p-4 text-left flex flex-col gap-2.5 sm:gap-3 shadow-apple-sm relative overflow-hidden">
+                      {/* Ambient Accent Glow */}
+                      <div className="absolute -top-12 -right-12 w-32 h-32 bg-blue-500/10 dark:bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
+
+                      <div className="flex items-start gap-2.5 sm:gap-3 relative z-10">
+                        <div className="p-1.5 sm:p-2 bg-blue-500/10 text-blue-400 rounded-xl mt-0.5 border border-blue-500/20 shrink-0 shadow-inner">
+                          <CalendarDays size={17} />
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-foreground">{h.title}</h4>
-                          <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{h.desc}</p>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-foreground">Holiday & Bridge Optimizer</h4>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed mt-0.5">
+                            Detects public holidays and bridges weekends to unlock long breaks with minimal leave count.
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      {/* Abstracted Showcase: Bridge Arc & Date Timeline Graphic */}
+                      <div className="relative bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-950/95 border border-white/[0.08] rounded-xl p-2.5 sm:p-3 shadow-xl overflow-hidden">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                            <span className="text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300">
+                              October 2026 • Bridge Span
+                            </span>
+                          </div>
+                          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                            <Sparkles size={9} /> 4 Days Off • 1 PL
+                          </span>
+                        </div>
+
+                        {/* Abstracted Timeline Nodes with Illuminated Bridge Track */}
+                        <div className="grid grid-cols-5 gap-1 sm:gap-1.5 relative z-10">
+                          <div className="bg-white/[0.03] border border-white/[0.05] rounded-lg p-1 sm:p-1.5 flex flex-col items-center">
+                            <span className="text-[7px] sm:text-[8px] font-mono uppercase text-slate-400">Thu</span>
+                            <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-300">15</span>
+                            <span className="text-[7px] font-mono text-slate-400/80 mt-0.5">Work</span>
+                          </div>
+
+                          <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-1 sm:p-1.5 flex flex-col items-center shadow-xs">
+                            <span className="text-[7px] sm:text-[8px] font-mono uppercase text-amber-400 font-bold">Fri</span>
+                            <span className="text-[11px] sm:text-xs font-mono font-bold text-amber-300">16</span>
+                            <span className="text-[7px] font-mono font-bold text-amber-300 mt-0.5">Holiday</span>
+                          </div>
+
+                          <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-1 sm:p-1.5 flex flex-col items-center">
+                            <span className="text-[7px] sm:text-[8px] font-mono uppercase text-slate-400">Sat</span>
+                            <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-300">17</span>
+                            <span className="text-[7px] font-mono text-slate-400/80 mt-0.5">Weekend</span>
+                          </div>
+
+                          <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-1 sm:p-1.5 flex flex-col items-center">
+                            <span className="text-[7px] sm:text-[8px] font-mono uppercase text-slate-400">Sun</span>
+                            <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-300">18</span>
+                            <span className="text-[7px] font-mono text-slate-400/80 mt-0.5">Weekend</span>
+                          </div>
+
+                          <div className="bg-gradient-to-b from-blue-500/25 to-blue-600/15 border border-blue-400/50 rounded-lg p-1 sm:p-1.5 flex flex-col items-center relative shadow-[0_0_12px_rgba(59,130,246,0.25)]">
+                            <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-400 ring-2 ring-black" />
+                            <span className="text-[7px] sm:text-[8px] font-mono uppercase text-blue-300 font-bold">Mon</span>
+                            <span className="text-[11px] sm:text-xs font-mono font-bold text-blue-200">19</span>
+                            <span className="text-[7px] font-mono font-black text-blue-200 bg-blue-500/30 px-1 py-0.2 rounded mt-0.5">1 PL</span>
+                          </div>
+                        </div>
+
+                        {/* Abstracted Bridge Connector Graphic */}
+                        <div className="mt-2 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-0.5 bg-gradient-to-r from-amber-400 via-blue-400 to-emerald-400 rounded-full" />
+                            <span>Continuous Break: Oct 16 → Oct 19</span>
+                          </div>
+                          <span className="text-slate-400 text-[8px] uppercase tracking-wider">Auto-Optimized</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Feature 2: Leave & Remote Balances Showcase */}
+                    <div className="bg-gradient-to-b from-card/90 to-card/50 dark:from-white/[0.04] dark:to-white/[0.01] border border-border/70 dark:border-white/[0.08] rounded-2xl p-3 sm:p-3.5 md:p-4 text-left flex flex-col gap-2.5 sm:gap-3 shadow-apple-sm relative overflow-hidden">
+                      {/* Ambient Accent Glow */}
+                      <div className="absolute -top-12 -right-12 w-32 h-32 bg-cyan-500/10 dark:bg-cyan-500/15 rounded-full blur-2xl pointer-events-none" />
+
+                      <div className="flex items-start gap-2.5 sm:gap-3 relative z-10">
+                        <div className="p-1.5 sm:p-2 bg-cyan-500/10 text-cyan-400 rounded-xl mt-0.5 border border-cyan-500/20 shrink-0 shadow-inner">
+                          <SlidersHorizontal size={17} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-foreground">Leave & Remote Allowances</h4>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed mt-0.5">
+                            Track annual leaves, monthly remote quotas, and custom benefits in real time.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Abstracted Showcase: Multi-Tier Quota Gauges */}
+                      <div className="relative bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-950/95 border border-white/[0.08] rounded-xl p-2.5 sm:p-3 shadow-xl overflow-hidden flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1 sm:gap-1.5">
+                            <span className="text-[8px] sm:text-[9px] font-mono font-bold text-slate-300 bg-white/[0.06] border border-white/[0.08] px-1.5 sm:px-2 py-0.5 rounded-md">
+                              Annual Bank
+                            </span>
+                            <span className="text-[8px] sm:text-[9px] font-mono text-slate-400 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded-md">
+                              Remote / WFH
+                            </span>
+                            <span className="text-[8px] sm:text-[9px] font-mono text-slate-400 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded-md">
+                              Benefits
+                            </span>
+                          </div>
+                          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                            20 / 25 Available
+                          </span>
+                        </div>
+
+                        {/* Abstracted Dual Gradient Progress Gauges */}
+                        <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-1.5 sm:p-2 flex flex-col gap-1 sm:gap-1.5">
+                            <div className="flex justify-between items-center text-[8px] sm:text-[9px] font-mono">
+                              <span className="text-slate-300 font-bold truncate">Planned (PL)</span>
+                              <span className="text-blue-300 font-black">12 / 15</span>
+                            </div>
+                            <div className="w-full bg-white/[0.08] rounded-full h-1.5 overflow-hidden p-0.2">
+                              <div className="bg-gradient-to-r from-blue-500 to-indigo-400 h-full rounded-full w-4/5 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                            </div>
+                          </div>
+
+                          <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-1.5 sm:p-2 flex flex-col gap-1 sm:gap-1.5">
+                            <div className="flex justify-between items-center text-[8px] sm:text-[9px] font-mono">
+                              <span className="text-slate-300 font-bold truncate">Remote (WFH)</span>
+                              <span className="text-cyan-300 font-black">7 / 10</span>
+                            </div>
+                            <div className="w-full bg-white/[0.08] rounded-full h-1.5 overflow-hidden p-0.2">
+                              <div className="bg-gradient-to-r from-cyan-400 to-teal-400 h-full rounded-full w-[70%] shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Feature 3: Vacation & Trip Itineraries Showcase (Hidden on Mobile for Zero-Scroll Compactness) */}
+                    <div className="hidden sm:flex bg-gradient-to-b from-card/90 to-card/50 dark:from-white/[0.04] dark:to-white/[0.01] border border-border/70 dark:border-white/[0.08] rounded-2xl p-3.5 sm:p-4 text-left flex-col gap-3 shadow-apple-sm relative overflow-hidden">
+                      {/* Ambient Accent Glow */}
+                      <div className="absolute -top-12 -right-12 w-32 h-32 bg-pink-500/10 dark:bg-pink-500/15 rounded-full blur-2xl pointer-events-none" />
+
+                      <div className="flex items-start gap-2.5 sm:gap-3 relative z-10">
+                        <div className="p-2 bg-pink-500/10 text-pink-400 rounded-xl mt-0.5 border border-pink-500/20 shrink-0 shadow-inner">
+                          <Palmtree size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-foreground">Vacation & Trip Itineraries</h4>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed mt-0.5">
+                            Group multi-day leaves into tagged trip projects with automatic duration and coverage breakdowns.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Abstracted Showcase: Itinerary Capsule with Gradient Depth */}
+                      <div className="relative bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-950/95 border border-white/[0.08] rounded-xl p-3 shadow-xl overflow-hidden flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20 border border-pink-500/30 flex items-center justify-center text-sm shadow-inner shrink-0">
+                            🌴
+                          </div>
+                          <div className="text-left min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-100 truncate">Goa Beach Retreat</span>
+                              <span className="text-[8px] font-mono font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.2 rounded shrink-0">
+                                Confirmed
+                              </span>
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-400 mt-0.5 flex items-center gap-1.5">
+                              <span>Nov 12</span>
+                              <span className="text-slate-400">─✈─</span>
+                              <span>Nov 16</span>
+                              <span className="text-slate-400">•</span>
+                              <span className="text-slate-300 font-semibold">5 Days</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 pl-2">
+                          <div className="text-xs font-mono font-black text-pink-300">3 Leaves</div>
+                          <div className="text-[8px] font-mono text-slate-400 mt-0.5">+2 Weekend Saved</div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -242,7 +450,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                     scale: isCompanySearching ? 0.85 : 1
                   }}
                   transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-                  className="text-center flex flex-col items-center mb-6"
+                  className="text-left flex flex-col items-start w-full mb-6"
                 >
                   <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-3 shadow-inner">
                     <User size={32} />
@@ -279,7 +487,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                     transition={{ type: 'spring', stiffness: 350, damping: 28 }}
                   >
                     <label className="text-xs font-bold text-foreground mb-1.5 block text-left flex items-center gap-1.5">
-                      <Building2 size={14} className="text-primary" /> Company Name & Logo
+                      <Building2 size={14} className="text-primary" /> Company Name / URL
                     </label>
                     <CompanyInput
                       value={companyName}
@@ -312,8 +520,8 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                 transition={{ duration: 0.2 }}
                 className="flex flex-col gap-4 max-w-2xl mx-auto w-full"
               >
-                <div className="text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-2 shadow-inner">
+                <div className="text-left flex flex-col items-start w-full mb-1">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mb-2 shadow-inner">
                     <SlidersHorizontal size={24} />
                   </div>
                   <h2 className="text-xl font-black text-foreground tracking-tight">Leave Quotas & Policy Tiers</h2>
@@ -326,16 +534,19 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                     {
                       id: 'annual',
                       label: 'Annual Bank',
+                      shortLabel: 'Annual',
                       count: leaveConfigs.filter(c => c.tier === 'annual').length
                     },
                     {
                       id: 'wfh',
                       label: 'Work From Home',
+                      shortLabel: 'WFH',
                       dotColor: leaveConfigs.find(c => c.id === 'wfh')?.enabled !== false ? 'bg-cyan-500' : 'bg-muted-foreground/40'
                     },
                     {
                       id: 'special',
                       label: 'Special Benefits',
+                      shortLabel: 'Special',
                       count: leaveConfigs.filter(c => c.tier === 'special' && c.enabled).length
                     }
                   ]}
@@ -349,18 +560,23 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                   {/* TIER 1: Annual Leave Bank */}
                   {onboardingTierTab === 'annual' && (
                     <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between px-1">
-                      <span className="text-xs font-bold text-muted-foreground">
-                        Annual Vacation Bank (Deducts from core quota)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingAnnual(!isAddingAnnual)}
-                        className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus size={13} /> Add Category
-                      </button>
-                    </div>
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold text-foreground sm:text-muted-foreground truncate">
+                            Annual Vacation Bank
+                          </span>
+                          <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                            Deducts from core yearly allowance
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingAnnual(!isAddingAnnual)}
+                          className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer flex-shrink-0 transition-colors"
+                        >
+                          <Plus size={13} /> Add Category
+                        </button>
+                      </div>
 
                     {/* Inline Creator for Custom Annual Category */}
                     {isAddingAnnual && (
@@ -420,7 +636,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                         <div className="flex items-center justify-between pt-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
-                            {COLOR_PALETTE.map((c) => (
+                            {SELECTABLE_LEAVE_PALETTE.map((c) => (
                               <button
                                 key={c.id}
                                 type="button"
@@ -471,12 +687,9 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                     {/* Auto-Adapting Wheel Pickers Grid */}
                     {(() => {
                       const annuals = leaveConfigs.filter(c => c.tier === 'annual');
-                      const gridColsClass = annuals.length === 1 ? 'grid-cols-1 max-w-xs mx-auto' :
-                                            annuals.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
-                                            annuals.length === 3 ? 'grid-cols-1 sm:grid-cols-3' :
-                                            'grid-cols-2 md:grid-cols-4';
+                      const gridColsClass = annuals.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-1 sm:grid-cols-2';
                       return (
-                        <div className={`grid ${gridColsClass} gap-3`}>
+                        <div className={`grid ${gridColsClass} gap-3.5`}>
                           {annuals.map((conf) => (
                             <AppleWheelPicker
                               key={conf.id}
@@ -696,7 +909,7 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
 
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
-                            {COLOR_PALETTE.map((c) => (
+                            {SELECTABLE_LEAVE_PALETTE.map((c) => (
                               <button
                                 key={c.id}
                                 type="button"
@@ -751,37 +964,48 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                         const Icon = getSpecialBenefitIcon(conf);
                         const isEditing = editingSpecialId === conf.id;
                         const isAnotherEditing = editingSpecialId !== null && !isEditing;
+                        const colorTheme = getLeaveColor(conf.color || 'pink');
 
                         return (
                           <div
                             key={conf.id}
                             className={`p-3.5 rounded-2xl border transition-all duration-200 flex flex-col gap-3 ${
                               isEditing 
-                                ? 'bg-card border-primary/60 shadow-xl ring-2 ring-primary/20 scale-[1.01] z-10' 
+                                ? 'bg-card border-primary/60 shadow-xl ring-2 ring-primary/20 z-10' 
                                 : isAnotherEditing
-                                  ? 'opacity-25 pointer-events-none filter grayscale-[30%] scale-[0.99]'
+                                  ? 'opacity-25 pointer-events-none filter grayscale-[30%]'
                                   : conf.enabled 
                                     ? 'bg-card border-border/80 shadow-xs' 
                                     : 'bg-muted/20 border-border/40 opacity-80'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                  conf.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                                }`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0 flex-1">
+                                <div 
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                                    conf.enabled ? `${colorTheme.badge}` : 'bg-muted text-muted-foreground'
+                                  }`}
+                                  style={conf.enabled ? { color: colorTheme.hex } : undefined}
+                                >
                                   <Icon size={16} />
                                 </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5 truncate">
-                                    {conf.name}
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span 
+                                      className="w-2 h-2 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: colorTheme.hex }}
+                                      title={colorTheme.name}
+                                    />
+                                    <span className="text-xs font-bold text-foreground">
+                                      {conf.name}
+                                    </span>
                                     <span className="text-[10px] font-mono text-muted-foreground font-medium">
                                       ({conf.cadence === 'month' ? `${conf.quota}d / mo` : conf.cadence === 'year' ? `${conf.quota}d / yr` : `${conf.quota} days`})
                                     </span>
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground truncate">
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground leading-relaxed break-words mt-0.5 line-clamp-2 sm:line-clamp-none">
                                     {conf.subtitle || (conf.cadence === 'month' ? 'Monthly health and wellness allowance' : 'Company benefit allowance')}
-                                  </span>
+                                  </p>
                                 </div>
                               </div>
 
@@ -930,6 +1154,50 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                                     className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                                   />
                                 </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/40">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[11px] font-bold text-muted-foreground mr-1">Icon:</span>
+                                    {BENEFIT_ICON_PRESETS.map((p) => {
+                                      const PIcon = p.icon;
+                                      return (
+                                        <button
+                                          key={p.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, icon: p.id } : c));
+                                          }}
+                                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                            (conf.icon || 'sparkles') === p.id
+                                              ? 'bg-primary text-primary-foreground shadow-xs scale-105'
+                                              : 'bg-muted/60 text-muted-foreground hover:text-foreground'
+                                          }`}
+                                          title={p.label}
+                                        >
+                                          <PIcon size={13} />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
+                                    {SELECTABLE_LEAVE_PALETTE.map((pal) => (
+                                      <button
+                                        key={pal.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setLeaveConfigs(prev => prev.map(c => c.id === conf.id ? { ...c, color: pal.id } : c));
+                                        }}
+                                        className={`w-4 h-4 rounded-full ${pal.bg} transition-transform cursor-pointer ${
+                                          (conf.color || 'pink') === pal.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                        }`}
+                                        title={pal.name}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+
                                 <div className="flex items-center justify-between pt-1">
                                   <button
                                     type="button"
@@ -988,12 +1256,12 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-6 max-w-md mx-auto py-2 text-center"
+                className="flex flex-col gap-6 max-w-md mx-auto py-2 text-left"
               >
-                <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-inner">
-                  <Bell size={32} />
-                </div>
-                <div>
+                <div className="flex flex-col items-start w-full">
+                  <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3 shadow-inner">
+                    <Bell size={32} />
+                  </div>
                   <h2 className="text-2xl font-black text-foreground tracking-tight">Check-in Prompt & Notifications</h2>
                   <p className="text-xs text-muted-foreground mt-1 font-medium">Set your preferred time for daily attendance prompts and enable browser notifications.</p>
                 </div>

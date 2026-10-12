@@ -10,12 +10,16 @@ import { SegmentedPolicyTabs, MorphingTabContent } from './SegmentedPolicyTabs';
 
 export const getAllDatesInRange = (startDateStr, endDateStr) => {
   if (!startDateStr || !endDateStr) return [];
-  const partsS = String(startDateStr).split('-').map(Number);
-  const partsE = String(endDateStr).split('-').map(Number);
+  const sStr = typeof startDateStr === 'string' ? startDateStr : (Array.isArray(startDateStr) ? startDateStr[0] : String(startDateStr));
+  const eStr = typeof endDateStr === 'string' ? endDateStr : (Array.isArray(endDateStr) ? endDateStr[endDateStr.length - 1] : String(endDateStr));
+  if (!sStr || !eStr) return [];
+  const partsS = sStr.split('-').map(Number);
+  const partsE = eStr.split('-').map(Number);
   if (partsS.length !== 3 || partsE.length !== 3) return [];
 
   const start = new Date(partsS[0], partsS[1] - 1, partsS[2]);
   const end = new Date(partsE[0], partsE[1] - 1, partsE[2]);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
   const dates = [];
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -104,8 +108,10 @@ const LeaveTracker = ({
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   const renderMiniCalendar = (plan) => {
-    const sStr = plan.start_date || plan.startDate;
-    const eStr = plan.end_date || plan.endDate;
+    const rawStart = plan.start_date || plan.startDate;
+    const rawEnd = plan.end_date || plan.endDate;
+    const sStr = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+    const eStr = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : sStr));
     const allDateStrs = getAllDatesInRange(sStr, eStr);
     
     const allDates = allDateStrs.map(dateStr => {
@@ -181,8 +187,10 @@ const LeaveTracker = ({
     if (planId === 'tutorial-demo-plan-temp') {
       const plan = (leavePlans || []).find(p => p.id === 'tutorial-demo-plan-temp');
       if (plan && (plan.start_date || plan.startDate) && (plan.end_date || plan.endDate)) {
-        const s = plan.start_date || plan.startDate;
-        const e = plan.end_date || plan.endDate;
+        const rawStart = plan.start_date || plan.startDate;
+        const rawEnd = plan.end_date || plan.endDate;
+        const s = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+        const e = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : s));
         return getAllDatesInRange(s, e)
           .filter(d => !isWeekend(d) && !isHoliday(d))
           .map(d => ({ date: d, type: 'pl', duration: 1 }));
@@ -432,11 +440,12 @@ const LeaveTracker = ({
         {/* WFH Monthly Utilization Card */}
         {(() => {
           const curMonthKey = new Date().toISOString().substring(0, 7);
-          const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length;
+          const wfhUsedThisMonth = bookedDates.filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).reduce((s, b) => s + (b.duration || 1), 0);
           const quotaWfh = maxWfh || 10;
           const isWfhOverQuota = wfhUsedThisMonth >= quotaWfh;
           const wfhOverAmount = wfhUsedThisMonth - quotaWfh;
           const wfhRemaining = Math.max(0, quotaWfh - wfhUsedThisMonth);
+          const remFmt = Number.isInteger(wfhRemaining) ? wfhRemaining : wfhRemaining.toFixed(1);
           const isWfhWarning = !isWfhOverQuota && wfhRemaining <= 2;
           const wfhTheme = getLeaveTheme(leaveColors.wfh || 'cyan');
 
@@ -456,7 +465,7 @@ const LeaveTracker = ({
 
           const subtitleText = isWfhOverQuota
             ? `+${wfhOverAmount} day${wfhOverAmount === 1 ? '' : 's'} over monthly quota`
-            : `${wfhRemaining} ${getShortform(leaveNames.wfh, 'WFH')} day${wfhRemaining === 1 ? '' : 's'} remaining this month`;
+            : `${remFmt} ${getShortform(leaveNames.wfh, 'WFH')} day${remFmt === 1 ? '' : 's'} left this month`;
 
           const strokeColor = isWfhOverQuota ? 'stroke-red-500' : (isWfhWarning ? 'stroke-amber-500' : 'stroke-cyan-400');
 
@@ -474,7 +483,7 @@ const LeaveTracker = ({
               <div className="flex items-center justify-between gap-4">
                 <div className="flex flex-col">
                   <span className="text-3xl font-black font-mono text-foreground">
-                    {wfhUsedThisMonth}<span className="text-sm font-bold text-muted-foreground">/{quotaWfh}</span>
+                    {remFmt}<span className="text-sm font-bold text-muted-foreground">/{quotaWfh}</span>
                   </span>
                   <span className="text-xs font-semibold text-muted-foreground mt-0.5">
                     {subtitleText}
@@ -489,13 +498,13 @@ const LeaveTracker = ({
                       className={`transition-all duration-1000 ease-out ${strokeColor}`}
                       strokeWidth="4" 
                       strokeDasharray={125.6}
-                      strokeDashoffset={125.6 - Math.min(1, wfhUsedThisMonth / quotaWfh) * 125.6}
-                      strokeLinecap="round"
+                      strokeDashoffset={125.6 - Math.min(1, wfhRemaining / quotaWfh) * 125.6}
+                      strokeLinecap="round" 
                       fill="transparent" 
                     />
                   </svg>
                   <span className="absolute text-[10px] font-black font-mono text-foreground">
-                    {Math.round((wfhUsedThisMonth / quotaWfh) * 100)}%
+                    {Math.round((wfhRemaining / quotaWfh) * 100)}%
                   </span>
                 </div>
               </div>
@@ -512,20 +521,48 @@ const LeaveTracker = ({
           <h2 className="font-bold text-xl text-foreground mb-1">Leave Plans</h2>
           <p className="text-sm text-muted-foreground mb-4">Your planned leave ranges, grouped and named.</p>
 
-          {leavePlans.length === 0 ? (
-            <div className="bg-card rounded-2xl border-2 border-dashed border-border p-8 flex flex-col items-center justify-center text-center">
-              <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center text-muted-foreground mb-3">
-                <CalendarDays size={24} />
-              </div>
-              <h3 className="text-base font-semibold text-foreground mb-1">No leave plans yet</h3>
-              <p className="text-sm text-muted-foreground max-w-xs">Select date ranges on the calendar and apply leaves to create plans.</p>
-            </div>
-          ) : (
-            <div id="tutorial-step-leave-plans" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {leavePlans.map((plan) => {
+          {(() => {
+            const planMap = new Map();
+            for (const plan of (leavePlans || [])) {
+              const rawStart = plan.start_date || plan.startDate;
+              const rawEnd = plan.end_date || plan.endDate;
+              const sStr = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+              const eStr = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : sStr));
+              const key = `${(plan.name || '').trim().toLowerCase()}|${sStr}|${eStr}`;
+              const planLeaves = getLeavesForPlan(plan.id);
+              const leavesCount = (planLeaves || []).reduce((sum, l) => sum + (l?.duration || 1), 0);
+
+              if (!planMap.has(key)) {
+                planMap.set(key, { plan, leavesCount });
+              } else {
+                const existing = planMap.get(key);
+                if (existing.leavesCount === 0 && leavesCount > 0) {
+                  planMap.set(key, { plan, leavesCount });
+                }
+              }
+            }
+            const displayPlans = Array.from(planMap.values()).map(v => v.plan);
+
+            if (displayPlans.length === 0) {
+              return (
+                <div className="bg-card rounded-2xl border-2 border-dashed border-border p-8 flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center text-muted-foreground mb-3">
+                    <CalendarDays size={24} />
+                  </div>
+                  <h3 className="text-base font-semibold text-foreground mb-1">No leave plans yet</h3>
+                  <p className="text-sm text-muted-foreground max-w-xs">Select date ranges on the calendar and apply leaves to create plans.</p>
+                </div>
+              );
+            }
+
+            return (
+              <div id="tutorial-step-leave-plans" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {displayPlans.map((plan) => {
                 const planLeaves = getLeavesForPlan(plan.id);
-                const sStr = plan.start_date || plan.startDate;
-                const eStr = plan.end_date || plan.endDate;
+                const rawStart = plan.start_date || plan.startDate;
+                const rawEnd = plan.end_date || plan.endDate;
+                const sStr = typeof rawStart === 'string' ? rawStart : (Array.isArray(rawStart) ? rawStart[0] : (rawStart ? String(rawStart) : ''));
+                const eStr = typeof rawEnd === 'string' ? rawEnd : (Array.isArray(rawEnd) ? rawEnd[rawEnd.length - 1] : (rawEnd ? String(rawEnd) : sStr));
                 const allDatesInRange = getAllDatesInRange(sStr, eStr);
                 const partsStart = (sStr || '').split('-').map(Number);
                 const partsEnd = (eStr || '').split('-').map(Number);
@@ -713,8 +750,9 @@ const LeaveTracker = ({
                 );
               })}
             </div>
-          )}
-        </div>
+          );
+        })()}
+      </div>
 
         {/* All Records Table (Fits page width on mobile without horizontal scroll) */}
         <div className="bg-card rounded-[24px] sm:rounded-[32px] border border-border shadow-apple-sm overflow-hidden">
@@ -732,7 +770,7 @@ const LeaveTracker = ({
             </div>
             
             {/* Filter Tabs across 3 Tiers */}
-            <div className="w-full md:w-auto overflow-x-auto no-scrollbar">
+            <div className="w-full md:w-auto min-w-0">
               <SegmentedPolicyTabs
                 tabs={[
                   { id: 'all', label: 'All', count: countsByTier.all },

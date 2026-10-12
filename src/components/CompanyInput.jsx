@@ -110,7 +110,7 @@ const CompanyInput = ({
             className="absolute left-0 right-0 top-full mt-1.5 z-[150] bg-card border border-border rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-0.5 max-h-56 overflow-y-auto no-scrollbar"
           >
             <div className="px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center justify-between border-b border-border/60 mb-0.5">
-              <span>{value ? 'Matching Companies' : 'Popular Workspaces (or type nykaa.com)'}</span>
+              <span>{value ? 'Matching Companies' : 'Popular Workspaces'}</span>
               <Search size={10} />
             </div>
 

@@ -12,7 +12,7 @@ import CompanyInput from './CompanyInput';
 import HolidayManager from './HolidayManager';
 import { getStoredHolidays } from '../data/holidays';
 import { getCompanyLogoUrl } from '../utils/companyLogoUtils';
-import { COLOR_PALETTE } from '../utils/colorUtils';
+import { COLOR_PALETTE, SELECTABLE_LEAVE_PALETTE, getLeaveColor } from '../utils/colorUtils';
 import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from '../utils/specialBenefitUtils';
 import { SegmentedPolicyTabs, MorphingTabContent } from './SegmentedPolicyTabs';
 import ConsecutiveLimitControl from './ConsecutiveLimitControl';
@@ -50,6 +50,7 @@ const SettingsModal = ({
   onOpenAuthModal,
   onResetData,
   onDeleteAccount,
+  onSignOut,
   onImportSuccess,
   onReplayTutorial,
   leavesQuota,
@@ -527,6 +528,7 @@ const SettingsModal = ({
           <div className="hidden md:flex items-center gap-2 mt-4 pt-4 border-t border-border/60">
             <button
               type="button"
+              data-capability="sign-out"
               onClick={() => { onClose(); if (onSignOut) onSignOut(); }}
               className="flex-1 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
@@ -833,17 +835,23 @@ const SettingsModal = ({
                         {
                           id: 'annual',
                           label: 'Annual Bank',
+                          shortLabel: 'Annual',
+                          testId: 'desktop-quotas-tab-annual',
                           count: annualConfigs.length
                         },
                         {
                           id: 'remote',
                           label: 'Remote / WFH',
+                          shortLabel: 'WFH',
+                          testId: 'desktop-quotas-tab-remote',
                           count: wfhConfig.enabled ? `${wfhConfig.quota}/mo` : 'Off',
                           dotColor: wfhConfig.enabled ? 'bg-cyan-500' : 'bg-muted-foreground/40'
                         },
                         {
                           id: 'special',
                           label: 'Special Benefits',
+                          shortLabel: 'Special',
+                          testId: 'desktop-quotas-tab-special',
                           count: specialConfigs.filter(c => c.enabled).length
                         }
                       ]}
@@ -856,7 +864,7 @@ const SettingsModal = ({
                     <MorphingTabContent activeKey={quotasTierTab}>
                       {/* ─── TIER 1: ANNUAL LEAVE BANK ─── */}
                       {quotasTierTab === 'annual' && (
-                        <div className="flex flex-col gap-3">
+                        <div data-capability="annual-policy-edit" className="flex flex-col gap-3">
                         <div className="flex items-center justify-between px-1">
                           <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
                             <SlidersHorizontal size={14} className="text-cyan-500" /> Tier 1: Annual Vacation Bank
@@ -963,6 +971,7 @@ const SettingsModal = ({
                         ) : (
                           <button
                             type="button"
+                            data-capability="add-annual-category"
                             onClick={() => setShowAddAnnualForm(true)}
                             className="w-full py-3 border border-dashed border-border/80 hover:border-foreground/40 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                           >
@@ -974,7 +983,7 @@ const SettingsModal = ({
 
                     {/* ─── TIER 2: MONTHLY REMOTE (WFH) ─── */}
                     {quotasTierTab === 'remote' && (
-                      <div className="flex flex-col gap-3">
+                      <div data-capability="remote-policy-edit" className="flex flex-col gap-3">
                         <div className="flex items-center justify-between p-4 bg-muted/30 border border-border/60 rounded-3xl">
                           <div className="flex flex-col">
                             <span className="text-xs font-bold text-foreground">Enable Remote / Work From Home</span>
@@ -1033,7 +1042,7 @@ const SettingsModal = ({
 
                     {/* ─── TIER 3: SPECIAL & BONUS BENEFITS ─── */}
                     {quotasTierTab === 'special' && (
-                      <div className="flex flex-col gap-3">
+                      <div data-capability="special-benefits-edit" className="flex flex-col gap-3">
                         <div className="p-3 bg-pink-500/10 border border-pink-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-pink-600 dark:text-pink-400">
                           <Info size={16} className="flex-shrink-0 mt-0.5" />
                           <span>
@@ -1046,37 +1055,48 @@ const SettingsModal = ({
                             const Icon = getSpecialBenefitIcon(c);
                             const isEditing = editingSpecialId === c.id;
                             const isAnotherEditing = editingSpecialId !== null && !isEditing;
+                            const colorTheme = getLeaveColor(c.color || 'pink');
 
                             return (
                               <div
                                 key={c.id}
                                 className={`p-3.5 rounded-2xl border transition-all duration-200 flex flex-col gap-3 ${
                                   isEditing 
-                                    ? 'bg-card border-primary/60 shadow-xl ring-2 ring-primary/20 scale-[1.01] z-10' 
+                                    ? 'bg-card border-primary/60 shadow-xl ring-2 ring-primary/20 z-10' 
                                     : isAnotherEditing
-                                      ? 'opacity-25 pointer-events-none filter grayscale-[30%] scale-[0.99]'
+                                      ? 'opacity-25 pointer-events-none filter grayscale-[30%]'
                                       : c.enabled 
                                         ? 'bg-card border-border/80 shadow-xs' 
                                         : 'bg-muted/20 border-border/40 opacity-80'
                                 }`}
                               >
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                      c.enabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                                    }`}>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    <div 
+                                      className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                                        c.enabled ? `${colorTheme.badge}` : 'bg-muted text-muted-foreground'
+                                      }`}
+                                      style={c.enabled ? { color: colorTheme.hex } : undefined}
+                                    >
                                       <Icon size={16} />
                                     </div>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5 truncate">
-                                        {c.name}
+                                    <div className="flex flex-col min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span 
+                                          className="w-2 h-2 rounded-full flex-shrink-0"
+                                          style={{ backgroundColor: colorTheme.hex }}
+                                          title={colorTheme.name}
+                                        />
+                                        <span className="text-xs font-bold text-foreground">
+                                          {c.name}
+                                        </span>
                                         <span className="text-[10px] font-mono text-muted-foreground font-medium">
                                           ({c.cadence === 'month' ? `${c.quota}d / mo` : c.cadence === 'year' ? `${c.quota}d / yr` : `${c.quota} days`})
                                         </span>
-                                      </span>
-                                      <span className="text-[10px] text-muted-foreground truncate">
+                                      </div>
+                                      <p className="text-[11px] text-muted-foreground leading-relaxed break-words mt-0.5 line-clamp-2 sm:line-clamp-none">
                                         {c.subtitle || (c.cadence === 'month' ? 'Monthly health and wellness allowance' : 'Company benefit allowance')}
-                                      </span>
+                                      </p>
                                     </div>
                                   </div>
 
@@ -1206,6 +1226,46 @@ const SettingsModal = ({
                                         className="w-full bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                                       />
                                     </div>
+
+                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/40">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[11px] font-bold text-muted-foreground mr-1">Icon:</span>
+                                        {BENEFIT_ICON_PRESETS.map((p) => {
+                                          const PIcon = p.icon;
+                                          return (
+                                            <button
+                                              key={p.id}
+                                              type="button"
+                                              onClick={() => updateConfig(c.id, { icon: p.id })}
+                                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                                (c.icon || 'sparkles') === p.id
+                                                  ? 'bg-primary text-primary-foreground shadow-xs scale-105'
+                                                  : 'bg-muted/60 text-muted-foreground hover:text-foreground'
+                                              }`}
+                                              title={p.label}
+                                            >
+                                              <PIcon size={13} />
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
+                                        {SELECTABLE_LEAVE_PALETTE.map((pal) => (
+                                          <button
+                                            key={pal.id}
+                                            type="button"
+                                            onClick={() => updateConfig(c.id, { color: pal.id })}
+                                            className={`w-4 h-4 rounded-full ${pal.bg} transition-transform cursor-pointer ${
+                                              (c.color || 'pink') === pal.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                            }`}
+                                            title={pal.name}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+
                                     <div className="flex items-center justify-between pt-1">
                                       <button
                                         type="button"
@@ -1316,7 +1376,7 @@ const SettingsModal = ({
                             {/* Preset Color Picker */}
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[11px] font-bold text-muted-foreground mr-1">Color:</span>
-                              {COLOR_PALETTE.map((c) => (
+                              {SELECTABLE_LEAVE_PALETTE.map((c) => (
                                 <button
                                   key={c.id}
                                   type="button"
@@ -1350,6 +1410,7 @@ const SettingsModal = ({
                         ) : (
                           <button
                             type="button"
+                            data-capability="add-special-benefit"
                             onClick={() => setShowAddSpecialForm(true)}
                             className="w-full py-3 border border-dashed border-border/80 hover:border-foreground/40 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                           >
@@ -1697,6 +1758,7 @@ const SettingsModal = ({
                     <div className="flex gap-2">
                       <button
                         type="button"
+                        data-capability="export-json"
                         onClick={handleExportJson}
                         disabled={isExporting}
                         className="flex-1 py-3 bg-card border border-border text-foreground hover:bg-muted rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
@@ -1706,6 +1768,7 @@ const SettingsModal = ({
 
                       <button
                         type="button"
+                        data-capability="export-csv"
                         onClick={handleExportCsv}
                         disabled={isExportingCsv}
                         className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"

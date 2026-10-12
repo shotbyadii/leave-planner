@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, ChevronLeft, Check, Calendar as CalendarIcon
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
 
-const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial, leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }, leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' }, onClearAiPreview }) => {
+const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial, leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }, leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' }, leaveConfigs = [], onClearAiPreview }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -289,25 +289,31 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           baseClasses += "bg-yellow-400/30 text-yellow-500 font-black border border-yellow-300 scale-105 z-10";
         } else if (bookedLeave) {
           const type = bookedLeave.type;
-          if (['pl', 'el', 'rh'].includes(type)) {
-            const colorId = leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'cyan');
-            const theme = getLeaveTheme(colorId);
-            baseClasses += `${theme.activeBoxBg} border ${theme.activeBoxBorder} ${theme.activeText} font-black cursor-pointer shadow-sm`;
-          } else if (type === 'wfh') {
-            baseClasses += useNavy ? "bg-white/10 border border-cyan-500/40 hover:bg-white/20 cursor-pointer text-white font-bold" : "bg-card border border-border/60 hover:bg-muted/70 cursor-pointer text-foreground font-bold shadow-2xs";
+          if (type === 'wfh') {
+            const wfhColor = (Array.isArray(leaveConfigs) && leaveConfigs.find(c => c.id === 'wfh')?.color) || leaveColors?.wfh || 'cyan';
+            const wfhTheme = getLeaveTheme(wfhColor);
+            baseClasses += useNavy 
+              ? `bg-white/10 border ${wfhTheme.border}/40 hover:bg-white/20 cursor-pointer text-white font-bold` 
+              : `bg-card border ${wfhTheme.border}/50 hover:bg-muted/70 cursor-pointer text-foreground font-bold shadow-2xs`;
           } else if (type === 'office') {
             baseClasses += "bg-slate-500/15 border border-slate-500/40 text-slate-400 font-black cursor-pointer shadow-sm";
           } else {
-            baseClasses += "bg-muted/40 border border-border/60 hover:bg-muted cursor-pointer text-foreground font-bold";
+            // Universal leave coloring: syncs to user's choice for any leave type
+            const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
+            const colorId = cfg?.color || leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'blue');
+            const theme = getLeaveTheme(colorId);
+            baseClasses += `${theme.activeBoxBg} border ${theme.activeBoxBorder} ${theme.activeText} font-black cursor-pointer shadow-sm`;
           }
         } else if (holidayInfo) {
           baseClasses += "bg-purple-500/15 border border-purple-500/40 text-purple-500 font-black";
         } else if (weekend) {
           baseClasses += useNavy ? "text-white/40 bg-transparent" : "text-muted-foreground/40 bg-transparent";
         } else if (isPast) {
-          baseClasses += "text-muted-foreground/40 bg-muted/20 border border-border/30 opacity-50 cursor-pointer";
+          // Unmarked past days: clean number without bounding box
+          baseClasses += useNavy ? "text-white/30 hover:bg-white/10 opacity-50 cursor-pointer" : "text-muted-foreground/40 hover:bg-muted/40 opacity-50 cursor-pointer";
         } else {
-          baseClasses += useNavy ? "bg-white/10 border border-white/15 hover:bg-white/25 cursor-pointer text-white font-bold" : "bg-card border border-border/60 hover:bg-muted/70 cursor-pointer text-foreground font-bold shadow-2xs";
+          // Unmarked days: clean number without bounding box
+          baseClasses += useNavy ? "text-white/80 hover:bg-white/15 cursor-pointer font-medium" : "text-foreground hover:bg-muted/60 cursor-pointer font-medium";
         }
       } else {
         if (isSelected) {
@@ -336,32 +342,49 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           }
         } else if (bookedLeave) {
           const type = bookedLeave.type;
-          if (['pl', 'el', 'rh'].includes(type)) {
-            const colorId = leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : 'green');
-            const theme = getLeaveTheme(colorId);
-            baseClasses += `${theme.bg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
-          } else if (type === 'wfh') {
+          if (type === 'wfh') {
             baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white font-bold" : "hover:bg-muted cursor-pointer text-foreground font-bold";
           } else if (type === 'office') {
             baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
+          } else {
+            // Universal leave coloring
+            const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
+            const colorId = cfg?.color || leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'blue');
+            const theme = getLeaveTheme(colorId);
+            baseClasses += `${theme.bg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
           }
         } else if (holidayInfo) {
           baseClasses += useNavy ? "bg-purple-500 text-white font-medium" : "bg-purple-200 text-purple-900 font-medium";
         } else if (weekend) {
-          baseClasses += useNavy ? "text-white/50 bg-white/10" : "text-muted-foreground bg-muted";
+          baseClasses += useNavy ? "text-white/40 bg-transparent" : "text-muted-foreground/40 bg-transparent";
         } else if (isPast) {
-          baseClasses += useNavy ? "text-white/30 bg-white/5 opacity-50 hover:opacity-70 hover:bg-white/10 cursor-pointer" : "text-muted-foreground/60 bg-muted/50 opacity-50 hover:opacity-70 hover:bg-muted cursor-pointer";
+          baseClasses += useNavy ? "text-white/30 opacity-50 hover:bg-white/10 cursor-pointer" : "text-muted-foreground/40 opacity-50 hover:bg-muted/50 cursor-pointer";
         } else {
-          baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90" : "hover:bg-muted cursor-pointer text-foreground";
+          baseClasses += useNavy ? "hover:bg-white/15 cursor-pointer text-white/90 font-medium" : "hover:bg-muted/60 cursor-pointer text-foreground font-medium";
         }
       }
 
       const isWfh = bookedLeave?.type === 'wfh';
 
       days.push(
-        <div key={`d-${i}`} id={`date-cell-${year}-${monthIndex}-${i}`} className={baseClasses} style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} title={holidayInfo ? holidayInfo.name : (isWfh ? (leaveNames.wfh || 'Work From Home') : (isPast ? 'Past date — click to log retroactive leave' : ''))}>
+        <div 
+          key={`d-${i}`} 
+          id={`date-cell-${year}-${monthIndex}-${i}`} 
+          className={baseClasses} 
+          style={isLarge ? { height: `${effectiveCellHeight}px` } : {}} 
+          onClick={(e) => { if (isInteractive) { e.stopPropagation(); handleDayClick(monthIndex, i); } }} 
+          title={
+            holidayInfo 
+              ? holidayInfo.name 
+              : (isWfh 
+                  ? (leaveNames.wfh || 'Work From Home') 
+                  : (bookedLeave 
+                      ? ((Array.isArray(leaveConfigs) && leaveConfigs.find(c => c.id === bookedLeave.type)?.name) || leaveNames[bookedLeave.type] || bookedLeave.type.toUpperCase()) 
+                      : (isPast ? 'Past date — click to log retroactive leave' : 'Click to log leave')))
+          }
+        >
           {isWfh && (
-            <span className={isMini ? `absolute top-0.5 right-0.5 w-1.5 h-1.5 ${getLeaveColor(leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none ring-1 ring-background/40` : `absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 ${getLeaveColor(leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none`} />
+            <span className={isMini ? `absolute top-0.5 right-0.5 w-1.5 h-1.5 ${getLeaveColor((Array.isArray(leaveConfigs) && leaveConfigs.find(c => c.id === 'wfh')?.color) || leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none ring-1 ring-background/40` : `absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 ${getLeaveColor((Array.isArray(leaveConfigs) && leaveConfigs.find(c => c.id === 'wfh')?.color) || leaveColors.wfh || 'cyan').bg} rounded-full shadow-sm z-20 pointer-events-none`} />
           )}
           <span className={isMini ? 'hidden md:inline' : ''}>{i}</span>
         </div>
@@ -592,6 +615,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             onConvertToLeave={handleConvertToLeave}
             leaves={leaves}
             leaveColors={leaveColors}
+            leaveConfigs={leaveConfigs}
             leaveNames={leaveNames}
             bookedDates={bookedDates}
             maxWfh={10}

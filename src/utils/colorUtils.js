@@ -9,6 +9,9 @@ export const COLOR_PALETTE = [
   { id: 'indigo', name: 'Indigo', bg: 'bg-indigo-500', text: 'text-indigo-500', border: 'border-indigo-500', badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', hex: '#6366f1' }
 ];
 
+// Selectable palette for user-configured leaves excludes cyan/teal (reserved exclusively for WFH)
+export const SELECTABLE_LEAVE_PALETTE = COLOR_PALETTE.filter(c => c.id !== 'cyan');
+
 export const getLeaveColor = (colorId = 'blue') => {
   return COLOR_PALETTE.find(c => c.id === colorId) || COLOR_PALETTE[0];
 };

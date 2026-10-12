@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { X, Shield } from 'lucide-react';
-import { COLOR_PALETTE } from '../utils/colorUtils';
+import { X, Shield, Plus, Minus } from 'lucide-react';
+import { COLOR_PALETTE, SELECTABLE_LEAVE_PALETTE } from '../utils/colorUtils';
+import { hapticSelectionTick, hapticLight } from '../utils/haptics';
 import ConsecutiveLimitControl from './ConsecutiveLimitControl';
 
 const AppleWheelPicker = ({ 
@@ -22,6 +23,7 @@ const AppleWheelPicker = ({
   const scrollRef = useRef(null);
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
+  const lastHapticValueRef = useRef(value);
   const itemHeight = 36;
 
   const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i);
@@ -30,6 +32,7 @@ const AppleWheelPicker = ({
   // Sync internal value with prop when not actively scrolling
   useEffect(() => {
     setInternalValue(value);
+    lastHapticValueRef.current = value;
     if (scrollRef.current && !isScrollingRef.current) {
       const selectedIndex = numbers.indexOf(value);
       if (selectedIndex !== -1) {
@@ -62,6 +65,11 @@ const AppleWheelPicker = ({
 
     if (selectedNum !== undefined && selectedNum !== internalValue) {
       setInternalValue(selectedNum);
+      // Sharp, focused haptic on every gear notch
+      if (selectedNum !== lastHapticValueRef.current) {
+        lastHapticValueRef.current = selectedNum;
+        hapticSelectionTick();
+      }
     }
 
     // Debounce calling the parent onChange so scroll momentum is never blocked
@@ -86,6 +94,8 @@ const AppleWheelPicker = ({
         behavior: 'smooth'
       });
       setInternalValue(num);
+      lastHapticValueRef.current = num;
+      hapticSelectionTick();
       if (onChange) onChange(num);
     }
   };
@@ -115,7 +125,10 @@ const AppleWheelPicker = ({
         {onRemove && (
           <button
             type="button"
-            onClick={onRemove}
+            onClick={() => {
+              hapticLight();
+              onRemove();
+            }}
             className="w-5 h-5 rounded-full bg-muted/60 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors cursor-pointer border border-border/40"
             title="Remove category"
           >
@@ -138,11 +151,14 @@ const AppleWheelPicker = ({
       {/* Color Swatches */}
       {onColorChange && (
         <div className="flex items-center justify-between gap-1 py-0.5">
-          {COLOR_PALETTE.map((c) => (
+          {SELECTABLE_LEAVE_PALETTE.map((c) => (
             <button
               key={c.id}
               type="button"
-              onClick={() => onColorChange(c.id)}
+              onClick={() => {
+                hapticLight();
+                onColorChange(c.id);
+              }}
               className={`w-4 h-4 rounded-full ${c.bg} transition-transform duration-150 cursor-pointer ${
                 color === c.id 
                   ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card scale-110' 
@@ -155,16 +171,49 @@ const AppleWheelPicker = ({
       )}
 
       {/* Compact Wheel Tumbler */}
-      <div className="relative h-28 w-full overflow-hidden rounded-xl bg-muted/30 border border-border/40 flex items-center justify-center select-none touch-pan-y">
+      <div className="relative h-28 w-full overflow-hidden rounded-xl bg-muted/30 border border-border/40 flex items-center justify-center select-none touch-pan-y group">
         
-        {/* Top & Bottom Fade Gradients */}
-        <div className="absolute top-0 inset-x-0 h-7 bg-gradient-to-b from-card via-card/80 to-transparent z-10 pointer-events-none" />
-        <div className="absolute bottom-0 inset-x-0 h-7 bg-gradient-to-t from-card via-card/80 to-transparent z-10 pointer-events-none" />
+        {/* Top & Bottom Fade Gradients with Apple depth */}
+        <div className="absolute top-0 inset-x-0 h-8 bg-gradient-to-b from-card via-card/75 to-transparent z-10 pointer-events-none" />
+        <div className="absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-card via-card/75 to-transparent z-10 pointer-events-none" />
         
-        {/* Central Selection Slot */}
-        <div className={`absolute h-9 inset-x-1.5 ${currentColor.badge} rounded-lg pointer-events-none z-0 shadow-inner`} />
+        {/* Central Selection Slot Lens */}
+        <div className={`absolute h-9 inset-x-1.5 ${currentColor.badge} rounded-lg pointer-events-none z-0 border-y border-foreground/15 dark:border-white/10 shadow-xs flex items-center justify-between px-2`} />
 
-        {/* Scrollable Number Wheel */}
+        {/* Quick Stepper Buttons inside Lens Slot */}
+        <div className="absolute inset-x-2.5 h-9 flex items-center justify-between pointer-events-none z-20">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (internalValue > min) {
+                selectNumber(internalValue - 1);
+              }
+            }}
+            disabled={internalValue <= min}
+            className="w-6 h-6 rounded-md bg-card/85 dark:bg-card/90 hover:bg-card text-muted-foreground hover:text-foreground border border-border/60 shadow-2xs flex items-center justify-center transition-all pointer-events-auto active:scale-90 disabled:opacity-20 disabled:pointer-events-none cursor-pointer"
+            title="Decrease by 1"
+          >
+            <Minus size={11} strokeWidth={2.5} />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (internalValue < max) {
+                selectNumber(internalValue + 1);
+              }
+            }}
+            disabled={internalValue >= max}
+            className="w-6 h-6 rounded-md bg-card/85 dark:bg-card/90 hover:bg-card text-muted-foreground hover:text-foreground border border-border/60 shadow-2xs flex items-center justify-center transition-all pointer-events-auto active:scale-90 disabled:opacity-20 disabled:pointer-events-none cursor-pointer"
+            title="Increase by 1"
+          >
+            <Plus size={11} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* Scrollable Number Wheel with 3D Tumbler Scale Curve */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}
@@ -173,15 +222,19 @@ const AppleWheelPicker = ({
         >
           {numbers.map((num) => {
             const isSelected = num === internalValue;
+            const distance = Math.abs(num - internalValue);
+
+            const styleClasses = isSelected 
+              ? `text-xl font-black ${currentColor.text} font-mono scale-110 opacity-100 z-10` 
+              : distance === 1
+                ? 'text-sm font-bold text-muted-foreground/60 font-mono scale-95 opacity-55'
+                : 'text-xs font-semibold text-muted-foreground/30 font-mono scale-85 opacity-25';
+
             return (
               <div
                 key={num}
                 onClick={() => selectNumber(num)}
-                className={`h-[36px] w-full max-w-full snap-center flex items-center justify-center gap-1 transition-transform duration-100 cursor-pointer select-none ${
-                  isSelected 
-                    ? `text-xl font-black ${currentColor.text} font-mono scale-110` 
-                    : 'text-xs font-bold text-muted-foreground/40 font-mono opacity-50 hover:opacity-80'
-                }`}
+                className={`h-[36px] w-full max-w-full snap-center flex items-center justify-center gap-1 transition-all duration-100 cursor-pointer select-none ${styleClasses}`}
               >
                 <span>{num}</span>
                 {isSelected && <span className="text-[9px] font-bold text-muted-foreground uppercase">{unit}</span>}

@@ -555,7 +555,7 @@ export default function HolidayManager({
       {showTitle && (
         <div className="flex-shrink-0 flex items-center justify-between pb-1.5 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+            <CalendarIcon className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-bold text-foreground">Company Public Holidays</h3>
             <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-primary/20 text-primary border border-primary/30">
               {activeList.length} Holidays
@@ -652,7 +652,7 @@ export default function HolidayManager({
 
           {/* SKELETON LOADING STATE FOR LIST */}
           {isUploading ? (
-            <div className="flex-1 max-h-[220px] md:max-h-none overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar min-h-0">
+            <div className="flex-1 min-h-[300px] max-h-[460px] md:max-h-none overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar">
               {[1, 2, 3, 4, 5, 6, 7].map((sk) => (
                 <div key={sk} className="p-2 bg-card/60 border border-border/50 rounded-xl animate-pulse flex items-center justify-between gap-2.5 shadow-2xs">
                   <div className="flex items-center gap-2 flex-1">
@@ -664,8 +664,8 @@ export default function HolidayManager({
               ))}
             </div>
           ) : (
-            /* Regular Holiday List Scroll Container - Full length on desktop, compact on mobile */
-            <div className="flex-1 max-h-[220px] md:max-h-none overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar overscroll-contain min-h-0">
+            /* Regular Holiday List Scroll Container - Full length on desktop, generous on mobile */
+            <div className="flex-1 min-h-[300px] max-h-[460px] md:max-h-none overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar overscroll-contain">
               {filteredList.length === 0 ? (
                 <div className="p-6 text-center bg-card/40 border border-border/60 rounded-xl text-muted-foreground text-xs flex flex-col items-center justify-center gap-1.5 my-auto">
                   <CalendarIcon className="w-5 h-5 text-muted-foreground/40" />
