@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar as CalendarIcon, List, Upload, Plus, Trash2, Edit2, 
-  Check, X, Sparkles, ChevronLeft, ChevronRight, AlertCircle, Search, FileText, Key
+  Check, X, Sparkles, ChevronLeft, ChevronRight, AlertCircle, Search, FileText, Key, ExternalLink
 } from 'lucide-react';
 import { extractHolidaysFromFile } from '../services/holidayExtractionService';
 import { defaultPublicHolidays, saveStoredHolidays, getStoredHolidays, deduplicateHolidays } from '../data/holidays';

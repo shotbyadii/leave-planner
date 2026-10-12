@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock, FileSpreadsheet, Plus, Trash2, Edit3, Info, Shield, Heart } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, ListTodo, RotateCw, Menu, X, Sparkles, Moon, Sun, Monitor, Check, AlertTriangle, Settings, User, ArrowLeft, ChevronLeft, Camera, Building2, SlidersHorizontal, ChevronRight, LogOut, ShieldCheck, Download, Upload, Save, CheckCircle2, FlaskConical, FileText, Table, Play, Clock, FileSpreadsheet, Plus, Trash2, Edit3, Info, Shield, Heart, Key, ExternalLink, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { publicHolidays, isHoliday, isWeekend, getStoredHolidays, loadHolidaysFromSupabase } from './data/holidays';
 import { checkSequentialELWarning } from './utils/leaveOptimizer';
@@ -43,6 +43,7 @@ import {
   getTutorialMonthIndex,
   SHORT_MONTH_NAMES
 } from './services/tutorialService';
+import { getMissingAttendanceDays } from './utils/attendanceCatchupUtils';
 import DemoBanner from './components/DemoBanner';
 import {
   getDemoUser,
@@ -61,6 +62,14 @@ import {
   subscribeUserToPush 
 } from './utils/notificationService';
 import { AiAssistantChatContent } from './components/AiAssistantModal';
+import { 
+  getStoredGeminiApiKey, 
+  setStoredGeminiApiKey, 
+  getStoredGeminiModel, 
+  setStoredGeminiModel, 
+  queryGeminiAssistant, 
+  AVAILABLE_MODELS 
+} from './services/aiAssistantService';
 import './index.css';
 
 function App() {
@@ -240,6 +249,31 @@ function App() {
   const [mobileNewSpecialColor, setMobileNewSpecialColor] = useState('pink');
   const [mobileNewSpecialIcon, setMobileNewSpecialIcon] = useState('heart');
   const [mobileToast, setMobileToast] = useState('');
+  const [mobileGeminiKey, setMobileGeminiKey] = useState(() => getStoredGeminiApiKey());
+  const [mobileSelectedModel, setMobileSelectedModel] = useState(() => getStoredGeminiModel());
+  const [mobileShowKeyPlain, setMobileShowKeyPlain] = useState(false);
+  const [mobileTestingGemini, setMobileTestingGemini] = useState(false);
+  const [mobileTestGeminiResult, setMobileTestGeminiResult] = useState(null);
+
+  const handleMobileTestGeminiKey = async () => {
+    if (!mobileGeminiKey.trim()) {
+      setMobileTestGeminiResult({ success: false, msg: 'Please enter a Gemini API Key first.' });
+      return;
+    }
+    setMobileTestingGemini(true);
+    setMobileTestGeminiResult(null);
+    try {
+      const res = await queryGeminiAssistant({
+        message: 'Ping: check connectivity and quota.',
+        customApiKey: mobileGeminiKey.trim()
+      });
+      setMobileTestGeminiResult({ success: true, msg: `Connected successfully using ${res.modelUsed || 'Gemini 2.5 Flash'}!` });
+    } catch (err) {
+      setMobileTestGeminiResult({ success: false, msg: `Test failed: ${err.message || 'Check your key.'}` });
+    } finally {
+      setMobileTestingGemini(false);
+    }
+  };
   const [isExportingMobile, setIsExportingMobile] = useState(false);
   const [isExportingCsvMobile, setIsExportingCsvMobile] = useState(false);
   const [isImportingMobile, setIsImportingMobile] = useState(false);
@@ -1159,33 +1193,45 @@ function App() {
   };
 
   const [wfhPromptHour, setWfhPromptHour] = useState(localStorage.getItem('wfh_prompt_hour') || '12');
+  const [attendanceCatchupMode, setAttendanceCatchupMode] = useState(localStorage.getItem('attendance_catchup_mode') || 'multi_day');
+  const [missingAttendanceDays, setMissingAttendanceDays] = useState([]);
 
-  // Auto-dismiss or suppress attendance modal whenever today's status is already recorded in bookedDates
+  // Auto-dismiss or suppress attendance modal whenever today's status or all missing days are logged
   useEffect(() => {
     if (!isLeavesLoaded) return;
-    const todayStr = getTodayStr();
-    const hasStatusRecorded = bookedDates.some(b => b.date === todayStr);
-    if (hasStatusRecorded) {
+    const effectiveToday = getTodayDate();
+    const missing = getMissingAttendanceDays({
+      todayDate: effectiveToday,
+      bookedDates,
+      promptHour: wfhPromptHour,
+      devDateOverride: devDateStr,
+      mode: attendanceCatchupMode
+    });
+    setMissingAttendanceDays(missing);
+    if (missing.length === 0) {
       setHasPromptedWfh(true);
       if (wfhModalOpen) {
         setWfhModalOpen(false);
       }
     }
-  }, [isLeavesLoaded, bookedDates, wfhModalOpen, devDateStr]);
+  }, [isLeavesLoaded, bookedDates, wfhModalOpen, devDateStr, wfhPromptHour, attendanceCatchupMode]);
 
-  // Daily Working Day Attendance Check-in Prompt
+  // Working Day Attendance Check-in & Catch-up Card Prompt
   useEffect(() => {
     if (!isLeavesLoaded) return;
 
     const checkAndTriggerAttendancePrompt = () => {
-      const todayStr = getTodayStr();
-      const isWorkday = !isWeekend(todayStr) && !isHoliday(todayStr);
-      const hasStatusRecorded = bookedDates.some(b => b.date === todayStr);
-      const now = getTodayDate();
-      const promptHourNum = parseInt(wfhPromptHour || '12', 10);
-      const isAfterPromptHour = devDateStr ? true : now.getHours() >= promptHourNum;
+      const effectiveToday = getTodayDate();
+      const missing = getMissingAttendanceDays({
+        todayDate: effectiveToday,
+        bookedDates,
+        promptHour: wfhPromptHour,
+        devDateOverride: devDateStr,
+        mode: attendanceCatchupMode
+      });
+      setMissingAttendanceDays(missing);
 
-      if (hasStatusRecorded) {
+      if (missing.length === 0) {
         setHasPromptedWfh(true);
         if (wfhModalOpen) {
           setWfhModalOpen(false);
@@ -1194,16 +1240,26 @@ function App() {
       }
 
       // Only prompt attendance if onboarding, tutorial, splash, and install modal are not active
-      if (isWorkday && !hasStatusRecorded && isAfterPromptHour && !hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
+      if (!hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
         setWfhModalOpen(true);
         setHasPromptedWfh(true);
 
+        const promptHourNum = parseInt(wfhPromptHour || '12', 10);
         const period = promptHourNum >= 12 ? 'PM' : 'AM';
         const displayH = promptHourNum > 12 ? promptHourNum - 12 : (promptHourNum === 0 ? 12 : promptHourNum);
-        showAppNotification('Daily Attendance Check-in', {
-          body: `It is past ${displayH} ${period}. Please confirm if today (${todayStr}) is WFH or In-Office.`,
-          tag: `wfh-checkin-${todayStr}`
-        });
+        const todayStr = getTodayStr();
+
+        if (missing.length > 1) {
+          showAppNotification('Attendance Catch-up', {
+            body: `You have ${missing.length} unlogged days in the current month. Swipe through your catch-up cards to record attendance.`,
+            tag: `wfh-catchup-${todayStr}`
+          });
+        } else {
+          showAppNotification('Daily Attendance Check-in', {
+            body: `It is past ${displayH} ${period}. Please confirm if today (${todayStr}) is WFH or In-Office.`,
+            tag: `wfh-checkin-${todayStr}`
+          });
+        }
       }
     };
 
@@ -1233,27 +1289,53 @@ function App() {
       window.removeEventListener('focus', handleSyncAndCheck);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, onboardingOpen, isTutorialActive, installModalOpen, showSplash, wfhModalOpen, currentUser]);
+  }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, attendanceCatchupMode, onboardingOpen, isTutorialActive, installModalOpen, showSplash, wfhModalOpen, currentUser]);
 
-  const handleWfhStatusSelect = async (statusType) => {
-    const todayStr = getTodayStr();
-    setHasPromptedWfh(true);
-    setWfhModalOpen(false);
-    await addLeave(todayStr, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
+  const handleWfhStatusSelect = async (statusType, targetDateStr = null) => {
+    const targetDate = targetDateStr || getTodayStr();
+    await addLeave(targetDate, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
     await loadLeaves();
+    
+    // Update local missing days list
+    setMissingAttendanceDays(prev => {
+      const updated = prev.filter(d => d !== targetDate);
+      if (updated.length === 0) {
+        setHasPromptedWfh(true);
+        setWfhModalOpen(false);
+      }
+      return updated;
+    });
+
     try {
       const bc = new BroadcastChannel('leave-vault-sync');
-      bc.postMessage({ type: 'LEAVES_UPDATED', todayStr, statusType });
+      bc.postMessage({ type: 'LEAVES_UPDATED', todayStr: targetDate, statusType });
       bc.close();
     } catch (e) {}
   };
 
-  const handleWfhMarkLeave = () => {
-    const todayStr = getTodayStr();
+  const handleBatchWfhStatusSelect = async (statusType, targetDates = []) => {
+    if (!Array.isArray(targetDates) || targetDates.length === 0) return;
+    for (const d of targetDates) {
+      await addLeave(d, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
+    }
+    await loadLeaves();
+    setMissingAttendanceDays(prev => prev.filter(d => !targetDates.includes(d)));
+    setHasPromptedWfh(true);
+    setWfhModalOpen(false);
+
+    try {
+      const bc = new BroadcastChannel('leave-vault-sync');
+      bc.postMessage({ type: 'LEAVES_UPDATED', batch: true, statusType });
+      bc.close();
+    } catch (e) {}
+  };
+
+  const handleWfhMarkLeave = (targetDateStr = null) => {
+    const targetDate = targetDateStr || getTodayStr();
     setWfhModalOpen(false);
     setActiveTab('calendar');
-    setSelectionStart(todayStr);
-    setPreviewDates([todayStr]);
+    setSelectionStart(targetDate);
+    setPreviewDates([targetDate]);
     setMobileConfirmOpen(true);
   };
 
@@ -1430,7 +1512,7 @@ function App() {
     });
   };
 
-  const handleSaveSettings = async ({ name, companyName, companyLogoUrl, avatarUrl, quotas, names, colors, leaveConfigs: newLeaveConfigs, wfhPromptHour: newPromptHour }) => {
+  const handleSaveSettings = async ({ name, companyName, companyLogoUrl, avatarUrl, quotas, names, colors, leaveConfigs: newLeaveConfigs, wfhPromptHour: newPromptHour, attendanceCatchupMode: newCatchupMode }) => {
     if (name) {
       setUserName(name);
       localStorage.setItem('user_name', name);
@@ -1458,6 +1540,10 @@ function App() {
       if (!isTutorialActive && !onboardingOpen) {
         setHasPromptedWfh(false);
       }
+    }
+    if (newCatchupMode !== undefined) {
+      setAttendanceCatchupMode(newCatchupMode);
+      localStorage.setItem('attendance_catchup_mode', newCatchupMode);
     }
     if (newLeaveConfigs) {
       setLeaveConfigs(newLeaveConfigs);
@@ -2575,6 +2661,7 @@ function App() {
                     <SegmentedPolicyTabs
                       tabs={[
                         { id: 'quotas', label: 'Quotas', icon: SlidersHorizontal },
+                        { id: 'ai', label: 'Calendar AI', icon: Sparkles },
                         { id: 'holidays', label: 'Public Holidays', icon: Clock },
                         { id: 'backup', label: 'Backups', icon: FileText }
                       ]}
@@ -2786,6 +2873,26 @@ function App() {
                                     })}
                                   </select>
                                 </div>
+
+                                  {/* Attendance Catch-up Prompt Mode */}
+                                  <div className="p-2.5 bg-muted/40 border border-border/80 rounded-xl flex justify-between items-center">
+                                    <div className="flex flex-col min-w-0 pr-2">
+                                      <span className="text-xs font-bold text-foreground truncate">Catch-up Card Mode</span>
+                                      <span className="text-[10px] text-muted-foreground truncate">Multi-day stack or Today only</span>
+                                    </div>
+                                    <select
+                                      value={attendanceCatchupMode}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setAttendanceCatchupMode(val);
+                                        localStorage.setItem('attendance_catchup_mode', val);
+                                      }}
+                                      className="bg-card border border-border rounded-lg px-2 py-1 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                                    >
+                                      <option value="multi_day">Multi-day Cards</option>
+                                      <option value="current_day">Today Only</option>
+                                    </select>
+                                  </div>
                               </motion.div>
                             )}
 
@@ -3118,6 +3225,163 @@ function App() {
                         </motion.div>
                       )}
 
+                      {mobileSettingsTab === 'ai' && (
+                        <motion.div
+                          key="tab-ai"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex flex-col gap-3.5"
+                        >
+                          {/* Overview Banner */}
+                          <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="p-2 bg-primary/10 text-primary rounded-xl flex-shrink-0">
+                                <Sparkles size={16} />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-bold text-foreground leading-tight truncate">Bring Your Own API Key</h4>
+                                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                                  Private • Stored locally in browser
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                              mobileGeminiKey.trim() 
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                            }`}>
+                              {mobileGeminiKey.trim() ? 'Active ✓' : 'No Key'}
+                            </span>
+                          </div>
+
+                          {/* API Key Input */}
+                          <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                                <Key size={13} className="text-primary" /> API Key
+                              </label>
+                              <a 
+                                href="https://aistudio.google.com/app/apikey" 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                              >
+                                Get free key <ExternalLink size={10} />
+                              </a>
+                            </div>
+
+                            <div className="relative flex items-center">
+                              <input
+                                type={mobileShowKeyPlain ? 'text' : 'password'}
+                                value={mobileGeminiKey}
+                                onChange={(e) => setMobileGeminiKey(e.target.value)}
+                                placeholder="Paste Gemini API key..."
+                                className="w-full bg-card border border-border rounded-xl px-3 pr-16 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner"
+                              />
+                              <div className="absolute right-1.5 flex items-center gap-0.5">
+                                {mobileGeminiKey && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setMobileGeminiKey('')}
+                                    title="Clear Key"
+                                    className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setMobileShowKeyPlain(!mobileShowKeyPlain)}
+                                  title={mobileShowKeyPlain ? "Hide Key" : "Show Key"}
+                                  className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                >
+                                  {mobileShowKeyPlain ? <EyeOff size={13} /> : <Eye size={13} />}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-0.5">
+                              <button
+                                type="button"
+                                onClick={handleMobileTestGeminiKey}
+                                disabled={mobileTestingGemini || !mobileGeminiKey.trim()}
+                                className="px-3 py-1.5 bg-card border border-border hover:bg-muted text-foreground disabled:opacity-40 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                              >
+                                {mobileTestingGemini ? <Loader2 size={12} className="animate-spin text-primary" /> : <Sparkles size={12} className="text-primary" />}
+                                {mobileTestingGemini ? 'Testing...' : 'Test Key'}
+                              </button>
+                              <span className="text-[10px] text-muted-foreground">
+                                Never sent to our servers
+                              </span>
+                            </div>
+
+                            {mobileTestGeminiResult && (
+                              <div className={`p-2.5 rounded-xl border text-[11px] flex gap-2 items-center ${
+                                mobileTestGeminiResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+                              }`}>
+                                {mobileTestGeminiResult.success ? <CheckCircle2 size={14} className="flex-shrink-0" /> : <AlertCircle size={14} className="flex-shrink-0" />}
+                                <span className="font-medium truncate">{mobileTestGeminiResult.msg}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Model Selection */}
+                          <div className="bg-muted/40 border border-border/80 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                                <SlidersHorizontal size={13} className="text-primary" /> Active Model
+                              </label>
+                              <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                {AVAILABLE_MODELS.find(m => m.id === mobileSelectedModel)?.name || 'Gemini 2.5 Flash'}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-1.5">
+                              {AVAILABLE_MODELS.map((m) => {
+                                const isSelected = mobileSelectedModel === m.id;
+                                return (
+                                  <div
+                                    key={m.id}
+                                    onClick={() => setMobileSelectedModel(m.id)}
+                                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                                      isSelected
+                                        ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20'
+                                        : 'bg-card hover:bg-muted/60 border-border/70'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
+                                        isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/50'
+                                      }`}>
+                                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                      </div>
+                                      <div className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-xs font-bold text-foreground truncate">
+                                            {m.name}
+                                          </span>
+                                          <span className="text-[8px] font-mono font-bold uppercase px-1 py-0.2 rounded bg-muted text-muted-foreground border border-border/80">
+                                            {m.badge}
+                                          </span>
+                                        </div>
+                                        <span className="text-[9px] text-muted-foreground truncate">
+                                          {m.desc}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-muted-foreground flex-shrink-0">
+                                      {m.speed}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
                       {mobileSettingsTab === 'holidays' && (
                         <motion.div
                           key="tab-holidays"
@@ -3278,6 +3542,8 @@ function App() {
                         <button 
                           type="button" 
                           onClick={() => {
+                            setStoredGeminiApiKey(mobileGeminiKey.trim());
+                            setStoredGeminiModel(mobileSelectedModel);
                             handleSaveSettings({
                               name: mobileFormName,
                               companyName: mobileFormCompany,
@@ -4170,10 +4436,12 @@ function App() {
             isOpen={wfhModalOpen && !isTutorialActive && !onboardingOpen && !showSplash}
             onClose={() => setWfhModalOpen(false)}
             onSelectStatus={handleWfhStatusSelect}
+            onBatchSelectStatus={handleBatchWfhStatusSelect}
             onMarkLeave={handleWfhMarkLeave}
             wfhUsedThisMonth={wfhUsedThisMonth}
             maxWfh={10}
             todayStr={todayStr}
+            missingDays={missingAttendanceDays}
             bookedDates={bookedDates}
             leaveConfigs={leaveConfigs}
             leaveNames={leaveNames}
@@ -4219,6 +4487,7 @@ function App() {
             leaveColors={leaveColors}
             leaveConfigs={leaveConfigs}
             wfhPromptHour={wfhPromptHour}
+            attendanceCatchupMode={attendanceCatchupMode}
             onSaveSettings={handleSaveSettings}
             currentUser={currentUser}
             onOpenAuthModal={() => setAuthModalOpen(true)}

@@ -2,6 +2,35 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.4] - 2026-10-12
+### Added
+- **Multi-Day Attendance Catch-Up Cards**:
+  - Month-scanning engine (`attendanceCatchupUtils.js`) to detect all unlogged working days in the current month.
+  - Interactive 3D tilted card stack in `WfhCheckinModal` with horizontal swipe gestures (`dragElastic`, flick velocity, and distance thresholds).
+  - Visual side-peeking preview cards on left and right flanks (scaled down, half-opacity with day and weekday badges) indicating horizontal swipe affordance.
+  - Interactive pagination pill bar below the card stack for direct day jumping.
+  - Configurable in Settings (`attendanceCatchupMode`): toggle between `Multi-Day Catch-up` and `Current Day Only`.
+- **Mobile AI & API Key Management**:
+  - Full desktop feature parity in mobile settings drawer with dedicated Calendar AI tab (custom key input, test connection, model selection).
+- **Automated Zero-Click Error Diagnostics**:
+  - Integrated `public.error_logs` table in Supabase with RLS policies.
+  - Automatic background error logging on unhandled application failures without requiring any user action.
+  - Privacy-preserving error boundary: raw stack trace hidden in production, visible only to developer (`krshnaditya2@gmail.com`, localhost, or `?dev=true`).
+  - Pre-filled "Report to Dev" direct email action with diagnostic context.
+
+### Changed
+- **Decluttered Check-In Modal UX**:
+  - Simplified header title to `Day X of Y` (removed verbose `Catch-up` and `remaining` text).
+  - Removed duplicate navigation counter between chevrons.
+  - Removed redundant `Skip` and batch action buttons for high CTA clarity.
+  - Cleaned up bottom navigation hints, keeping only the minimal pagination dots.
+
+### Fixed
+- **API Key Scoping**: Removed accidental global development API key assignment across new accounts.
+- **Missing Imports**: Fixed `ReferenceError: ExternalLink is not defined` in `HolidayManager.jsx`.
+
+---
+
 ## [v0.8.3] - 2026-10-12
 ### Added
 - **Desktop Header Redesign**: Compact topbar architecture with segmented policy tier switchers (`Annual`, `Special`, `Remote`), user profile dropdown, and streamlined actions.

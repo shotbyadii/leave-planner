@@ -45,6 +45,7 @@ const SettingsModal = ({
   leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
   leaveConfigs: propLeaveConfigs = null,
   wfhPromptHour: propWfhPromptHour = '12',
+  attendanceCatchupMode: propCatchupMode = 'multi_day',
   onSaveSettings,
   currentUser = null,
   onOpenAuthModal,
@@ -61,6 +62,7 @@ const SettingsModal = ({
   const [companyName, setCompanyName] = useState(propCompanyName);
   const [avatarUrl, setAvatarUrl] = useState(propAvatarUrl);
   const [wfhPromptHour, setWfhPromptHour] = useState(propWfhPromptHour || localStorage.getItem('wfh_prompt_hour') || '12');
+  const [attendanceCatchupMode, setAttendanceCatchupMode] = useState(propCatchupMode || localStorage.getItem('attendance_catchup_mode') || 'multi_day');
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -218,6 +220,7 @@ const SettingsModal = ({
     companyName.trim() !== (propCompanyName || '').trim() ||
     avatarUrl !== propAvatarUrl ||
     String(wfhPromptHour) !== String(propWfhPromptHour || '12') ||
+    attendanceCatchupMode !== (propCatchupMode || 'multi_day') ||
     geminiKey.trim() !== getStoredGeminiApiKey() ||
     selectedModel !== getStoredGeminiModel() ||
     JSON.stringify(currentConfigs) !== initialSerializedConfigs
@@ -228,6 +231,7 @@ const SettingsModal = ({
     setCompanyName(propCompanyName || '');
     setAvatarUrl(propAvatarUrl || '');
     setWfhPromptHour(propWfhPromptHour || '12');
+    setAttendanceCatchupMode(propCatchupMode || 'multi_day');
     setGeminiKey(getStoredGeminiApiKey());
     setSelectedModel(getStoredGeminiModel());
     setCurrentConfigs(buildInitialLeaveConfigs({
@@ -284,6 +288,7 @@ const SettingsModal = ({
       setCompanyName(propCompanyName);
       setAvatarUrl(propAvatarUrl);
       setWfhPromptHour(propWfhPromptHour || localStorage.getItem('wfh_prompt_hour') || '12');
+      setAttendanceCatchupMode(propCatchupMode || localStorage.getItem('attendance_catchup_mode') || 'multi_day');
       setCurrentQuotas({ ...quotas });
       setCurrentNames({ ...leaveNames });
       setCurrentColors({ ...leaveColors });
@@ -291,7 +296,7 @@ const SettingsModal = ({
       setShowResetConfirm(false);
       setBackupStatusMsg(null);
     }
-  }, [isOpen, userName, propCompanyName, propAvatarUrl, propWfhPromptHour, JSON.stringify(quotas), JSON.stringify(leaveNames), JSON.stringify(leaveColors)]);
+  }, [isOpen, userName, propCompanyName, propAvatarUrl, propWfhPromptHour, propCatchupMode, JSON.stringify(quotas), JSON.stringify(leaveNames), JSON.stringify(leaveColors)]);
 
   if (!isOpen) return null;
 
@@ -318,6 +323,7 @@ const SettingsModal = ({
   const handleSave = () => {
     setStoredGeminiApiKey(geminiKey.trim());
     setStoredGeminiModel(selectedModel);
+    localStorage.setItem('attendance_catchup_mode', attendanceCatchupMode);
 
     const updatedQuotas = {};
     const updatedNames = {};
@@ -338,7 +344,8 @@ const SettingsModal = ({
         names: updatedNames,
         colors: updatedColors,
         leaveConfigs: currentConfigs,
-        wfhPromptHour: String(wfhPromptHour)
+        wfhPromptHour: String(wfhPromptHour),
+        attendanceCatchupMode: attendanceCatchupMode
       });
     }
     setSavedSuccess(true);
@@ -1450,6 +1457,48 @@ const SettingsModal = ({
                         );
                       })}
                     </select>
+                  </div>
+
+                  {/* Attendance Catch-up Mode (Multi-day card stack vs Current day only) */}
+                  <div className="bg-muted/30 border border-border/60 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                        <Clock size={14} className="text-cyan-500" /> Attendance Catch-up Prompt Mode
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                        When unlogged workdays exist in current month: swipe through card stack or only ask for today
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-card border border-border p-1 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttendanceCatchupMode('multi_day');
+                          localStorage.setItem('attendance_catchup_mode', 'multi_day');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          attendanceCatchupMode === 'multi_day'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Multi-Day Cards
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttendanceCatchupMode('current_day');
+                          localStorage.setItem('attendance_catchup_mode', 'current_day');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          attendanceCatchupMode === 'current_day'
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Today Only
+                      </button>
+                    </div>
                   </div>
 
                   {/* Web Push Background Notifications Card */}

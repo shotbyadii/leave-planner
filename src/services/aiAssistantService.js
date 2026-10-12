@@ -120,10 +120,10 @@ export const setStoredGeminiModel = (modelId) => {
   localStorage.setItem('gemini_preferred_model', modelId);
 };
 
-export const DEFAULT_DEV_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+export const DEFAULT_DEV_KEY = '';
 
 export const getStoredGeminiApiKey = () => {
-  if (typeof window === 'undefined') return DEFAULT_DEV_KEY;
+  if (typeof window === 'undefined') return '';
   if (localStorage.getItem('gemini_api_key_cleared') === 'true') {
     return '';
   }
@@ -131,7 +131,7 @@ export const getStoredGeminiApiKey = () => {
   if (localKey && localKey.trim()) {
     return localKey.trim();
   }
-  return DEFAULT_DEV_KEY;
+  return '';
 };
 
 export const setStoredGeminiApiKey = (key) => {
