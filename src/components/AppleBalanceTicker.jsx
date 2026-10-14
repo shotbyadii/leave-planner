@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, AlertTriangle, AlertCircle, Sparkles, Building2, Home, Calendar, RotateCcw } from 'lucide-react';
 import { getShortform } from '../utils/colorUtils';
+import { hapticTickerStep, hapticYes, hapticSuccess } from '../utils/haptics';
 
 /**
  * AppleBalanceTicker
@@ -111,6 +112,7 @@ const AppleBalanceTicker = ({
     if (isOffice || diff === 0) {
       setCurrentValue(targetValue);
       setIsDoneTicking(true);
+      hapticYes();
       dismissTimerRef.current = setTimeout(() => {
         if (onCompleteRef.current) onCompleteRef.current();
       }, autoDismissMs);
@@ -134,9 +136,13 @@ const AppleBalanceTicker = ({
             current = targetValue;
             clearInterval(timerRef.current);
             setIsDoneTicking(true);
+            hapticTickerStep(current, totalQuota);
+            setTimeout(() => hapticSuccess(), 90);
             dismissTimerRef.current = setTimeout(() => {
               if (onCompleteRef.current) onCompleteRef.current();
             }, autoDismissMs);
+          } else {
+            hapticTickerStep(current, totalQuota);
           }
         } else {
           current += 1;
@@ -144,9 +150,13 @@ const AppleBalanceTicker = ({
             current = targetValue;
             clearInterval(timerRef.current);
             setIsDoneTicking(true);
+            hapticTickerStep(current, totalQuota);
+            setTimeout(() => hapticSuccess(), 90);
             dismissTimerRef.current = setTimeout(() => {
               if (onCompleteRef.current) onCompleteRef.current();
             }, autoDismissMs);
+          } else {
+            hapticTickerStep(current, totalQuota);
           }
         }
         setCurrentValue(Number(current.toFixed(1)));
@@ -158,7 +168,7 @@ const AppleBalanceTicker = ({
       if (timerRef.current) clearInterval(timerRef.current);
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
-  }, [initialValue, targetValue, diff, isOffice, autoDismissMs]);
+  }, [initialValue, targetValue, diff, isOffice, autoDismissMs, totalQuota]);
 
   // Color & Theme calculations based on the live current value
   const isDepleted = currentValue <= 0;

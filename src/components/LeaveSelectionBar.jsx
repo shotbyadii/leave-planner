@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Check, X, AlertTriangle, ArrowRight, Sparkles, SlidersHorizontal, ShieldAlert, Heart, Calendar, Clock } from 'lucide-react';
 import { isHoliday, isWeekend, publicHolidays } from '../data/holidays';
 import { TimePicker } from './TimePicker';
@@ -7,6 +7,7 @@ import AppleBalanceTicker from './AppleBalanceTicker';
 import { getShortform, getLeaveColor, getLeaveTheme } from '../utils/colorUtils';
 import { DEFAULT_LEAVE_CONFIGS, checkLeaveConstraints, buildInitialLeaveConfigs } from '../services/leaveConfigService';
 import SegmentedPolicyTabs, { MorphingTabContent } from './SegmentedPolicyTabs';
+import { hapticYes, hapticNo, hapticSelectionTick } from '../utils/haptics';
 
 const LeaveSelectionBar = ({ 
   selectionStart, 
@@ -27,7 +28,26 @@ const LeaveSelectionBar = ({
 }) => {
   const isTutorialMode = Boolean(onAdvanceTutorial);
 
-  const dates = previewDates.length > 0 ? previewDates : (selectionStart ? [selectionStart] : []);
+  const rawDates = previewDates.length > 0 ? previewDates : (selectionStart ? [selectionStart] : []);
+  const isVisible = rawDates.length > 0;
+
+  // Cache last active selection so the exit animation preserves the pill text and buttons while sliding out
+  const lastSelectionRef = useRef({
+    selectionStart,
+    previewDates,
+    dates: rawDates
+  });
+  if (isVisible) {
+    lastSelectionRef.current = {
+      selectionStart,
+      previewDates,
+      dates: rawDates
+    };
+  }
+
+  const activeSelectionStart = isVisible ? selectionStart : lastSelectionRef.current.selectionStart;
+  const activePreviewDates = isVisible ? previewDates : lastSelectionRef.current.previewDates;
+  const dates = isVisible ? rawDates : lastSelectionRef.current.dates;
   const targetMonthKey = (dates[0] || '').substring(0, 7) || new Date().toISOString().substring(0, 7);
 
   // Active configurations for all categories
@@ -173,9 +193,14 @@ const LeaveSelectionBar = ({
     }
   }, [isExpanded]);
 
-  if (dates.length === 0) return null;
+  useEffect(() => {
+    if (!isVisible) {
+      setIsExpanded(false);
+    }
+  }, [isVisible]);
 
   const handleApply = () => {
+    hapticYes();
     if (isTutorialMode) {
       onApply(dates, selectedType || 'pl', note, planName || defaultName, durationPerDay);
       setIsExpanded(false);
@@ -236,7 +261,7 @@ const LeaveSelectionBar = ({
   return (
     <>
       <AnimatePresence>
-        {isExpanded && (
+        {isVisible && isExpanded && (
           <motion.div 
             id="leave-modal-backdrop"
             initial={{ opacity: 0 }}
@@ -249,7 +274,7 @@ const LeaveSelectionBar = ({
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
-        {isExpanded ? (
+        {isVisible && (isExpanded ? (
           <motion.div 
             key="expanded-modal"
             id="leave-creation-modal"
@@ -517,7 +542,6 @@ const LeaveSelectionBar = ({
           <motion.div
             key="collapsed-pill"
             id="tutorial-step-selection-bar"
-            layout
             initial={{ opacity: 0, y: 50, x: "-50%" }}
             animate={{ opacity: 1, y: 0, x: "-50%" }}
             exit={{ opacity: 0, y: 50, x: "-50%" }}
@@ -525,12 +549,12 @@ const LeaveSelectionBar = ({
             className="hidden md:flex fixed bottom-8 left-1/2 bg-foreground text-background w-fit md:max-w-2xl h-[56px] px-4 rounded-full shadow-2xl shadow-black/80 border border-border/20 z-[9992] overflow-visible items-center justify-between gap-6"
           >
             <motion.div layout className="flex items-center gap-3 flex-1">
-              {selectionStart && previewDates.length === 0 ? (
+              {activeSelectionStart && activePreviewDates.length === 0 ? (
                 <div className="flex items-center gap-2.5">
                    <div className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse flex-shrink-0"></div>
                    <div className="flex flex-col">
                      <span className="text-xs font-bold text-background leading-none">
-                       Selected {new Date(selectionStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                       Selected {new Date(activeSelectionStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                      </span>
                      <span className="text-[10px] text-background/70 leading-none mt-1">
                        Select end date for range, or apply 1 day directly.
@@ -554,7 +578,7 @@ const LeaveSelectionBar = ({
               >
                 Cancel
               </button>
-              {selectionStart && previewDates.length === 0 && (
+              {activeSelectionStart && activePreviewDates.length === 0 && (
                 <button 
                   onClick={() => setIsExpanded(true)}
                   className="flex items-center gap-1.5 text-xs font-bold text-foreground bg-background hover:bg-muted px-4 py-2 rounded-full shadow-md transition-colors whitespace-nowrap cursor-pointer"
@@ -562,7 +586,7 @@ const LeaveSelectionBar = ({
                   Apply Single Day <Check size={14} strokeWidth={3} />
                 </button>
               )}
-              {previewDates.length > 0 && (
+              {activePreviewDates.length > 0 && (
                 <button 
                   id="tutorial-step-confirm-plan-btn"
                   onClick={(e) => {
@@ -577,7 +601,7 @@ const LeaveSelectionBar = ({
               )}
             </motion.div>
           </motion.div>
-        )}
+        ))}
       </AnimatePresence>
     </>
   );

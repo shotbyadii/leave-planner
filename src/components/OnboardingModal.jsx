@@ -99,8 +99,8 @@ const OnboardingModal = ({ isOpen, onClose, onComplete, initialName = '', leaveC
     const perm = await requestNotificationPermission();
     if (perm === 'granted') {
       setNotifGranted(true);
-      showAppNotification('Attendance Reminders Enabled', {
-        body: `Daily check-in reminders set for ${wfhPromptHour}:00.`,
+      showAppNotification('Leave Vault', {
+        body: `Attendance Reminders Enabled! Daily check-in reminders set for ${wfhPromptHour}:00.`,
         tag: 'onboarding-welcome'
       });
     }

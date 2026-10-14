@@ -33,6 +33,7 @@ import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from './utils/specialBene
 import { buildInitialLeaveConfigs, checkLeaveConstraints, deriveShortCode } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
+import { initGlobalHaptics, hapticDateRangeCascade, hapticYes, hapticNo, hapticSelectionTick } from './utils/haptics';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from './utils/dataMigration';
 import { getCompanyLogoUrl, getCompanyInitials } from './utils/companyLogoUtils';
 import TutorialOverlay from './components/TutorialOverlay';
@@ -529,6 +530,11 @@ function App() {
       }
     }
   }, [mobileLeaveType, previewDates.length, selectedMobileBal, allowsHalfDayMobile]);
+
+  // System-wide tactile button haptics listener (Yes / No / Tab / Button clicks)
+  useEffect(() => {
+    return initGlobalHaptics();
+  }, []);
 
   // Keep mobile modal active tab in sync and pre-select available category if current has zero balance
   useEffect(() => {
@@ -1250,13 +1256,13 @@ function App() {
         const todayStr = getTodayStr();
 
         if (missing.length > 1) {
-          showAppNotification('Attendance Catch-up', {
-            body: `You have ${missing.length} unlogged days in the current month. Swipe through your catch-up cards to record attendance.`,
+          showAppNotification('Leave Vault', {
+            body: `Attendance Catch-up: You have ${missing.length} unlogged days this month. Swipe through your cards to record attendance.`,
             tag: `wfh-catchup-${todayStr}`
           });
         } else {
-          showAppNotification('Daily Attendance Check-in', {
-            body: `It is past ${displayH} ${period}. Please confirm if today (${todayStr}) is WFH or In-Office.`,
+          showAppNotification('Leave Vault', {
+            body: `Daily Check-in: It is past ${displayH} ${period}. Please confirm if today (${todayStr}) is WFH or In-Office.`,
             tag: `wfh-checkin-${todayStr}`
           });
         }
@@ -1736,6 +1742,9 @@ function App() {
   };
 
   const handlePreviewRange = (datesArray, holidayName = null, options = {}) => {
+    if (Array.isArray(datesArray) && datesArray.length > 0) {
+      hapticDateRangeCascade(datesArray.length);
+    }
     setActiveTab('calendar');
     setSuggestedPlanName(holidayName || null);
     setPreviewDates(datesArray || []);
@@ -1797,6 +1806,7 @@ function App() {
   }, [previewDates.length, suggestedPlanName, previewDates[0]]);
 
   const handleMobileApply = async () => {
+    hapticYes();
     if (isTutorialActive) {
       // Sandboxed demo plan for tutorial mode: do NOT write to real database
       const chosenName = mobilePlanName || defaultTutorialPlanName;
@@ -2277,31 +2287,22 @@ function App() {
                     leaveConfigs={leaveConfigs}
                     onClearAiPreview={handleClearAiPreview}
                   />
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div 
-                      key={`mobile-panel-${calendarViewMode}-${calendarFocusedMonth}`}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.18, ease: "easeInOut" }}
-                      className="md:hidden bg-card border border-border rounded-2xl shadow-apple-sm overflow-hidden flex-shrink-0"
-                    >
-                      <OptimizerPanel 
-                        onPreviewRange={handlePreviewRange} 
-                        onHoverSuggestion={setHoveredSuggestion}
-                        bookedDates={bookedDates}
-                        viewMode={calendarViewMode}
-                        setFocusedMonth={setCalendarFocusedMonth}
-                        inlineOnMobile={true}
-                        leaves={leaves}
-                        leaveNames={leaveNames}
-                        leavePlans={leavePlans}
-                        companyName={companyName}
-                        onOpenSettings={(tab = 'profile') => { setSettingsInitialTab(tab); setSettingsModalOpen(true); }}
-                        onExecuteAction={handleExecuteAiAction}
-                      />
-                    </motion.div>
-                  </AnimatePresence>
+                  <div className="md:hidden bg-card border border-border rounded-2xl shadow-apple-sm overflow-hidden flex-shrink-0">
+                    <OptimizerPanel 
+                      onPreviewRange={handlePreviewRange} 
+                      onHoverSuggestion={setHoveredSuggestion}
+                      bookedDates={bookedDates}
+                      viewMode={calendarViewMode}
+                      setFocusedMonth={setCalendarFocusedMonth}
+                      inlineOnMobile={true}
+                      leaves={leaves}
+                      leaveNames={leaveNames}
+                      leavePlans={leavePlans}
+                      companyName={companyName}
+                      onOpenSettings={(tab = 'profile') => { setSettingsInitialTab(tab); setSettingsModalOpen(true); }}
+                      onExecuteAction={handleExecuteAiAction}
+                    />
+                  </div>
                 </motion.div>
               )}
               {activeTab === 'tracker' && (
@@ -2443,7 +2444,7 @@ function App() {
               <motion.div key="menu"
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.18, ease: "easeInOut" }}
-                className="max-h-[min(88dvh,calc(100dvh-2.5rem-env(safe-area-inset-bottom,0px)))] flex flex-col overflow-hidden"
+                className={`${mobileSubView ? 'h-[min(90dvh,calc(100dvh-1.5rem-env(safe-area-inset-bottom,0px)))]' : 'max-h-[min(88dvh,calc(100dvh-2.5rem-env(safe-area-inset-bottom,0px)))]'} flex flex-col overflow-hidden`}
               >
                 {/* Handle */}
                 <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
@@ -2673,7 +2674,7 @@ function App() {
                   </div>
 
                   {/* Scrollable Tab Content Body */}
-                  <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2.5 pb-4 flex flex-col gap-3 no-scrollbar overscroll-contain">
+                  <div className={`flex-1 min-h-0 ${mobileSettingsTab === 'holidays' ? 'overflow-hidden py-1.5 pb-2.5' : 'overflow-y-auto py-2.5 pb-4'} px-4 flex flex-col gap-3 no-scrollbar overscroll-contain`}>
                     <AnimatePresence mode="wait">
                       {mobileSettingsTab === 'quotas' && (
                         <motion.div
@@ -2756,45 +2757,47 @@ function App() {
                                   ))}
                                 </div>
 
-                                {/* Add Custom Annual Category */}
-                                {showMobileAddAnnual ? (
-                                  <div className="p-3 bg-muted/40 border border-border rounded-xl flex flex-col gap-2">
-                                    <span className="text-[11px] font-bold text-foreground font-mono">New Annual Leave Category</span>
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        placeholder="e.g. Sabbatical, Floating"
-                                        value={mobileNewAnnualName}
-                                        onChange={(e) => setMobileNewAnnualName(e.target.value)}
-                                        className="flex-1 bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none"
-                                        autoFocus
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={handleMobileAddAnnual}
-                                        className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer active:scale-95 transition-all"
-                                      >
-                                        Add
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowMobileAddAnnual(false)}
-                                        className="px-2.5 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-lg cursor-pointer"
-                                      >
-                                        Cancel
-                                      </button>
+                                {/* Add Custom Annual Category — Pinned at bottom with gradient fade */}
+                                <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-card via-card/95 to-transparent z-10">
+                                  {showMobileAddAnnual ? (
+                                    <div className="p-3 bg-card border border-border rounded-xl flex flex-col gap-2 shadow-lg">
+                                      <span className="text-[11px] font-bold text-foreground font-mono">New Annual Leave Category</span>
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="text"
+                                          placeholder="e.g. Sabbatical, Floating"
+                                          value={mobileNewAnnualName}
+                                          onChange={(e) => setMobileNewAnnualName(e.target.value)}
+                                          className="flex-1 bg-muted/40 border border-border rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                          autoFocus
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={handleMobileAddAnnual}
+                                          className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer active:scale-95 transition-all"
+                                        >
+                                          Add
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowMobileAddAnnual(false)}
+                                          className="px-2.5 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-lg cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    data-capability="add-annual-category"
-                                    onClick={() => setShowMobileAddAnnual(true)}
-                                    className="w-full py-2.5 border border-dashed border-border/80 hover:border-foreground/40 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98"
-                                  >
-                                    <Plus size={14} /> Add Custom Annual Category
-                                  </button>
-                                )}
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      data-capability="add-annual-category"
+                                      onClick={() => setShowMobileAddAnnual(true)}
+                                      className="w-full py-2.5 bg-card/90 backdrop-blur-xs border border-dashed border-border/80 hover:border-foreground/40 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98 shadow-xs"
+                                    >
+                                      <Plus size={14} /> Add Custom Annual Category
+                                    </button>
+                                  )}
+                                </div>
                               </motion.div>
                             )}
 
@@ -3133,92 +3136,94 @@ function App() {
                                   })}
                                 </div>
 
-                                {/* Add Custom Special Benefit */}
-                                {showMobileAddSpecial ? (
-                                  <div className="p-3 bg-muted/40 border border-border rounded-xl flex flex-col gap-2.5">
-                                    <span className="text-[11px] font-bold text-foreground font-mono">New Special Benefit</span>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Name</label>
-                                        <input
-                                          type="text"
-                                          placeholder="e.g. Wellness Break"
-                                          value={mobileNewSpecialName}
-                                          onChange={(e) => setMobileNewSpecialName(e.target.value)}
-                                          className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
-                                          autoFocus
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Days Allowance</label>
-                                        <input
-                                          type="number"
-                                          min={1}
-                                          max={90}
-                                          value={mobileNewSpecialQuota}
-                                          onChange={(e) => setMobileNewSpecialQuota(e.target.value)}
-                                          className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Cadence</label>
-                                        <select
-                                          value={mobileNewSpecialCadence}
-                                          onChange={(e) => setMobileNewSpecialCadence(e.target.value)}
-                                          className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
-                                        >
-                                          <option value="month">Per Month</option>
-                                          <option value="year">Per Year</option>
-                                          <option value="event">Per Occurrence</option>
-                                        </select>
-                                      </div>
-                                      <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Color</label>
-                                        <div className="flex items-center gap-1.5 h-8">
-                                          {SELECTABLE_LEAVE_PALETTE.slice(0, 5).map((pal) => (
-                                            <button
-                                              key={pal.id}
-                                              type="button"
-                                              onClick={() => setMobileNewSpecialColor(pal.id)}
-                                              className={`w-4 h-4 rounded-full ${pal.bg} transition-transform cursor-pointer ${
-                                                mobileNewSpecialColor === pal.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
-                                              }`}
-                                            />
-                                          ))}
+                                {/* Add Custom Special Benefit — Pinned at bottom with gradient fade */}
+                                <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-card via-card/95 to-transparent z-10">
+                                  {showMobileAddSpecial ? (
+                                    <div className="p-3 bg-card border border-border rounded-xl flex flex-col gap-2.5 shadow-lg">
+                                      <span className="text-[11px] font-bold text-foreground font-mono">New Special Benefit</span>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Benefit Name</label>
+                                          <input
+                                            type="text"
+                                            placeholder="e.g. Wellness Break"
+                                            value={mobileNewSpecialName}
+                                            onChange={(e) => setMobileNewSpecialName(e.target.value)}
+                                            className="w-full bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                            autoFocus
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Days Allowance</label>
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            max={90}
+                                            value={mobileNewSpecialQuota}
+                                            onChange={(e) => setMobileNewSpecialQuota(e.target.value)}
+                                            className="w-full bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                          />
                                         </div>
                                       </div>
-                                    </div>
 
-                                    <div className="flex gap-2 pt-1">
-                                      <button
-                                        type="button"
-                                        onClick={handleMobileAddSpecial}
-                                        className="flex-1 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer active:scale-95 transition-all"
-                                      >
-                                        Add Benefit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowMobileAddSpecial(false)}
-                                        className="px-3 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-lg cursor-pointer"
-                                      >
-                                        Cancel
-                                      </button>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Cadence</label>
+                                          <select
+                                            value={mobileNewSpecialCadence}
+                                            onChange={(e) => setMobileNewSpecialCadence(e.target.value)}
+                                            className="w-full bg-muted/40 border border-border rounded-lg px-2 py-1.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                                          >
+                                            <option value="month">Per Month</option>
+                                            <option value="year">Per Year</option>
+                                            <option value="event">Per Occurrence</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-muted-foreground mb-0.5 block">Color</label>
+                                          <div className="flex items-center gap-1.5 h-8">
+                                            {SELECTABLE_LEAVE_PALETTE.slice(0, 5).map((pal) => (
+                                              <button
+                                                key={pal.id}
+                                                type="button"
+                                                onClick={() => setMobileNewSpecialColor(pal.id)}
+                                                className={`w-4 h-4 rounded-full ${pal.bg} transition-transform cursor-pointer ${
+                                                  mobileNewSpecialColor === pal.id ? 'ring-2 ring-foreground scale-110' : 'opacity-60 hover:opacity-100'
+                                                }`}
+                                              />
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex gap-2 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={handleMobileAddSpecial}
+                                          className="flex-1 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg cursor-pointer active:scale-95 transition-all"
+                                        >
+                                          Add Benefit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowMobileAddSpecial(false)}
+                                          className="px-3 py-1.5 bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-lg cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    data-capability="add-special-benefit"
-                                    onClick={() => setShowMobileAddSpecial(true)}
-                                    className="w-full py-2.5 border border-dashed border-border/80 hover:border-foreground/40 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98"
-                                  >
-                                    <Plus size={14} /> Add Special Benefit
-                                  </button>
-                                )}
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      data-capability="add-special-benefit"
+                                      onClick={() => setShowMobileAddSpecial(true)}
+                                      className="w-full py-2.5 bg-card/90 backdrop-blur-xs border border-dashed border-border/80 hover:border-foreground/40 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98 shadow-xs"
+                                    >
+                                      <Plus size={14} /> Add Special Benefit
+                                    </button>
+                                  )}
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -3389,7 +3394,7 @@ function App() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.15 }}
-                          className="flex flex-col gap-2"
+                          className="h-full min-h-0 flex-1 flex flex-col overflow-hidden"
                         >
                           <HolidayManager 
                             showTitle={false} 
@@ -4361,7 +4366,7 @@ function App() {
 
       {/* Selection Modal — Lifted for layering (desktop & mobile) */}
       <div className="block">
-        {!isAiPreview && (selectionStart || previewDates.length > 0) && (
+        {!isAiPreview && (
           <LeaveSelectionBar 
             selectionStart={selectionStart}
             previewDates={previewDates}

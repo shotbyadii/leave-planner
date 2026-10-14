@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { hapticSelectionTick } from '../utils/haptics';
 
 /**
  * Common High-Contrast Segmented Tab Selector for Slate Design System
@@ -105,7 +106,10 @@ export const SegmentedPolicyTabs = ({
                 aria-selected={isActive}
                 type="button"
                 data-testid={tab.testId || `policy-tab-${tab.id}`}
-                onClick={() => onChange(tab.id)}
+                onClick={() => {
+                  if (!isActive) hapticSelectionTick();
+                  onChange(tab.id);
+                }}
                 className={`flex-1 min-w-max ${sizeClasses} font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer relative z-10 whitespace-nowrap flex-shrink-0 ${
                   isActive
                     ? 'text-background font-black'

@@ -627,11 +627,11 @@ export default function HolidayManager({
       <motion.div 
         layout="position"
         transition={{ layout: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
-        className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch flex-1 min-h-0 overflow-hidden relative"
+        className="flex flex-col md:grid md:grid-cols-12 md:grid-rows-[minmax(0,1fr)] gap-3 sm:gap-4 items-stretch flex-1 min-h-0 overflow-hidden relative"
       >
         
         {/* LEFT PANEL: Holiday List */}
-        <div className={`md:col-span-5 lg:col-span-5 flex-col gap-2 relative h-full min-h-0 overflow-hidden ${
+        <div className={`md:col-span-5 lg:col-span-5 flex-col gap-2 relative flex-1 w-full h-full min-h-0 overflow-hidden ${
           mobileTab === 'calendar' 
             ? 'hidden md:flex' 
             : 'flex animate-in fade-in-50 slide-in-from-left-2 duration-200'
@@ -652,7 +652,7 @@ export default function HolidayManager({
 
           {/* SKELETON LOADING STATE FOR LIST */}
           {isUploading ? (
-            <div className="flex-1 min-h-[300px] max-h-[460px] md:max-h-none overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar">
+            <div className="flex-1 min-h-0 overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar">
               {[1, 2, 3, 4, 5, 6, 7].map((sk) => (
                 <div key={sk} className="p-2 bg-card/60 border border-border/50 rounded-xl animate-pulse flex items-center justify-between gap-2.5 shadow-2xs">
                   <div className="flex items-center gap-2 flex-1">
@@ -664,8 +664,8 @@ export default function HolidayManager({
               ))}
             </div>
           ) : (
-            /* Regular Holiday List Scroll Container - Full length on desktop, generous on mobile */
-            <div className="flex-1 min-h-[300px] max-h-[460px] md:max-h-none overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar overscroll-contain">
+            /* Regular Holiday List Scroll Container - Flexes cleanly so bottom CTAs stay visible */
+            <div className="flex-1 min-h-0 overflow-y-auto px-1 py-1 pb-16 flex flex-col gap-1.5 rounded-xl no-scrollbar overscroll-contain">
               {filteredList.length === 0 ? (
                 <div className="p-6 text-center bg-card/40 border border-border/60 rounded-xl text-muted-foreground text-xs flex flex-col items-center justify-center gap-1.5 my-auto">
                   <CalendarIcon className="w-5 h-5 text-muted-foreground/40" />
@@ -883,7 +883,7 @@ export default function HolidayManager({
         </div>
 
         {/* RIGHT PANEL: Calendar */}
-        <div className={`md:col-span-7 lg:col-span-7 bg-card dark:bg-[#0b0b0d] border border-border/80 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-xl flex-col justify-between gap-2 sm:gap-3 h-full min-h-0 overflow-y-auto sm:overflow-hidden ${
+        <div className={`md:col-span-7 lg:col-span-7 bg-card dark:bg-[#0b0b0d] border border-border/80 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-xl flex-col justify-between gap-2 sm:gap-3 flex-1 w-full h-full min-h-0 overflow-y-auto sm:overflow-hidden ${
           mobileTab === 'list' 
             ? 'hidden md:flex' 
             : 'flex animate-in fade-in-50 slide-in-from-right-2 duration-200'

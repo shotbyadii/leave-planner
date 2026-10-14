@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { isHoliday, isWeekend } from '../data/holidays';
 import { addLeave, removeLeave, createLeavePlan } from '../services/leaveService';
 import LeaveSelectionBar from './LeaveSelectionBar';
@@ -6,11 +6,57 @@ import ExistingLeaveModal from './ExistingLeaveModal';
 import { ChevronDown, ChevronRight, ChevronLeft, Check, Calendar as CalendarIcon, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { getLeaveTheme, getLeaveColor, getShortform } from '../utils/colorUtils';
+import { hapticSelectionTick, hapticDateRangeCascade, hapticSwipeCard } from '../utils/haptics';
+
+const monthTitleVariants = {
+  enter: (dir) => ({
+    x: dir > 0 ? 18 : -18,
+    opacity: 0
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] }
+  },
+  exit: (dir) => ({
+    x: dir > 0 ? -18 : 18,
+    opacity: 0,
+    transition: { duration: 0.14, ease: [0.32, 0.72, 0, 1] }
+  })
+};
+
+const monthBodyVariants = {
+  enter: (dir) => ({
+    x: dir > 0 ? 36 : -36,
+    opacity: 0
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] }
+  },
+  exit: (dir) => ({
+    x: dir > 0 ? -36 : 36,
+    opacity: 0,
+    transition: { duration: 0.15, ease: [0.32, 0.72, 0, 1] }
+  })
+};
 
 const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, loadLeaves, previewDates, setPreviewDates, hoveredSuggestion, viewMode, setViewMode, focusedMonth, setFocusedMonth, setIsSelecting, selectionStart, setSelectionStart, onMobileConfirm, leavePlans = [], todayDate, calendarStyle = 'classic', focusedCellHeight = 56, theme = 'system', viewingLeave: propViewingLeave, setViewingLeave: propSetViewingLeave, onAdvanceTutorial, leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' }, leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' }, leaveConfigs = [], onClearAiPreview }) => {
   const year = 2026;
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+  // Synchronous direction tracking for left/right month carousel transitions
+  const prevMonthRef = useRef(focusedMonth);
+  const directionRef = useRef(1);
+  if (prevMonthRef.current !== focusedMonth) {
+    directionRef.current = focusedMonth > prevMonthRef.current ? 1 : -1;
+    prevMonthRef.current = focusedMonth;
+  }
+  const monthDirection = directionRef.current;
+  const touchStartXRef = useRef(null);
+  const touchStartYRef = useRef(null);
 
   const [internalViewingLeave, setInternalViewingLeave] = useState(null);
   const viewingLeave = propViewingLeave !== undefined ? propViewingLeave : internalViewingLeave;
@@ -146,6 +192,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const existingLeave = bookedDates.find(d => d.date === dateStr);
     if (existingLeave) {
+      hapticSelectionTick();
       // Find associated plan explicitly created in DB
       const associatedPlan = leavePlans.find(p => p.id === existingLeave.plan_id);
       let tripDates = [dateStr];
@@ -161,9 +208,11 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
     }
     if (_selectionStart) {
       const range = getAllDatesInRange(_selectionStart, dateStr);
+      hapticDateRangeCascade(range.length);
       setPreviewDates(range);
       _setSelectionStart(null);
     } else {
+      hapticSelectionTick();
       if (previewDates.length > 0) setPreviewDates([]);
       _setSelectionStart(dateStr);
     }
@@ -402,18 +451,62 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       cardBg = 'bg-card border-2 border-blue-500/40 dark:border-blue-400/40 ring-4 ring-blue-500/10 dark:ring-blue-400/10 shadow-lg shadow-blue-500/5 relative overflow-visible';
     }
 
+    const handleFocusedTouchStart = isLarge && setFocusedMonth ? (e) => {
+      if (e.touches && e.touches.length === 1) {
+        touchStartXRef.current = e.touches[0].clientX;
+        touchStartYRef.current = e.touches[0].clientY;
+      }
+    } : undefined;
+
+    const handleFocusedTouchEnd = isLarge && setFocusedMonth ? (e) => {
+      if (touchStartXRef.current === null || !e.changedTouches || e.changedTouches.length === 0) return;
+      const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+      const dy = e.changedTouches[0].clientY - (touchStartYRef.current ?? 0);
+      touchStartXRef.current = null;
+      touchStartYRef.current = null;
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+        if (dx < 0 && monthIndex < 11) {
+          if (onClearAiPreview) onClearAiPreview();
+          hapticSwipeCard();
+          setFocusedMonth(monthIndex + 1);
+        } else if (dx > 0 && monthIndex > 0) {
+          if (onClearAiPreview) onClearAiPreview();
+          hapticSwipeCard();
+          setFocusedMonth(monthIndex - 1);
+        }
+      }
+    } : undefined;
+
     return (
       <div
         id={`month-card-${monthIndex}`}
-        key={`month-${monthIndex}`}
+        key={isLarge ? 'focused-month-card' : `month-${monthIndex}`}
         onClick={onClick}
+        onTouchStart={handleFocusedTouchStart}
+        onTouchEnd={handleFocusedTouchEnd}
         className={`${cardBg} border flex flex-col transition-all duration-200 ease-out transform-gpu origin-top-left overflow-hidden ${isLarge ? 'p-4 md:p-6 rounded-2xl min-h-[300px]' : (isMini ? 'p-1.5 md:p-2.5 rounded-xl h-auto md:h-full flex flex-col justify-start md:justify-between gap-0.5 md:gap-0' : 'p-5 rounded-2xl hover:border-foreground/20 hover:scale-[1.015] cursor-pointer')} ${isPastMonth && !isLarge ? 'opacity-50 hover:opacity-90' : opacityClass} ${wrapperClasses}`}
       >
         <div className={`flex justify-between items-center ${isLarge ? 'mb-4' : (isMini ? 'mb-2' : 'mb-4')}`}>
-          <div className="flex items-center gap-2">
-            <h3 className={`font-semibold leading-none ${useNavy ? 'text-white' : 'text-foreground'} ${isLarge ? 'text-lg md:text-xl' : (isMini ? 'text-[11px] uppercase tracking-wider' : 'text-lg group-hover:text-muted-foreground')}`}>
-              {isMini ? monthNames[monthIndex].substring(0,3) : monthNames[monthIndex]}
-            </h3>
+          <div className="flex items-center gap-2 overflow-hidden">
+            {isLarge ? (
+              <AnimatePresence mode="popLayout" initial={false} custom={monthDirection}>
+                <motion.h3
+                  key={`focused-title-${monthIndex}`}
+                  custom={monthDirection}
+                  variants={monthTitleVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className={`font-semibold leading-none ${useNavy ? 'text-white' : 'text-foreground'} text-lg md:text-xl`}
+                >
+                  {monthNames[monthIndex]}
+                </motion.h3>
+              </AnimatePresence>
+            ) : (
+              <h3 className={`font-semibold leading-none ${useNavy ? 'text-white' : 'text-foreground'} ${isMini ? 'text-[11px] uppercase tracking-wider' : 'text-lg group-hover:text-muted-foreground'}`}>
+                {isMini ? monthNames[monthIndex].substring(0,3) : monthNames[monthIndex]}
+              </h3>
+            )}
             {isCurrentMonthCard && !isLarge && (
               <span className="hidden md:inline-block px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-wider font-mono">
                 Current
@@ -427,7 +520,9 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (monthIndex === 0) return;
                     if (onClearAiPreview) onClearAiPreview();
+                    hapticSwipeCard();
                     setFocusedMonth(Math.max(0, monthIndex - 1));
                   }}
                   disabled={monthIndex === 0}
@@ -440,7 +535,9 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (monthIndex === 11) return;
                     if (onClearAiPreview) onClearAiPreview();
+                    hapticSwipeCard();
                     setFocusedMonth(Math.min(11, monthIndex + 1));
                   }}
                   disabled={monthIndex === 11}
@@ -465,25 +562,63 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           ))}
         </div>
 
-        <div className={`grid grid-cols-7 ${isLarge ? 'gap-1 md:gap-2 mb-3' : 'gap-px md:gap-1 mb-2.5'}`}>
-          {days}
-        </div>
-
-        <div className={`mt-auto pt-3.5 border-t ${useNavy ? 'border-white/20' : 'border-border'} ${isMini ? 'hidden md:block' : ''}`}>
-          {monthHolidays.length > 0 ? (
-            <div className={`grid ${isLarge ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-x-3 gap-y-1'} ${isMini ? 'hidden md:grid' : ''}`}>
-              {monthHolidays.map((h, idx) => (
-                <div key={idx} className={`flex items-center gap-1.5 ${isLarge ? 'text-sm' : 'text-[10px]'} ${useNavy ? 'text-white/60' : 'text-muted-foreground'} min-w-0`}>
-                  <div className={`${isLarge ? 'w-1.5 h-1.5' : 'w-1 h-1'} rounded-full ${useNavy ? 'bg-purple-300' : 'bg-purple-400'} flex-shrink-0`}></div>
-                  <span className={`font-bold flex-shrink-0 ${useNavy ? 'text-white' : 'text-foreground'}`}>{h.day}</span>
-                  <span className="truncate" title={h.name}>{h.name}</span>
+        {isLarge ? (
+          <div className="relative overflow-hidden flex-1 flex flex-col">
+            <AnimatePresence mode="popLayout" initial={false} custom={monthDirection}>
+              <motion.div
+                key={`focused-body-${monthIndex}`}
+                custom={monthDirection}
+                variants={monthBodyVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex-1 flex flex-col"
+              >
+                <div className="grid grid-cols-7 gap-1 md:gap-2 mb-3">
+                  {days}
                 </div>
-              ))}
+
+                <div className={`mt-auto pt-3.5 border-t ${useNavy ? 'border-white/20' : 'border-border'}`}>
+                  {monthHolidays.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {monthHolidays.map((h, idx) => (
+                        <div key={idx} className={`flex items-center gap-1.5 text-sm ${useNavy ? 'text-white/60' : 'text-muted-foreground'} min-w-0`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${useNavy ? 'bg-purple-300' : 'bg-purple-400'} flex-shrink-0`}></div>
+                          <span className={`font-bold flex-shrink-0 ${useNavy ? 'text-white' : 'text-foreground'}`}>{h.day}</span>
+                          <span className="truncate" title={h.name}>{h.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`italic text-sm ${useNavy ? 'text-white/40' : 'text-muted-foreground/50'}`}>No holidays</div>
+                  )}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-7 gap-px md:gap-1 mb-2.5">
+              {days}
             </div>
-          ) : (
-            <div className={`italic ${isLarge ? 'text-sm' : 'text-[10px]'} ${useNavy ? 'text-white/40' : 'text-muted-foreground/50'} ${isMini ? 'hidden md:block' : ''}`}>No holidays</div>
-          )}
-        </div>
+
+            <div className={`mt-auto pt-3.5 border-t ${useNavy ? 'border-white/20' : 'border-border'} ${isMini ? 'hidden md:block' : ''}`}>
+              {monthHolidays.length > 0 ? (
+                <div className={`grid grid-cols-2 gap-x-3 gap-y-1 ${isMini ? 'hidden md:grid' : ''}`}>
+                  {monthHolidays.map((h, idx) => (
+                    <div key={idx} className={`flex items-center gap-1.5 text-[10px] ${useNavy ? 'text-white/60' : 'text-muted-foreground'} min-w-0`}>
+                      <div className={`w-1 h-1 rounded-full ${useNavy ? 'bg-purple-300' : 'bg-purple-400'} flex-shrink-0`}></div>
+                      <span className={`font-bold flex-shrink-0 ${useNavy ? 'text-white' : 'text-foreground'}`}>{h.day}</span>
+                      <span className="truncate" title={h.name}>{h.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`italic text-[10px] ${useNavy ? 'text-white/40' : 'text-muted-foreground/50'} ${isMini ? 'hidden md:block' : ''}`}>No holidays</div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -507,7 +642,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           <div className="w-full">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={`mobile-view-${viewMode}-${focusedMonth}`}
+                key={`mobile-view-${viewMode}`}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
@@ -540,15 +675,9 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
             ) : (
               <div className="flex flex-col md:flex-row gap-6 items-start h-full min-h-0 p-1 overflow-hidden">
                 {/* Main Focused Month Card */}
-                <motion.div 
-                  key={`main-focused-${focusedMonth}`}
-                  initial={{ opacity: 0.85, scale: 0.98, y: 8 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex-1 flex justify-start w-full relative z-10 overflow-visible flex-shrink-0"
-                >
+                <div className="flex-1 flex justify-start w-full relative z-10 overflow-visible flex-shrink-0">
                   <div className="w-full">{renderMonth(focusedMonth, true)}</div>
-                </motion.div>
+                </div>
 
                 {/* Right Side Vertical Stack of Mini Cards */}
                 <div className="hidden md:flex w-80 flex-shrink-0 relative h-full min-h-0">

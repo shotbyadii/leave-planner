@@ -1,5 +1,5 @@
 // Basic Service Worker for Leave Vault PWA Installation & Offline Support
-const CACHE_NAME = 'leave-vault-v1';
+const CACHE_NAME = 'leave-vault-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -39,8 +39,8 @@ self.addEventListener('fetch', (event) => {
 // Handle Web Push event (Background notifications on iOS, Android & Desktop)
 self.addEventListener('push', (event) => {
   let payload = {
-    title: 'Daily Attendance Check-in',
-    body: 'Please confirm whether today is Work From Home or In-Office.',
+    title: 'Leave Vault',
+    body: 'Daily Attendance Check-in: Please confirm whether today is Work From Home or In-Office.',
     icon: '/app-icon-192.png',
     badge: '/app-icon-192.png',
     tag: 'wfh-checkin',
