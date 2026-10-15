@@ -6,11 +6,12 @@ export const COLOR_PALETTE = [
   { id: 'pink', name: 'Pink', bg: 'bg-pink-500', text: 'text-pink-500', border: 'border-pink-500', badge: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20', hex: '#ec4899' },
   { id: 'cyan', name: 'Cyan', bg: 'bg-cyan-500', text: 'text-cyan-500', border: 'border-cyan-500', badge: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20', hex: '#06b6d4' },
   { id: 'amber', name: 'Amber', bg: 'bg-amber-500', text: 'text-amber-500', border: 'border-amber-500', badge: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/20', hex: '#f59e0b' },
-  { id: 'indigo', name: 'Indigo', bg: 'bg-indigo-500', text: 'text-indigo-500', border: 'border-indigo-500', badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', hex: '#6366f1' }
+  { id: 'indigo', name: 'Indigo', bg: 'bg-indigo-500', text: 'text-indigo-500', border: 'border-indigo-500', badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', hex: '#6366f1' },
+  { id: 'zinc', name: 'Zinc', bg: 'bg-zinc-500', text: 'text-zinc-500 dark:text-zinc-400', border: 'border-zinc-500', badge: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-500/30', hex: '#71717a' }
 ];
 
-// Selectable palette for user-configured leaves excludes cyan/teal (reserved exclusively for WFH)
-export const SELECTABLE_LEAVE_PALETTE = COLOR_PALETTE.filter(c => c.id !== 'cyan');
+// Selectable palette for user-configured leaves excludes cyan/teal (reserved for WFH) and zinc (reserved for LOP)
+export const SELECTABLE_LEAVE_PALETTE = COLOR_PALETTE.filter(c => c.id !== 'cyan' && c.id !== 'zinc');
 
 export const getLeaveColor = (colorId = 'blue') => {
   return COLOR_PALETTE.find(c => c.id === colorId) || COLOR_PALETTE[0];

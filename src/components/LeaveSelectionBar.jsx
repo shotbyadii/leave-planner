@@ -5,7 +5,7 @@ import { TimePicker } from './TimePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppleBalanceTicker from './AppleBalanceTicker';
 import { getShortform, getLeaveColor, getLeaveTheme } from '../utils/colorUtils';
-import { DEFAULT_LEAVE_CONFIGS, checkLeaveConstraints, buildInitialLeaveConfigs } from '../services/leaveConfigService';
+import { DEFAULT_LEAVE_CONFIGS, checkLeaveConstraints, buildInitialLeaveConfigs, LOP_CONFIG } from '../services/leaveConfigService';
 import SegmentedPolicyTabs, { MorphingTabContent } from './SegmentedPolicyTabs';
 import { hapticYes, hapticNo, hapticSelectionTick } from '../utils/haptics';
 
@@ -136,13 +136,47 @@ const LeaveSelectionBar = ({
   const weekendsCount = dates.filter(d => isWeekend(d)).length;
   const holidaysCount = dates.filter(d => isHoliday(d) && !isWeekend(d)).length;
 
+  const curYear = new Date().getFullYear();
+  const lopUsedThisYear = useMemo(() => {
+    return Array.isArray(bookedDates)
+      ? bookedDates.filter(b => b && b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(String(curYear))).reduce((sum, b) => sum + (b.duration || 1), 0)
+      : 0;
+  }, [bookedDates, curYear]);
+
+  // Group active categories by tier
+  const annualConfigs = activeConfigs.filter(c => c.tier === 'annual');
+  const specialConfigs = activeConfigs.filter(c => c.tier === 'special');
+  const monthlyConfigs = activeConfigs.filter(c => c.tier === 'monthly' || c.id === 'wfh');
+
+  const totalAnnualBankRemaining = useMemo(() => {
+    return annualConfigs.reduce((sum, c) => sum + (effectiveBalances[c.id] ?? 0), 0);
+  }, [annualConfigs, effectiveBalances]);
+
+  const isAnnualBankDepleted = totalAnnualBankRemaining <= 0.5;
+
+  const effectiveAnnualConfigs = useMemo(() => {
+    if (!isAnnualBankDepleted) return annualConfigs;
+    return [...annualConfigs, LOP_CONFIG];
+  }, [isAnnualBankDepleted, annualConfigs]);
+
   const selectedConfig = useMemo(() => {
+    if (selectedType === 'lop') return LOP_CONFIG;
     return activeConfigs.find(c => c.id === selectedType) || activeConfigs[0] || null;
   }, [activeConfigs, selectedType]);
 
+  // If annual bank is completely exhausted (< 0.5), auto-select LOP when in annual tab
+  useEffect(() => {
+    if (isAnnualBankDepleted && totalAnnualBankRemaining < 0.5 && activeTierTab === 'annual') {
+      const curBal = effectiveBalances[selectedType] ?? 0;
+      if (curBal < 0.5 && selectedType !== 'lop') {
+        setSelectedType('lop');
+      }
+    }
+  }, [isAnnualBankDepleted, totalAnnualBankRemaining, activeTierTab, selectedType, effectiveBalances]);
+
   // Auto-switch duration to 0.5 when balance is exactly 0.5 or less than 1 (fixes 0.5 lockout bug!)
   useEffect(() => {
-    if (!isMultiple && selectedType) {
+    if (!isMultiple && selectedType && selectedType !== 'lop') {
       const curBal = effectiveBalances[selectedType] ?? 0;
       if (curBal < 1 && curBal >= 0.5 && selectedConfig?.allowsHalfDay !== false) {
         setDuration(0.5);
@@ -153,7 +187,7 @@ const LeaveSelectionBar = ({
   // Automatically update active tab when selectedType changes
   useEffect(() => {
     if (selectedConfig?.tier) {
-      setActiveTierTab(selectedConfig.tier);
+      setActiveTierTab(selectedConfig.tier === 'unpaid' ? 'annual' : selectedConfig.tier);
     }
   }, [selectedConfig]);
 
@@ -209,6 +243,21 @@ const LeaveSelectionBar = ({
     }
 
     const type = (selectedType || 'pl').toLowerCase();
+    if (type === 'lop') {
+      setTickerData({
+        initialValue: lopUsedThisYear,
+        targetValue: lopUsedThisYear + leavesNeeded,
+        totalQuota: lopUsedThisYear + leavesNeeded,
+        leaveType: 'lop',
+        leaveLabel: 'Unpaid Leave (LOP)',
+        leaveColor: 'zinc',
+        deductedCount: leavesNeeded,
+        cadence: 'year',
+        actionType: 'lop'
+      });
+      return;
+    }
+
     const config = selectedConfig || {};
     const totalQuota = config.quota || (type === 'wfh' ? targetWfhQuota : 15);
     const curBalance = effectiveBalances[type] ?? 15;
@@ -228,11 +277,6 @@ const LeaveSelectionBar = ({
       actionType: type === 'wfh' ? 'wfh' : (config.tier === 'special' ? 'special' : 'leave')
     });
   };
-
-  // Group active categories by tier
-  const annualConfigs = activeConfigs.filter(c => c.tier === 'annual');
-  const specialConfigs = activeConfigs.filter(c => c.tier === 'special');
-  const monthlyConfigs = activeConfigs.filter(c => c.tier === 'monthly' || c.id === 'wfh');
 
   let displayDate = '';
   if (isMultiple) {
@@ -403,14 +447,25 @@ const LeaveSelectionBar = ({
                       {/* Category Options List for Active Tier with Smooth Morphing Container */}
                       <MorphingTabContent activeKey={activeTierTab}>
                         <div className="flex flex-col gap-2 p-1.5">
-                        {(activeTierTab === 'annual' ? annualConfigs : (activeTierTab === 'special' ? specialConfigs : monthlyConfigs)).map(config => {
-                          const confTheme = getLeaveTheme(config.color || 'blue');
+                        {activeTierTab === 'annual' && isAnnualBankDepleted && (
+                          <div className="p-2.5 bg-zinc-500/10 border border-zinc-500/25 rounded-2xl flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 mb-1">
+                            <Sparkles size={14} className="text-zinc-500 flex-shrink-0" />
+                            <span className="leading-tight text-[11px] font-medium">
+                              {totalAnnualBankRemaining === 0.5
+                                ? 'Annual bank has 0.5 days remaining. You can use that 0.5 day or take an Unpaid Leave (LOP).'
+                                : 'All annual bank leaves used. Loss of Pay (LOP) leaves are now available.'}
+                            </span>
+                          </div>
+                        )}
+                        {(activeTierTab === 'annual' ? effectiveAnnualConfigs : (activeTierTab === 'special' ? specialConfigs : monthlyConfigs)).map(config => {
+                          const isLop = config.id === 'lop';
+                          const confTheme = getLeaveTheme(config.color || (isLop ? 'zinc' : 'blue'));
                           const isSelected = selectedType === config.id;
-                          const curBal = effectiveBalances[config.id] ?? 0;
+                          const curBal = isLop ? lopUsedThisYear : (effectiveBalances[config.id] ?? 0);
                           
                           // RESOLVES 0.5 HALF-DAY BUG: Only disable if remaining balance is less than 0.5!
                           const minReq = (!isMultiple && config.allowsHalfDay !== false) ? 0.5 : baseLeavesNeeded;
-                          const isDisabled = curBal < minReq || (config.id === 'rh' && baseLeavesNeeded > 1);
+                          const isDisabled = !isLop && (curBal < minReq || (config.id === 'rh' && baseLeavesNeeded > 1));
 
                           return (
                             <div key={config.id} className="flex flex-col gap-1.5">
@@ -458,12 +513,17 @@ const LeaveSelectionBar = ({
                                         Non-deductible benefit
                                       </span>
                                     )}
+                                    {isLop && (
+                                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">
+                                        Loss of Pay • No quota ceiling
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <span className={`text-[11px] font-bold font-mono border px-2.5 py-1 rounded-xl transition-all ${
                                   isSelected ? `${confTheme.activeBadge} font-black shadow-xs` : 'bg-muted/40 border-border/60 text-muted-foreground'
                                 }`}>
-                                  {curBal} {config.cadence === 'month' ? '/ mo left' : 'left'}
+                                  {isLop ? `${curBal} taken` : `${curBal} ${config.cadence === 'month' ? '/ mo left' : 'left'}`}
                                 </span>
                               </label>
 
@@ -475,10 +535,10 @@ const LeaveSelectionBar = ({
                                     <button
                                       type="button"
                                       onClick={() => setDuration(1)}
-                                      disabled={curBal < 1}
+                                      disabled={!isLop && curBal < 1}
                                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold font-mono transition-all ${
                                         duration === 1 ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                                      } ${curBal < 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                      } ${!isLop && curBal < 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
                                     >
                                       Full Day (1.0)
                                     </button>
@@ -527,7 +587,7 @@ const LeaveSelectionBar = ({
                     <button
                       id="tutorial-step-modal-apply-btn"
                       onClick={handleApply}
-                      disabled={!isTutorialMode && (effectiveBalances[selectedType] ?? 0) < leavesNeeded}
+                      disabled={!isTutorialMode && selectedType !== 'lop' && (effectiveBalances[selectedType] ?? 0) < leavesNeeded}
                       className="px-6 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl text-xs font-bold transition-colors disabled:opacity-40 shadow-sm flex-[1.5] cursor-pointer"
                     >
                       Confirm & Apply

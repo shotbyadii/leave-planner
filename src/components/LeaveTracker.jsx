@@ -73,6 +73,19 @@ const LeaveTracker = ({
     return annualConfigs.reduce((sum, c) => sum + (leaves[c.id]?.used ?? 0), 0);
   }, [annualConfigs, leaves]);
 
+  const totalAnnualRemaining = useMemo(() => {
+    return annualConfigs.reduce((sum, c) => sum + Math.max(0, (leaves[c.id]?.total ?? c.quota ?? 0) - (leaves[c.id]?.used ?? 0)), 0);
+  }, [annualConfigs, leaves]);
+
+  const curYearStr = String(new Date().getFullYear());
+  const lopUsedThisYear = useMemo(() => {
+    return Array.isArray(bookedDates)
+      ? bookedDates.filter(b => b && b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(curYearStr)).reduce((s, b) => s + (b.duration || 1), 0)
+      : 0;
+  }, [bookedDates, curYearStr]);
+
+  const isLopActive = totalAnnualRemaining <= 0.5 || lopUsedThisYear > 0;
+
   // Dynamic SVG Gauge Arcs for Annual Leave Bank
   const gaugeArcs = useMemo(() => {
     let accumulated = 0;
@@ -239,7 +252,7 @@ const LeaveTracker = ({
       if (tableFilterTab === 'all') return true;
       const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leave.type) : null;
       if (tableFilterTab === 'annual') {
-        return cfg?.tier === 'annual' || (!cfg?.tier && ['pl', 'el', 'rh'].includes(leave.type));
+        return cfg?.tier === 'annual' || (!cfg?.tier && ['pl', 'el', 'rh', 'lop'].includes(leave.type)) || leave.type === 'lop';
       }
       if (tableFilterTab === 'special') {
         return cfg?.tier === 'special';
@@ -381,6 +394,26 @@ const LeaveTracker = ({
                     </div>
                   );
                 })}
+                {isLopActive && (
+                  <div 
+                    data-surface="tracker-dashboard"
+                    data-leave-id="lop"
+                    className="flex justify-between items-center text-xs pt-2 border-t border-white/10"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2 h-2 rounded-full bg-zinc-400 flex-shrink-0" />
+                      <span className="text-white/90 font-bold truncate">
+                        Unpaid Leave <span className="text-white/40 font-mono text-[10px]">(LOP)</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 font-mono">
+                      <span className="font-bold text-white">{Number.isInteger(lopUsedThisYear) ? lopUsedThisYear : lopUsedThisYear.toFixed(1)}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-zinc-500/25 text-zinc-300 font-semibold ml-1">
+                        taken
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -828,14 +861,15 @@ const LeaveTracker = ({
                     const dateObj = new Date(leave.date);
                     const isHalfDay = leave.duration === 0.5;
                     const isOffice = leave.type === 'office';
-                    const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leave.type) : null;
-                    const themeColor = cfg?.color || leaveColors?.[leave.type] || (leave.type === 'pl' ? 'blue' : leave.type === 'el' ? 'orange' : leave.type === 'rh' ? 'green' : 'cyan');
+                    const isLop = leave.type === 'lop';
+                    const cfg = isLop ? null : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leave.type) : null);
+                    const themeColor = isLop ? 'zinc' : (cfg?.color || leaveColors?.[leave.type] || (leave.type === 'pl' ? 'blue' : leave.type === 'el' ? 'orange' : leave.type === 'rh' ? 'green' : 'cyan'));
                     const theme = getLeaveTheme(themeColor);
                     const cls = isOffice 
                       ? 'bg-muted text-foreground border-border' 
                       : theme.activeBadge;
-                    const typeLabel = isOffice ? 'OFFICE' : (cfg?.shortCode || getShortform(cfg?.name || leaveNames?.[leave.type] || leave.type.toUpperCase(), leave.type.toUpperCase()));
-                    const typeFullName = isOffice ? 'Office Day' : (cfg?.name || leaveNames?.[leave.type] || leave.type.toUpperCase());
+                    const typeLabel = isLop ? 'LOP' : (isOffice ? 'OFFICE' : (cfg?.shortCode || getShortform(cfg?.name || leaveNames?.[leave.type] || leave.type.toUpperCase(), leave.type.toUpperCase())));
+                    const typeFullName = isLop ? 'Unpaid Leave (LOP)' : (isOffice ? 'Office Day' : (cfg?.name || leaveNames?.[leave.type] || leave.type.toUpperCase()));
 
                     // Policy & Consecutive Limit Tracking
                     const maxConsecutive = cfg?.constraints?.maxConsecutive;
@@ -845,9 +879,11 @@ const LeaveTracker = ({
                       : 0;
                     const isLimitExceeded = isConsecutiveLimited && streakCount > maxConsecutive;
 
-                    const tierLabel = cfg?.tier === 'special'
-                      ? 'Special'
-                      : (leave.type === 'wfh' || cfg?.tier === 'remote' || cfg?.tier === 'monthly' ? 'Remote' : 'Annual');
+                    const tierLabel = isLop
+                      ? 'Unpaid'
+                      : (cfg?.tier === 'special'
+                        ? 'Special'
+                        : (leave.type === 'wfh' || cfg?.tier === 'remote' || cfg?.tier === 'monthly' ? 'Remote' : 'Annual'));
 
                     return (
                       <tr 

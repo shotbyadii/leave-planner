@@ -73,6 +73,14 @@ const COLOR_CONFIG = {
     badge: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
     bar: 'bg-indigo-500',
     glow: 'from-indigo-500/25 to-purple-500/10'
+  },
+  zinc: {
+    text: 'text-zinc-600 dark:text-zinc-300',
+    bg: 'bg-zinc-500/10',
+    border: 'border-zinc-500/30',
+    badge: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-500/30',
+    bar: 'bg-zinc-500',
+    glow: 'from-zinc-500/25 to-slate-500/10'
   }
 };
 
@@ -171,11 +179,15 @@ const AppleBalanceTicker = ({
   }, [initialValue, targetValue, diff, isOffice, autoDismissMs, totalQuota]);
 
   // Color & Theme calculations based on the live current value
-  const isDepleted = currentValue <= 0;
-  const isLow = !isDepleted && currentValue <= 3;
-  const isHealthy = !isDepleted && !isLow;
+  const isLop = actionType === 'lop' || leaveType === 'lop';
+  const isDepleted = !isLop && currentValue <= 0;
+  const isLow = !isLop && !isDepleted && currentValue <= 3;
+  const isHealthy = !isLop && !isDepleted && !isLow;
 
   const getStatusTheme = () => {
+    if (isLop) {
+      return COLOR_CONFIG.zinc;
+    }
     if (isOffice) {
       return {
         text: 'text-emerald-500 dark:text-emerald-400',
@@ -217,6 +229,7 @@ const AppleBalanceTicker = ({
       leaveType === 'mental' ? 'purple' :
       leaveType === 'bereavement' ? 'indigo' :
       leaveType === 'parental' ? 'amber' :
+      leaveType === 'lop' ? 'zinc' :
       'blue'
     );
     return COLOR_CONFIG[effectiveColorKey] || COLOR_CONFIG.blue;
@@ -254,6 +267,22 @@ const AppleBalanceTicker = ({
         title: 'Work From Home Logged',
         desc: `Check-in recorded! You have ${targetValue} WFH days remaining this month.`,
         icon: Home
+      };
+    }
+
+    // Loss of Pay (LOP) Booking & Cancellation
+    if (isLop) {
+      if (actionType === 'restore' || actionType === 'cancel') {
+        return {
+          title: `${deductedCount} Day${deductedCount === 1 ? '' : 's'} Unpaid Leave Cancelled`,
+          desc: `Unpaid leave removed. Total LOP taken this year: ${targetValue} day${targetValue === 1 ? '' : 's'}.`,
+          icon: RotateCcw
+        };
+      }
+      return {
+        title: `${deductedCount} Day${deductedCount === 1 ? '' : 's'} Unpaid Leave (LOP) Logged`,
+        desc: `Recorded as Loss of Pay. Total LOP taken this year: ${targetValue} day${targetValue === 1 ? '' : 's'}.`,
+        icon: CheckCircle2
       };
     }
 
@@ -298,7 +327,7 @@ const AppleBalanceTicker = ({
   const msg = getContextMessage();
   const IconComponent = msg.icon;
 
-  const quotaPercent = totalQuota > 0 ? Math.min(100, Math.max(0, (currentValue / totalQuota) * 100)) : 0;
+  const quotaPercent = totalQuota > 0 ? Math.min(100, Math.max(0, (currentValue / totalQuota) * 100)) : (isLop ? 100 : 0);
   const isIncrement = targetValue > initialValue;
 
   return (
@@ -312,7 +341,7 @@ const AppleBalanceTicker = ({
       {/* Top Category Badge */}
       <div className="flex items-center gap-2">
         <span className={`px-2 py-0.5 rounded-full ${compact ? 'text-[9px]' : 'text-[10px]'} font-black font-mono uppercase tracking-wider border ${theme.badge}`}>
-          {shortCode} • {leaveLabel} {actionType === 'restore' || actionType === 'cancel' ? '• RESTORED' : ''}
+          {shortCode} • {leaveLabel} {actionType === 'restore' || actionType === 'cancel' ? '• CANCELLED' : ''}
         </span>
       </div>
 
@@ -339,9 +368,19 @@ const AppleBalanceTicker = ({
 
         {/* Units / Quota Label */}
         <div className={`${compact ? 'text-[9px] mt-0.5' : 'text-[11px] mt-1'} font-bold font-mono text-muted-foreground uppercase tracking-widest flex items-center gap-1.5`}>
-          <span>Days Left</span>
-          <span className="text-muted-foreground/40">•</span>
-          <span className="text-muted-foreground/70">{totalQuota} Total</span>
+          {isLop ? (
+            <>
+              <span>Days Taken</span>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground/70">Loss of Pay</span>
+            </>
+          ) : (
+            <>
+              <span>Days Left</span>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground/70">{totalQuota} Total</span>
+            </>
+          )}
         </div>
 
         {/* Synchronized Animated Progress Bar */}

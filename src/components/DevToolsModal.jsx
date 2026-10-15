@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FlaskConical, X, RotateCcw, Calendar, Play, Sparkles, Check, Sliders, Palette, Bell } from 'lucide-react';
-import { subscribeUserToPush, triggerTestWebPush } from '../utils/notificationService';
+import { FlaskConical, X, RotateCcw, Calendar, Play, Sparkles, Check, Sliders, Palette, Bell, Radio, Layers, Plane, AlertTriangle, CalendarDays } from 'lucide-react';
+import { 
+  subscribeUserToPush, 
+  triggerTestWebPush, 
+  showAttendanceLiveActivity, 
+  showAttendanceCatchupNotification,
+  showUpcomingLeaveNotification,
+  showQuotaAlertNotification,
+  showHolidayNotification,
+  requestNotificationPermission 
+} from '../utils/notificationService';
 
 const DevToolsModal = ({ 
   isOpen, 
@@ -219,7 +228,120 @@ const DevToolsModal = ({
                 <Sparkles size={15} /> Trigger Attendance Check-in Modal
               </button>
 
-              {/* 6. Test Web Push Notification */}
+              {/* 6. Smart Notification Test Suite */}
+              <div className="p-3 bg-muted/40 border border-border rounded-2xl flex flex-col gap-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                  <Bell size={13} className="text-amber-500" /> Notification Test Suite
+                </label>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {/* Daily Check-in */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setPushStatus('Sending Daily Check-in notification...');
+                      try {
+                        const perm = await requestNotificationPermission();
+                        if (perm !== 'granted') return setPushStatus('Notification permission not granted.');
+                        await showAttendanceLiveActivity({ dateStr: devDateStr || (getTodayStr ? getTodayStr() : new Date().toISOString().split('T')[0]) });
+                        setPushStatus('Daily Check-in sent! Pull down notification shade.');
+                      } catch (e) {
+                        setPushStatus('Error: ' + e.message);
+                      }
+                      setTimeout(() => setPushStatus(''), 4500);
+                    }}
+                    className="w-full p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 rounded-xl text-xs font-bold font-mono flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><Radio size={13} /> Daily Check-in</span>
+                    <span className="text-[10px] opacity-75 font-sans font-normal">Single Day</span>
+                  </button>
+
+                  {/* Multi-Day Catch-up */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setPushStatus('Sending Multi-Day Catch-up notification...');
+                      try {
+                        const perm = await requestNotificationPermission();
+                        if (perm !== 'granted') return setPushStatus('Notification permission not granted.');
+                        await showAttendanceCatchupNotification({ count: 3, unloggedDates: ['2026-10-12', '2026-10-13', '2026-10-14'] });
+                        setPushStatus('Multi-Day Catch-up sent! Pull down notification shade.');
+                      } catch (e) {
+                        setPushStatus('Error: ' + e.message);
+                      }
+                      setTimeout(() => setPushStatus(''), 4500);
+                    }}
+                    className="w-full p-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/25 rounded-xl text-xs font-bold font-mono flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><Layers size={13} /> Attendance Catch-up</span>
+                    <span className="text-[10px] opacity-75 font-sans font-normal">Multi-Day</span>
+                  </button>
+
+                  {/* Upcoming Leave Tomorrow */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setPushStatus('Sending Upcoming Leave notification...');
+                      try {
+                        const perm = await requestNotificationPermission();
+                        if (perm !== 'granted') return setPushStatus('Notification permission not granted.');
+                        await showUpcomingLeaveNotification({ planName: 'Diwali Getaway', daysCount: 4 });
+                        setPushStatus('Upcoming Leave notification sent!');
+                      } catch (e) {
+                        setPushStatus('Error: ' + e.message);
+                      }
+                      setTimeout(() => setPushStatus(''), 4500);
+                    }}
+                    className="w-full p-2.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/25 rounded-xl text-xs font-bold font-mono flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><Plane size={13} /> Upcoming Leave Tomorrow</span>
+                    <span className="text-[10px] opacity-75 font-sans font-normal">Trip Eve</span>
+                  </button>
+
+                  {/* WFH Quota Alert */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setPushStatus('Sending WFH Quota Alert...');
+                      try {
+                        const perm = await requestNotificationPermission();
+                        if (perm !== 'granted') return setPushStatus('Notification permission not granted.');
+                        await showQuotaAlertNotification({ type: 'wfh', used: 9, total: 10, remaining: 1 });
+                        setPushStatus('WFH Quota Alert sent!');
+                      } catch (e) {
+                        setPushStatus('Error: ' + e.message);
+                      }
+                      setTimeout(() => setPushStatus(''), 4500);
+                    }}
+                    className="w-full p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/25 rounded-xl text-xs font-bold font-mono flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><AlertTriangle size={13} /> WFH Quota Alert</span>
+                    <span className="text-[10px] opacity-75 font-sans font-normal">Quota Limit</span>
+                  </button>
+
+                  {/* Public Holiday Tomorrow */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setPushStatus('Sending Public Holiday notification...');
+                      try {
+                        const perm = await requestNotificationPermission();
+                        if (perm !== 'granted') return setPushStatus('Notification permission not granted.');
+                        await showHolidayNotification({ holidayName: 'Deepavali', isLongWeekend: true });
+                        setPushStatus('Public Holiday notification sent!');
+                      } catch (e) {
+                        setPushStatus('Error: ' + e.message);
+                      }
+                      setTimeout(() => setPushStatus(''), 4500);
+                    }}
+                    className="w-full p-2.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/25 rounded-xl text-xs font-bold font-mono flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><CalendarDays size={13} /> Holiday Reminder</span>
+                    <span className="text-[10px] opacity-75 font-sans font-normal">Holiday Eve</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 7. Test Web Push Notification */}
               <button
                 type="button"
                 onClick={async () => {

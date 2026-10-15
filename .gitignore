@@ -26,3 +26,6 @@ dist-ssr
 # Test outputs
 test-results/
 playwright-report/
+
+# Executables & Binaries
+*.exe

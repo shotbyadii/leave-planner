@@ -30,7 +30,7 @@ import AppleBalanceTicker from './components/AppleBalanceTicker';
 import SegmentedPolicyTabs, { MorphingTabContent } from './components/SegmentedPolicyTabs';
 import { getLeaveColor, getLeaveTheme, getShortform, COLOR_PALETTE, SELECTABLE_LEAVE_PALETTE } from './utils/colorUtils';
 import { getSpecialBenefitIcon, BENEFIT_ICON_PRESETS } from './utils/specialBenefitUtils';
-import { buildInitialLeaveConfigs, checkLeaveConstraints, deriveShortCode } from './services/leaveConfigService';
+import { buildInitialLeaveConfigs, checkLeaveConstraints, deriveShortCode, LOP_CONFIG } from './services/leaveConfigService';
 import { getCurrentUser, getCurrentSession, signOutUser, fetchUserProfile, upsertUserProfile, deleteUserAccount } from './services/authService';
 import { supabase } from './lib/supabase';
 import { initGlobalHaptics, hapticDateRangeCascade, hapticYes, hapticNo, hapticSelectionTick } from './utils/haptics';
@@ -57,6 +57,11 @@ import {
 import { isDemoModeActive } from './services/leaveService';
 import { 
   showAppNotification, 
+  showAttendanceLiveActivity,
+  showAttendanceCatchupNotification,
+  showUpcomingLeaveNotification,
+  showQuotaAlertNotification,
+  showHolidayNotification,
   requestNotificationPermission, 
   isNotificationSupported, 
   isNotificationGranted,
@@ -490,8 +495,25 @@ function App() {
     };
   }, [bookedDates, leaveNames.wfh, leaveColors.wfh]);
 
+  const curYearStr = String(new Date().getFullYear());
+  const lopUsedThisYear = useMemo(() => {
+    return Array.isArray(bookedDates)
+      ? bookedDates.filter(b => b && b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(curYearStr)).reduce((s, b) => s + (b.duration || 1), 0)
+      : 0;
+  }, [bookedDates, curYearStr]);
+
+  const totalAnnualBankRemaining = useMemo(() => {
+    return annualTrackerEntries.reduce((s, e) => s + (typeof e.remaining === 'number' ? e.remaining : parseFloat(e.remaining) || 0), 0);
+  }, [annualTrackerEntries]);
+
+  const isAnnualBankDepleted = totalAnnualBankRemaining <= 0.5;
+  const isLopActive = isAnnualBankDepleted || lopUsedThisYear > 0;
+
   // Calculate current mobile balance and needed leave units
   const selectedMobileBal = useMemo(() => {
+    if (mobileLeaveType === 'lop') {
+      return lopUsedThisYear;
+    }
     const item = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
     if (mobileLeaveType === 'wfh') {
       const targetMonthKey = (previewDates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
@@ -506,13 +528,14 @@ function App() {
     const total = item?.quota || (leaves[mobileLeaveType]?.total ?? 15);
     const used = leaves[mobileLeaveType]?.used ?? 0;
     return Math.max(0, total - used);
-  }, [leaveConfigs, mobileLeaveType, previewDates, bookedDates, leaves]);
+  }, [leaveConfigs, mobileLeaveType, previewDates, bookedDates, leaves, lopUsedThisYear]);
 
   const actualLeavesMobile = useMemo(() => {
     return previewDates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
   }, [previewDates]);
 
   const activeMobileConfig = useMemo(() => {
+    if (mobileLeaveType === 'lop') return LOP_CONFIG;
     return Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
   }, [leaveConfigs, mobileLeaveType]);
 
@@ -522,7 +545,7 @@ function App() {
 
   // Auto-switch mobile duration to 0.5 when balance is exactly 0.5 or less than 1
   useEffect(() => {
-    if (previewDates.length === 1 && mobileLeaveType) {
+    if (previewDates.length === 1 && mobileLeaveType && mobileLeaveType !== 'lop') {
       if (allowsHalfDayMobile && selectedMobileBal < 1 && selectedMobileBal >= 0.5) {
         setMobileDuration(0.5);
       } else if (selectedMobileBal >= 1) {
@@ -539,45 +562,81 @@ function App() {
   // Keep mobile modal active tab in sync and pre-select available category if current has zero balance
   useEffect(() => {
     if (mobileConfirmOpen && mobileLeaveType) {
-      const curCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
-      if (curCfg) {
-        if (curCfg.tier === 'annual') setMobileModalTierTab('annual');
-        else if (curCfg.tier === 'special') setMobileModalTierTab('special');
-        else if (curCfg.tier === 'monthly' || curCfg.tier === 'remote' || curCfg.id === 'wfh') setMobileModalTierTab('remote');
-      } else if (mobileLeaveType === 'wfh') {
-        setMobileModalTierTab('remote');
+      if (mobileLeaveType === 'lop') {
+        setMobileModalTierTab('annual');
+      } else {
+        const curCfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === mobileLeaveType) : null;
+        if (curCfg) {
+          if (curCfg.tier === 'annual') setMobileModalTierTab('annual');
+          else if (curCfg.tier === 'special') setMobileModalTierTab('special');
+          else if (curCfg.tier === 'monthly' || curCfg.tier === 'remote' || curCfg.id === 'wfh') setMobileModalTierTab('remote');
+        } else if (mobileLeaveType === 'wfh') {
+          setMobileModalTierTab('remote');
+        }
+      }
+
+      // If annual bank is depleted (<= 0.5), prioritize Annual Bank with LOP when annual balance is exhausted
+      if (isAnnualBankDepleted && (mobileModalTierTab === 'annual' || ['pl', 'el', 'rh', 'lop'].includes(mobileLeaveType))) {
+        setMobileModalTierTab('annual');
+        if (selectedMobileBal <= 0 && mobileLeaveType !== 'lop') {
+          setMobileLeaveType('lop');
+          return;
+        }
       }
 
       if (previewDates.length === 1) {
-        if (allowsHalfDayMobile && selectedMobileBal < 1 && selectedMobileBal >= 0.5) {
+        if (allowsHalfDayMobile && selectedMobileBal < 1 && selectedMobileBal >= 0.5 && mobileLeaveType !== 'lop') {
           setMobileDuration(0.5);
         } else {
           setMobileDuration(1);
         }
       }
 
-      // If currently selected leave has zero balance, try to find an available category
-      if (selectedMobileBal <= 0 && Array.isArray(leaveConfigs)) {
-        const available = leaveConfigs.find(c => {
+      // If currently selected leave has zero balance, try to find an available category WITHIN current tab first
+      if (selectedMobileBal <= 0 && mobileLeaveType !== 'lop' && Array.isArray(leaveConfigs)) {
+        if (mobileModalTierTab === 'annual' && isAnnualBankDepleted) {
+          setMobileLeaveType('lop');
+          return;
+        }
+
+        // Search in same tier tab
+        const sameTierAvailable = leaveConfigs.find(c => {
           if (!c.enabled) return false;
-          if (c.id === 'wfh') {
-            const targetMonthKey = (previewDates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
-            const wfhUsed = Array.isArray(bookedDates)
-              ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).reduce((s, b) => s + (b.duration || 1), 0)
-              : 0;
-            return ((c.quota || 10) - wfhUsed) > 0;
-          }
+          const tier = (c.tier === 'monthly' || c.id === 'wfh') ? 'remote' : c.tier;
+          if (tier !== mobileModalTierTab) return false;
           const tot = c.quota || (leaves[c.id]?.total ?? 10);
           const u = leaves[c.id]?.used ?? 0;
           return (tot - u) > 0;
         });
-        if (available) {
-          setMobileLeaveType(available.id);
-          if (available.tier) setMobileModalTierTab(available.tier === 'monthly' ? 'remote' : available.tier);
+
+        if (sameTierAvailable) {
+          setMobileLeaveType(sameTierAvailable.id);
+        } else if (isAnnualBankDepleted) {
+          setMobileLeaveType('lop');
+          setMobileModalTierTab('annual');
+        } else {
+          // Switch tab to an available category
+          const available = leaveConfigs.find(c => {
+            if (!c.enabled) return false;
+            if (c.id === 'wfh') {
+              const targetMonthKey = (previewDates[0] || '').substring(0, 7) || getTodayStr().substring(0, 7);
+              const wfhUsed = Array.isArray(bookedDates)
+                ? bookedDates.filter(b => b && b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(targetMonthKey)).reduce((s, b) => s + (b.duration || 1), 0)
+                : 0;
+              return ((c.quota || 10) - wfhUsed) > 0;
+            }
+            const tot = c.quota || (leaves[c.id]?.total ?? 10);
+            const u = leaves[c.id]?.used ?? 0;
+            return (tot - u) > 0;
+          });
+          if (available) {
+            setMobileLeaveType(available.id);
+            if (available.tier) setMobileModalTierTab(available.tier === 'monthly' ? 'remote' : available.tier);
+          }
         }
       }
     }
-  }, [mobileConfirmOpen, mobileLeaveType, leaveConfigs, selectedMobileBal, allowsHalfDayMobile, previewDates, bookedDates, leaves]);
+  }, [mobileConfirmOpen, mobileLeaveType, leaveConfigs, selectedMobileBal, allowsHalfDayMobile, previewDates, bookedDates, leaves, isAnnualBankDepleted, totalAnnualBankRemaining, mobileModalTierTab]);
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -681,7 +740,7 @@ function App() {
     };
   }, [currentUser?.id, isDemoMode]);
 
-  // Cross-tab / cross-instance broadcast channel for instantaneous local sync
+  // Cross-tab / cross-instance broadcast channel & ServiceWorker messages for instantaneous local sync
   useEffect(() => {
     let bc;
     try {
@@ -693,10 +752,22 @@ function App() {
       };
     } catch (e) {}
 
+    const handleSwMessage = (event) => {
+      if (event.data?.type === 'QUICK_ATTENDANCE_LOGGED' || event.data?.type === 'LEAVES_UPDATED') {
+        loadLeaves(currentUser);
+      }
+    };
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
     return () => {
       try {
         bc?.close();
       } catch (e) {}
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
     };
   }, [currentUser]);
 
@@ -713,12 +784,33 @@ function App() {
     return () => window.removeEventListener('hashchange', checkRecoveryHash);
   }, []);
 
-  // Handle notification click routing (?action=attendance)
+  // Handle notification click routing (?action=attendance or ?action=leave&date=...)
   useEffect(() => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
-      if (searchParams.get('action') === 'attendance') {
+      const action = searchParams.get('action');
+      const targetDate = searchParams.get('date');
+
+      if (action === 'leave') {
+        const d = targetDate || getTodayStr();
+        setActiveTab('calendar');
+        setSelectionStart(d);
+        setPreviewDates([d]);
+        setMobileConfirmOpen(true);
+        const cleanUrl = window.location.pathname + (window.location.hash || '');
+        window.history.replaceState(null, '', cleanUrl);
+      } else if (action === 'attendance') {
         setWfhModalOpen(true);
+        const cleanUrl = window.location.pathname + (window.location.hash || '');
+        window.history.replaceState(null, '', cleanUrl);
+      } else if (action === 'tracker') {
+        setActiveTab('tracker');
+        if (typeof window !== 'undefined') window.scrollTo(0, 0);
+        const cleanUrl = window.location.pathname + (window.location.hash || '');
+        window.history.replaceState(null, '', cleanUrl);
+      } else if (action === 'calendar') {
+        setActiveTab('calendar');
+        if (typeof window !== 'undefined') window.scrollTo(0, 0);
         const cleanUrl = window.location.pathname + (window.location.hash || '');
         window.history.replaceState(null, '', cleanUrl);
       }
@@ -1228,6 +1320,7 @@ function App() {
 
     const checkAndTriggerAttendancePrompt = () => {
       const effectiveToday = getTodayDate();
+      const todayStr = getTodayStr();
       const missing = getMissingAttendanceDays({
         todayDate: effectiveToday,
         bookedDates,
@@ -1245,26 +1338,91 @@ function App() {
         return;
       }
 
-      // Only prompt attendance if onboarding, tutorial, splash, and install modal are not active
+      const promptHourNum = parseInt(wfhPromptHour || '12', 10);
+      const now = new Date();
+      const currentHour = now.getHours();
+
+      const pastMissing = missing.filter(d => d < todayStr);
+      const isTodayMissing = missing.includes(todayStr);
+
+      // Only prompt in-app modal if user hasn't seen it yet and onboarding/tutorial is inactive
       if (!hasPromptedWfh && !onboardingOpen && !isTutorialActive && !installModalOpen && !showSplash) {
         setWfhModalOpen(true);
         setHasPromptedWfh(true);
+      }
 
-        const promptHourNum = parseInt(wfhPromptHour || '12', 10);
-        const period = promptHourNum >= 12 ? 'PM' : 'AM';
-        const displayH = promptHourNum > 12 ? promptHourNum - 12 : (promptHourNum === 0 ? 12 : promptHourNum);
-        const todayStr = getTodayStr();
+      // ── 1. DAILY ATTENDANCE CHECK-IN (TODAY) ──
+      // Fires at or past the configured wfhPromptHour (e.g. 12:00 PM)
+      const lastDailyNotifDate = localStorage.getItem('last_daily_notif_date');
+      if (isTodayMissing && lastDailyNotifDate !== todayStr) {
+        const isDailyTime = devDateStr ? true : currentHour >= promptHourNum;
+        if (isDailyTime) {
+          showAttendanceLiveActivity({
+            dateStr: todayStr,
+            userId: currentUser?.id
+          });
+          localStorage.setItem('last_daily_notif_date', todayStr);
+        }
+      }
 
-        if (missing.length > 1) {
-          showAppNotification('Leave Vault', {
-            body: `Attendance Catch-up: You have ${missing.length} unlogged days this month. Swipe through your cards to record attendance.`,
-            tag: `wfh-catchup-${todayStr}`
+      // ── 2. SMART MULTI-DAY ATTENDANCE CATCH-UP (PAST DAYS) ──
+      // Staggered Timing: Does NOT fire at the same hour as the daily prompt.
+      // Fires during the morning review window (9:30 - 11:30 AM), evening wrap-up (>= 17:00 / 5 PM),
+      // or whenever today is already logged and only past days remain.
+      const lastCatchupNotifDate = localStorage.getItem('last_catchup_notif_date');
+      if (pastMissing.length > 0 && lastCatchupNotifDate !== todayStr) {
+        const isCatchupTimeWindow = devDateStr 
+          || !isTodayMissing 
+          || (currentHour >= 9 && currentHour < promptHourNum) 
+          || currentHour >= 17;
+
+        if (isCatchupTimeWindow) {
+          showAttendanceCatchupNotification({
+            count: pastMissing.length,
+            unloggedDates: pastMissing,
+            userId: currentUser?.id
           });
-        } else {
-          showAppNotification('Leave Vault', {
-            body: `Daily Check-in: It is past ${displayH} ${period}. Please confirm if today (${todayStr}) is WFH or In-Office.`,
-            tag: `wfh-checkin-${todayStr}`
+          localStorage.setItem('last_catchup_notif_date', todayStr);
+        }
+      }
+
+      // ── 3. UPCOMING LEAVE REMINDER (EVE OF VACATION) ──
+      // Fires in the evening (>= 17:00 / 5 PM) on the day before a booked leave starts
+      const tomorrowObj = new Date();
+      tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+      const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, '0')}-${String(tomorrowObj.getDate()).padStart(2, '0')}`;
+      const lastLeaveRemindDate = localStorage.getItem(`last_leave_remind_${tomorrowStr}`);
+
+      if (lastLeaveRemindDate !== 'true' && (devDateStr || currentHour >= 17)) {
+        const tomorrowLeave = (bookedDates || []).find(b => b.date === tomorrowStr && ['pl', 'el', 'rh'].includes(b.type));
+        if (tomorrowLeave) {
+          const matchingPlan = (leavePlans || []).find(p => {
+            const s = p.startDate || p.start_date;
+            const e = p.endDate || p.end_date || s;
+            return tomorrowStr >= s && tomorrowStr <= e;
           });
+          showUpcomingLeaveNotification({
+            planName: matchingPlan?.name || 'Your planned leave',
+            startDate: tomorrowStr,
+            daysCount: matchingPlan?.duration || 1
+          });
+          localStorage.setItem(`last_leave_remind_${tomorrowStr}`, 'true');
+        }
+      }
+
+      // ── 4. UPCOMING PUBLIC HOLIDAY REMINDER (EVE OF HOLIDAY) ──
+      const lastHolidayRemindDate = localStorage.getItem(`last_holiday_remind_${tomorrowStr}`);
+      if (lastHolidayRemindDate !== 'true' && (devDateStr || currentHour >= 17)) {
+        const tomorrowHoliday = currentHolidays.find(h => h.date === tomorrowStr);
+        if (tomorrowHoliday) {
+          const isFri = tomorrowObj.getDay() === 5;
+          const isMon = tomorrowObj.getDay() === 1;
+          showHolidayNotification({
+            holidayName: tomorrowHoliday.name,
+            dateStr: tomorrowStr,
+            isLongWeekend: isFri || isMon
+          });
+          localStorage.setItem(`last_holiday_remind_${tomorrowStr}`, 'true');
         }
       }
     };
@@ -1299,10 +1457,41 @@ function App() {
 
   const handleWfhStatusSelect = async (statusType, targetDateStr = null) => {
     const targetDate = targetDateStr || getTodayStr();
-    await addLeave(targetDate, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
+    const isLop = statusType === 'lop';
+    const isWfh = statusType === 'wfh';
+    const isOffice = statusType === 'office';
+    const activeCfg = isLop ? LOP_CONFIG : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === statusType) : null);
+
+    // Guard: Prevent logging regular leave if quota is exhausted
+    if (!isLop && !isWfh && !isOffice) {
+      const curRemaining = leaves && leaves[statusType] 
+        ? Math.max(0, (leaves[statusType].total ?? activeCfg?.quota ?? 0) - (leaves[statusType].used ?? 0))
+        : 1;
+      if (curRemaining < 1) {
+        console.warn(`Cannot log ${statusType}: quota exhausted.`);
+        return;
+      }
+    }
+
+    const note = isWfh ? 'Work From Home' : (isOffice ? 'In-Office' : (isLop ? 'Unpaid Leave (LOP)' : (activeCfg?.name || leaveNames[statusType] || statusType.toUpperCase())));
+    await addLeave(targetDate, statusType, note, null, 1, currentUser?.id);
     await loadLeaves();
-    
-    // Update local missing days list
+
+    // Check WFH Quota Threshold
+    if (isWfh) {
+      const curMonthKey = targetDate.substring(0, 7);
+      const curWfhCount = (bookedDates || []).filter(b => b.type === 'wfh' && b.date?.startsWith(curMonthKey)).length + 1;
+      const quota = parseInt(localStorage.getItem('quota_wfh') || '10', 10);
+      if (curWfhCount >= quota - 1 && localStorage.getItem(`wfh_alert_${curMonthKey}_${curWfhCount}`) !== 'true') {
+        showQuotaAlertNotification({
+          type: 'wfh',
+          used: curWfhCount,
+          total: quota,
+          remaining: Math.max(0, quota - curWfhCount)
+        });
+        localStorage.setItem(`wfh_alert_${curMonthKey}_${curWfhCount}`, 'true');
+      }
+    }
     setMissingAttendanceDays(prev => {
       const updated = prev.filter(d => d !== targetDate);
       if (updated.length === 0) {
@@ -1321,8 +1510,14 @@ function App() {
 
   const handleBatchWfhStatusSelect = async (statusType, targetDates = []) => {
     if (!Array.isArray(targetDates) || targetDates.length === 0) return;
+    const isLop = statusType === 'lop';
+    const isWfh = statusType === 'wfh';
+    const isOffice = statusType === 'office';
+    const activeCfg = isLop ? LOP_CONFIG : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === statusType) : null);
+    const note = isWfh ? 'Work From Home' : (isOffice ? 'In-Office' : (isLop ? 'Unpaid Leave (LOP)' : (activeCfg?.name || leaveNames[statusType] || statusType.toUpperCase())));
+
     for (const d of targetDates) {
-      await addLeave(d, statusType, statusType === 'wfh' ? 'Work From Home' : 'In-Office', null, 1, currentUser?.id);
+      await addLeave(d, statusType, note, null, 1, currentUser?.id);
     }
     await loadLeaves();
     setMissingAttendanceDays(prev => prev.filter(d => !targetDates.includes(d)));
@@ -1741,6 +1936,16 @@ function App() {
     }
   };
 
+  // Reset scroll position to top whenever switching main tabs (prevents tracker mounting scrolled down to plans)
+  useEffect(() => {
+    if (mainScrollContainerRef.current) {
+      mainScrollContainerRef.current.scrollTop = 0;
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, 0);
+    }
+  }, [activeTab]);
+
   const handlePreviewRange = (datesArray, holidayName = null, options = {}) => {
     if (Array.isArray(datesArray) && datesArray.length > 0) {
       hapticDateRangeCascade(datesArray.length);
@@ -1836,11 +2041,30 @@ function App() {
     const dates = previewDates;
     const actualLeaves = dates.filter(d => !isHoliday(d) && !isWeekend(d)).length;
     const type = (mobileLeaveType || 'pl').toLowerCase();
-    const activeConfig = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
+    const activeConfig = type === 'lop' ? LOP_CONFIG : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null);
     const allowsHalf = activeConfig ? activeConfig.allowsHalfDay !== false : (type === 'el' || type === 'pl');
     const isHalfDay = allowsHalf && dates.length === 1 && mobileDuration === 0.5;
     const durationPerDay = isHalfDay ? 0.5 : 1;
     const leavesNeeded = isHalfDay ? 0.5 : actualLeaves;
+
+    if (type === 'lop') {
+      const currentYear = new Date().getFullYear();
+      const currentLopUsed = bookedDates.filter(b => b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(String(currentYear))).reduce((sum, b) => sum + (b.duration || 1), 0);
+      setMobileTickerData({
+        initialValue: currentLopUsed,
+        targetValue: currentLopUsed + leavesNeeded,
+        totalQuota: currentLopUsed + leavesNeeded,
+        leaveType: 'lop',
+        leaveLabel: 'Unpaid Leave (LOP)',
+        leaveColor: 'zinc',
+        deductedCount: leavesNeeded,
+        dates: [...dates],
+        note: mobileNote,
+        planName: mobilePlanName,
+        durationPerDay
+      });
+      return;
+    }
 
     const maxWfh = activeConfig?.quota || 10;
     let curBalance = 0;
@@ -2124,6 +2348,30 @@ function App() {
                       </div>
                     );
                   })}
+                  {topbarTierTab === 'annual' && isLopActive && (
+                    <div
+                      data-surface="topbar-tracker"
+                      data-leave-id="lop"
+                      className="flex flex-col justify-center gap-1 bg-zinc-500/10 hover:bg-zinc-500/20 border border-zinc-500/30 px-2.5 py-1 rounded-xl transition-all shadow-2xs group flex-shrink-0 select-none cursor-default min-w-[76px]"
+                      title={`Unpaid Leave (LOP): ${lopUsedThisYear} days taken this year (Loss of Pay)`}
+                    >
+                      <div className="flex items-center justify-between gap-2 leading-none">
+                        <div className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 flex-shrink-0" />
+                          <span className="text-[10px] font-mono font-bold text-zinc-600 dark:text-zinc-300 group-hover:text-foreground uppercase transition-colors">
+                            LOP
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-0.5 font-mono leading-none">
+                          <span className="text-xs font-black text-foreground">{lopUsedThisYear}</span>
+                          <span className="text-[9px] text-muted-foreground font-semibold">taken</span>
+                        </div>
+                      </div>
+                      <div className="h-1 w-full bg-muted/90 dark:bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-zinc-500 w-full" />
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -2239,6 +2487,12 @@ function App() {
                   </div>
                 );
               })}
+              {isLopActive && (
+                <div className="flex items-center gap-1.5 text-xs text-foreground font-normal">
+                  <div className="w-2.5 h-2.5 rounded-full bg-zinc-500"></div>
+                  <span>LOP</span>
+                </div>
+              )}
             </div>
           )}
           
@@ -3756,6 +4010,32 @@ function App() {
                                 </div>
                               );
                             })}
+                            {isLopActive && (
+                              <div 
+                                data-surface="mobile-drawer-balances"
+                                data-leave-id="lop"
+                                className="p-2.5 bg-zinc-500/10 border border-zinc-500/25 rounded-2xl flex flex-col gap-1.5 shadow-2xs"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="w-2 h-2 rounded-full bg-zinc-500 flex-shrink-0" />
+                                    <span className="text-xs font-bold font-mono text-foreground truncate">
+                                      Unpaid Leave <span className="text-muted-foreground">(LOP)</span>
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-bold font-mono text-foreground flex-shrink-0">
+                                    {lopUsedThisYear}<span className="text-muted-foreground font-normal text-[10px]"> taken</span>
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full bg-zinc-500 w-full" />
+                                </div>
+                                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                                  <span>Loss of Pay</span>
+                                  <span>Annual bank fallback</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -3945,13 +4225,16 @@ function App() {
                       </div>
 
                       {(() => {
-                        const annualModalConfigs = Array.isArray(leaveConfigs)
+                        const baseAnnualModalConfigs = Array.isArray(leaveConfigs)
                           ? leaveConfigs.filter(c => c.tier === 'annual' && c.enabled)
                           : [
                               { id: 'pl', name: 'Planned Leave', shortCode: 'PL', color: 'blue', tier: 'annual', allowsHalfDay: true },
                               { id: 'el', name: 'Emergency Leave', shortCode: 'EL', color: 'orange', tier: 'annual', allowsHalfDay: true, constraints: { maxConsecutive: 2 } },
                               { id: 'rh', name: 'Restricted Leave', shortCode: 'RH', color: 'green', tier: 'annual', allowsHalfDay: false, constraints: { maxConsecutive: 1 } }
                             ];
+                        const annualModalConfigs = isAnnualBankDepleted
+                          ? [...baseAnnualModalConfigs, LOP_CONFIG]
+                          : baseAnnualModalConfigs;
                         const specialModalConfigs = Array.isArray(leaveConfigs)
                           ? leaveConfigs.filter(c => c.tier === 'special' && c.enabled)
                           : [];
@@ -3962,7 +4245,7 @@ function App() {
                             ];
 
                         const modalTabs = [
-                          { id: 'annual', label: 'Annual Bank', count: annualModalConfigs.length },
+                          { id: 'annual', label: isAnnualBankDepleted ? 'Annual Bank (LOP)' : 'Annual Bank', count: annualModalConfigs.length },
                           ...(specialModalConfigs.length > 0 ? [{ id: 'special', label: 'Special', count: specialModalConfigs.length }] : []),
                           { id: 'remote', label: 'Remote / WFH' }
                         ];
@@ -3996,25 +4279,41 @@ function App() {
                               className="w-full"
                             />
 
+                            {mobileModalTierTab === 'annual' && isAnnualBankDepleted && (
+                              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-500/10 border border-zinc-500/20 text-zinc-700 dark:text-zinc-300 text-xs">
+                                <AlertCircle size={14} className="text-zinc-500 flex-shrink-0" />
+                                <span className="text-[11px] leading-tight">
+                                  {totalAnnualBankRemaining === 0.5 
+                                    ? "0.5 days remaining in annual bank. You can use it or take Unpaid Leave (LOP)."
+                                    : "Annual bank depleted. Unpaid Leave (LOP) fallback active."}
+                                </span>
+                              </div>
+                            )}
+
                             <MorphingTabContent activeKey={mobileModalTierTab}>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-1.5 pb-2">
                                 {currentTabConfigs.map(item => {
                                   const isActive = mobileLeaveType === item.id;
-                                  const curBal = item.id === 'wfh'
-                                    ? Math.max(0, (item.quota || 10) - bookedDates.filter(b => b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(getTodayStr().substring(0, 7))).reduce((s, b) => s + (b.duration || 1), 0))
-                                    : item.cadence === 'month'
-                                      ? Math.max(0, (item.quota || 1) - (leaves[item.id]?.used || 0))
-                                      : Math.max(0, (item.quota || leaves[item.id]?.total || 10) - (leaves[item.id]?.used || 0));
+                                  const isLop = item.id === 'lop';
+                                  const curBal = isLop
+                                    ? lopUsedThisYear
+                                    : item.id === 'wfh'
+                                      ? Math.max(0, (item.quota || 10) - bookedDates.filter(b => b.type === 'wfh' && typeof b.date === 'string' && b.date.startsWith(getTodayStr().substring(0, 7))).reduce((s, b) => s + (b.duration || 1), 0))
+                                      : item.cadence === 'month'
+                                        ? Math.max(0, (item.quota || 1) - (leaves[item.id]?.used || 0))
+                                        : Math.max(0, (item.quota || leaves[item.id]?.total || 10) - (leaves[item.id]?.used || 0));
 
-                                  const displayRemaining = item.id === 'wfh'
-                                    ? `${curBal}/mo`
-                                    : item.cadence === 'month'
+                                  const displayRemaining = isLop
+                                    ? `${lopUsedThisYear} taken`
+                                    : item.id === 'wfh'
                                       ? `${curBal}/mo`
-                                      : `${curBal} left`;
+                                      : item.cadence === 'month'
+                                        ? `${curBal}/mo`
+                                        : `${curBal} left`;
 
                                   const minReq = (previewDates.length === 1 && item.allowsHalfDay !== false) ? 0.5 : workingLeaves;
                                   const maxConsecutive = item.constraints?.maxConsecutive;
-                                  const isInsufficient = curBal < minReq;
+                                  const isInsufficient = isLop ? false : (curBal < minReq);
                                   const isConsecutiveExceeded = Boolean(maxConsecutive && workingLeaves > maxConsecutive);
                                   const isRhOverLimit = item.id === 'rh' && workingLeaves > 1;
 
@@ -4090,24 +4389,24 @@ function App() {
                             <button
                               type="button"
                               onClick={() => setMobileDuration(1)}
-                              disabled={selectedMobileBal < 1}
+                              disabled={mobileLeaveType !== 'lop' && selectedMobileBal < 1}
                               className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                                 mobileDuration === 1 
                                   ? 'bg-primary text-primary-foreground shadow-xs' 
                                   : 'text-muted-foreground hover:text-foreground'
-                              } ${selectedMobileBal < 1 ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+                              } ${mobileLeaveType !== 'lop' && selectedMobileBal < 1 ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
                             >
                               Full Day (1.0)
                             </button>
                             <button
                               type="button"
                               onClick={() => setMobileDuration(0.5)}
-                              disabled={selectedMobileBal < 0.5}
+                              disabled={mobileLeaveType !== 'lop' && selectedMobileBal < 0.5}
                               className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                                 mobileDuration === 0.5 
                                   ? 'bg-primary text-primary-foreground shadow-xs' 
                                   : 'text-muted-foreground hover:text-foreground'
-                              } ${selectedMobileBal < 0.5 ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+                              } ${mobileLeaveType !== 'lop' && selectedMobileBal < 0.5 ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
                             >
                               Half Day (0.5)
                             </button>
@@ -4135,9 +4434,9 @@ function App() {
                       <button 
                         id="tutorial-step-modal-apply-btn-mobile"
                         onClick={handleMobileApply} 
-                        disabled={!isTutorialActive && (selectedMobileBal < mobileLeavesNeeded || selectedMobileBal <= 0)}
+                        disabled={!isTutorialActive && mobileLeaveType !== 'lop' && (selectedMobileBal < mobileLeavesNeeded || selectedMobileBal <= 0)}
                         className={`flex-[2] py-3 rounded-xl text-xs font-black shadow-lg flex items-center justify-center gap-2 transition-all ${
-                          !isTutorialActive && (selectedMobileBal < mobileLeavesNeeded || selectedMobileBal <= 0)
+                          !isTutorialActive && mobileLeaveType !== 'lop' && (selectedMobileBal < mobileLeavesNeeded || selectedMobileBal <= 0)
                             ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed pointer-events-none'
                             : 'bg-primary text-primary-foreground cursor-pointer active:scale-98'
                         }`}
@@ -4289,7 +4588,10 @@ function App() {
               })()}
               <div className="flex justify-around items-center px-2 py-1.5">
                 <button 
-                  onClick={() => setActiveTab('calendar')} 
+                  onClick={() => {
+                    setActiveTab('calendar');
+                    scrollToTop();
+                  }} 
                   className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-colors ${activeTab === 'calendar' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <CalendarIcon size={20} className="mb-1"/>
@@ -4313,7 +4615,10 @@ function App() {
 
                 <button 
                   data-testid="mobile-nav-tracker"
-                  onClick={() => setActiveTab('tracker')} 
+                  onClick={() => {
+                    setActiveTab('tracker');
+                    scrollToTop();
+                  }} 
                   className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-colors ${activeTab === 'tracker' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   <div className="relative">
@@ -4452,6 +4757,7 @@ function App() {
             leaveNames={leaveNames}
             leaveColors={leaveColors}
             wfhPromptHour={wfhPromptHour}
+            leaves={leaves}
           />
         );
       })()}

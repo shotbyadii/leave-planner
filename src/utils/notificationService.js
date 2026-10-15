@@ -177,9 +177,18 @@ export const showAppNotification = async (title, options = {}) => {
   // 1. Mobile & PWA: Prefer ServiceWorker showNotification (mandatory on Android / iOS PWA)
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && typeof reg.showNotification === 'function') {
-        await reg.showNotification(title, notificationOptions);
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      }
+
+      const activeReg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((resolve) => setTimeout(() => resolve(reg), 2500))
+      ]) || reg;
+
+      if (activeReg && typeof activeReg.showNotification === 'function') {
+        await activeReg.showNotification(title, notificationOptions);
         return true;
       }
     } catch (swErr) {
@@ -215,4 +224,176 @@ export const triggerTestWebPush = async (userId = null) => {
     console.warn('[NotificationService] triggerTestWebPush failed:', err);
     return { success: false, error: err.message };
   }
+};
+
+/**
+ * Triggers a rich ongoing / live activity notification for single-day attendance check-in.
+ * Specifically crafted for ColorOS 15/16 Fluid Cloud / Live Alert capsules on Oppo / OnePlus devices.
+ */
+export const showAttendanceLiveActivity = async ({ dateStr = null, userId = null } = {}) => {
+  if (!isNotificationSupported()) {
+    return false;
+  }
+
+  const effectiveDate = dateStr || new Date().toISOString().split('T')[0];
+
+  let dateLabel = 'today';
+  try {
+    const [y, m, d] = effectiveDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  } catch (_) {}
+
+  const title = 'Attendance Check-in';
+  const body = `Where are you working ${dateLabel}?`;
+
+  const options = {
+    body,
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
+    tag: 'leave-vault-attendance',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [150, 80, 150],
+    actions: [
+      { action: 'action_wfh', title: '🏠 WFH' },
+      { action: 'action_office', title: '🏢 Office' },
+      { action: 'action_leave', title: '🌴 Leave' }
+    ],
+    data: {
+      url: `/?action=attendance&date=${effectiveDate}`,
+      date: effectiveDate,
+      userId: userId || null,
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY
+    }
+  };
+
+  return await showAppNotification(title, options);
+};
+
+/**
+ * Triggers a smart catch-up notification when multiple past working days are unrecorded.
+ * Provides quick actions to review swipe cards or record all as In-Office.
+ */
+export const showAttendanceCatchupNotification = async ({ count = 1, unloggedDates = [], userId = null } = {}) => {
+  if (!isNotificationSupported()) return false;
+
+  const title = 'Attendance Catch-up';
+  const body = count === 1 
+    ? 'You have 1 past unrecorded working day this month.' 
+    : `You have ${count} past unrecorded working days this month.`;
+
+  const options = {
+    body,
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
+    tag: 'leave-vault-catchup',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [150, 80, 150],
+    actions: [
+      { action: 'action_catchup_review', title: '🗂️ Review' },
+      { action: 'action_all_office', title: '🏢 All Office' }
+    ],
+    data: {
+      url: '/?action=attendance&mode=catchup',
+      dates: unloggedDates,
+      userId: userId || null,
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY
+    }
+  };
+
+  return await showAppNotification(title, options);
+};
+
+/**
+ * Triggers a timely reminder on the evening before a booked leave or vacation begins.
+ */
+export const showUpcomingLeaveNotification = async ({ planName = 'Your planned leave', startDate = null, daysCount = 1 } = {}) => {
+  if (!isNotificationSupported()) return false;
+
+  const title = 'Upcoming Leave Tomorrow';
+  const daysText = daysCount > 1 ? ` (${daysCount} days off)` : '';
+  const body = `${planName} begins tomorrow${daysText}. Have a restful break!`;
+
+  const options = {
+    body,
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
+    tag: `upcoming-leave-${startDate || 'tomorrow'}`,
+    renotify: false,
+    requireInteraction: false,
+    actions: [
+      { action: 'action_view_plan', title: '✈️ View Plan' }
+    ],
+    data: {
+      url: '/?action=tracker'
+    }
+  };
+
+  return await showAppNotification(title, options);
+};
+
+/**
+ * Triggers an alert when approaching or exhausting monthly WFH or annual leave quotas.
+ */
+export const showQuotaAlertNotification = async ({ type = 'wfh', used = 0, total = 10, remaining = 0 } = {}) => {
+  if (!isNotificationSupported()) return false;
+
+  let title = 'Quota Alert';
+  let body = '';
+
+  if (type === 'wfh') {
+    title = 'WFH Quota Alert';
+    body = remaining === 0
+      ? `All ${total} monthly WFH days have been used. In-office attendance expected for remaining workdays.`
+      : `You've used ${used} of ${total} monthly WFH days (${remaining} remaining).`;
+  } else {
+    title = 'Leave Bank Depleted';
+    body = 'All annual leave days are currently used. Unpaid Leave (LOP) is now active.';
+  }
+
+  const options = {
+    body,
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
+    tag: `quota-alert-${type}`,
+    renotify: true,
+    actions: [
+      { action: 'action_view_tracker', title: '📊 View Tracker' }
+    ],
+    data: {
+      url: '/?action=tracker'
+    }
+  };
+
+  return await showAppNotification(title, options);
+};
+
+/**
+ * Triggers a reminder on the eve of a public holiday or natural long weekend.
+ */
+export const showHolidayNotification = async ({ holidayName = 'Public Holiday', dateStr = null, isLongWeekend = false } = {}) => {
+  if (!isNotificationSupported()) return false;
+
+  const title = isLongWeekend ? 'Long Weekend Ahead' : 'Public Holiday Tomorrow';
+  const body = `Office is closed tomorrow for ${holidayName}. Enjoy your day off!`;
+
+  const options = {
+    body,
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
+    tag: `holiday-${dateStr || 'tomorrow'}`,
+    renotify: false,
+    actions: [
+      { action: 'action_view_calendar', title: '🗓️ Calendar' }
+    ],
+    data: {
+      url: '/?action=calendar'
+    }
+  };
+
+  return await showAppNotification(title, options);
 };

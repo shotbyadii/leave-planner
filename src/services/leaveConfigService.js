@@ -126,6 +126,27 @@ export const DEFAULT_LEAVE_CONFIGS = [
   }
 ];
 
+// ─── Loss of Pay Fallback (Unpaid Leave) ─────────────────────
+export const LOP_CONFIG = {
+  id: 'lop',
+  name: 'Unpaid Leave (LOP)',
+  shortCode: 'LOP',
+  tier: 'unpaid',
+  color: 'zinc',
+  quota: 0,
+  cadence: 'year',
+  deductsFromAnnual: false,
+  enabled: true,
+  isSystem: true,
+  allowsHalfDay: true,
+  subtitle: 'Loss of Pay fallback when annual vacation bank is depleted',
+  constraints: {
+    maxConsecutive: null,
+    requiresNote: false,
+    warningMessage: null,
+  }
+};
+
 /**
  * Derives a short 2-3 letter code from a leave name
  */

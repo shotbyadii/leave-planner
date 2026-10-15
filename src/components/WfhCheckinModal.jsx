@@ -35,8 +35,18 @@ const WfhCheckinModal = ({
   leaveConfigs = null,
   leaveNames = { pl: 'Planned Leave', el: 'Emergency Leave', rh: 'Restricted Leave', wfh: 'Work From Home' },
   leaveColors = { pl: 'blue', el: 'orange', rh: 'green', wfh: 'cyan' },
-  wfhPromptHour = '12'
+  wfhPromptHour = '12',
+  leaves = null
 }) => {
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
+  const [direction, setDirection] = useState(0);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [notifPermission, setNotifPermission] = useState('default');
   const [selectedAction, setSelectedAction] = useState(null);
   const [showQuickLeaves, setShowQuickLeaves] = useState(false);
@@ -157,19 +167,77 @@ const WfhCheckinModal = ({
   const isOverQuota = wfhUsedThisMonth >= effectiveMaxWfh;
   const isWarning = !isOverQuota && remainingWfh <= 2;
 
-  // Available quick leaves to take on active date (Tier 3 special benefits + Emergency Leave)
-  const quickLeaves = (Array.isArray(leaveConfigs) ? leaveConfigs : [])
+  // Annual Bank Depletion Check for Loss of Pay (LOP) Fallback
+  const curYear = new Date().getFullYear();
+  const totalAnnualBankRemaining = useMemo(() => {
+    const annualConfigs = (Array.isArray(leaveConfigs) ? leaveConfigs : []).filter(c => c.tier === 'annual' && c.enabled !== false);
+    if (annualConfigs.length > 0) {
+      return annualConfigs.reduce((sum, c) => {
+        if (leaves && leaves[c.id]) {
+          const rem = Math.max(0, (leaves[c.id].total ?? c.quota ?? 0) - (leaves[c.id].used ?? 0));
+          return sum + rem;
+        }
+        const used = bookedDates
+          .filter(b => b && b.type === c.id && typeof b.date === 'string' && b.date.startsWith(String(curYear)))
+          .reduce((s, b) => s + (b.duration || 1), 0);
+        return sum + Math.max(0, (c.quota || 0) - used);
+      }, 0);
+    }
+    const plRem = Math.max(0, (leaves?.pl?.total ?? 15) - (leaves?.pl?.used ?? 0));
+    const elRem = Math.max(0, (leaves?.el?.total ?? 10) - (leaves?.el?.used ?? 0));
+    const rhRem = Math.max(0, (leaves?.rh?.total ?? 1) - (leaves?.rh?.used ?? 0));
+    return plRem + elRem + rhRem;
+  }, [leaveConfigs, leaves, bookedDates, curYear]);
+
+  const isAnnualBankDepleted = totalAnnualBankRemaining <= 0.5;
+
+  const lopUsedThisYear = useMemo(() => {
+    return Array.isArray(bookedDates)
+      ? bookedDates.filter(b => b && b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(String(curYear))).reduce((sum, b) => sum + (b.duration || 1), 0)
+      : 0;
+  }, [bookedDates, curYear]);
+
+  // Available quick leaves to take on active date (Tier 3 special benefits + Emergency Leave + LOP if annual bank <= 0.5)
+  const baseQuickLeaves = (Array.isArray(leaveConfigs) ? leaveConfigs : [])
     .filter(c => c.enabled && (c.tier === 'special' || c.id === 'el'));
 
+  const quickLeaves = isAnnualBankDepleted
+    ? [
+        ...baseQuickLeaves,
+        { id: 'lop', name: 'Unpaid Leave (LOP)', shortCode: 'LOP', color: 'zinc', tier: 'unpaid', quota: lopUsedThisYear, cadence: 'year', isLop: true }
+      ]
+    : baseQuickLeaves;
+
+  const getLeaveRemaining = useCallback((leaveId, cfg) => {
+    if (leaveId === 'lop') return lopUsedThisYear;
+    if (leaves && leaves[leaveId]) {
+      const tot = leaves[leaveId].total ?? cfg?.quota ?? 0;
+      const u = leaves[leaveId].used ?? 0;
+      return Math.max(0, tot - u);
+    }
+    const tot = cfg?.quota || 0;
+    const u = bookedDates
+      .filter(b => b && b.type === leaveId && typeof b.date === 'string' && b.date.startsWith(String(curYear)))
+      .reduce((s, b) => s + (b.duration || 1), 0);
+    return Math.max(0, tot - u);
+  }, [leaves, bookedDates, curYear, lopUsedThisYear]);
+
   // Currently selected action item details
-  const activeSelectedConfig = Array.isArray(leaveConfigs)
-    ? leaveConfigs.find(c => c.id === selectedAction)
-    : null;
-  const selectedLabel = activeSelectedConfig?.name || leaveNames[selectedAction] || (selectedAction === 'office' ? 'In-Office' : selectedAction);
-  const selectedColor = activeSelectedConfig?.color || leaveColors?.[selectedAction] || 'cyan';
-  const selectedTotal = activeSelectedConfig?.quota || (selectedAction === 'wfh' ? effectiveMaxWfh : 10);
-  const usedForSelected = bookedDates.filter(b => b.type === selectedAction).reduce((acc, b) => acc + (b.duration || 1), 0);
-  const remainingForSelected = selectedAction === 'wfh' ? remainingWfh : Math.max(0, selectedTotal - usedForSelected);
+  const isLopSelected = selectedAction === 'lop';
+  const activeSelectedConfig = isLopSelected
+    ? { id: 'lop', name: 'Unpaid Leave (LOP)', shortCode: 'LOP', color: 'zinc', quota: lopUsedThisYear + 1 }
+    : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === selectedAction) : null);
+
+  const selectedLabel = isLopSelected
+    ? 'Unpaid Leave (LOP)'
+    : (activeSelectedConfig?.name || leaveNames[selectedAction] || (selectedAction === 'office' ? 'In-Office' : selectedAction));
+  const selectedColor = isLopSelected ? 'zinc' : (activeSelectedConfig?.color || leaveColors?.[selectedAction] || 'cyan');
+  const selectedTotal = isLopSelected
+    ? lopUsedThisYear + 1
+    : (activeSelectedConfig?.quota || (selectedAction === 'wfh' ? effectiveMaxWfh : 10));
+  const remainingForSelected = isLopSelected
+    ? lopUsedThisYear
+    : (selectedAction === 'wfh' ? remainingWfh : (selectedAction === 'office' ? 0 : getLeaveRemaining(selectedAction, activeSelectedConfig)));
 
   // Map booked dates in current month by date string YYYY-MM-DD
   const bookedMap = useMemo(() => {
@@ -192,6 +260,7 @@ const WfhCheckinModal = ({
   const handlePrevCard = useCallback(() => {
     if (activeCardIndex > 0) {
       hapticSwipeCard();
+      setDirection(-1);
       setIsDragging(false);
       setDragDeltaX(0);
       setActiveCardIndex(prev => prev - 1);
@@ -203,6 +272,7 @@ const WfhCheckinModal = ({
   const handleNextCard = useCallback(() => {
     if (activeCardIndex < dayStack.length - 1) {
       hapticSwipeCard();
+      setDirection(1);
       setIsDragging(false);
       setDragDeltaX(0);
       setActiveCardIndex(prev => prev + 1);
@@ -360,6 +430,7 @@ const WfhCheckinModal = ({
     // If there are more cards after this one, advance index, else close
     if (activeCardIndex < dayStack.length - 1) {
       hapticSwipeCard();
+      setDirection(1);
       setIsDragging(false);
       setDragDeltaX(0);
       setActiveCardIndex(prev => prev + 1);
@@ -368,6 +439,26 @@ const WfhCheckinModal = ({
     } else {
       onClose();
     }
+  };
+
+  const desktopCardVariants = {
+    enter: (dir) => ({
+      x: dir > 0 ? 32 : dir < 0 ? -32 : 0,
+      opacity: 0,
+      scale: 0.98
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] }
+    },
+    exit: (dir) => ({
+      x: dir > 0 ? -32 : dir < 0 ? 32 : 0,
+      opacity: 0,
+      scale: 0.98,
+      transition: { duration: 0.16, ease: [0.32, 0.72, 0, 1] }
+    })
   };
 
   const renderCarouselCard = (cardDateStr, idx) => {
@@ -402,30 +493,8 @@ const WfhCheckinModal = ({
       : 0;
     const isCardConsecutiveExceeded = Boolean(maxConsecutiveWfh && cardConsecutiveWfhCount > maxConsecutiveWfh);
 
-    return (
-      <motion.div
-        key={cardDateStr}
-        initial={false}
-        animate={{
-          x: offsetPx,
-          scale: cardScale,
-          opacity: cardOpacity
-        }}
-        transition={
-          isDragging
-            ? { duration: 0 }
-            : { type: 'spring', stiffness: 360, damping: 32, mass: 0.85 }
-        }
-        style={{ zIndex: cardZIndex }}
-        onClick={!isCenterCard ? () => {
-          if (swipeRef.current.wasSwiped) return;
-          if (idx < activeCardIndex) handlePrevCard();
-          else if (idx > activeCardIndex) handleNextCard();
-        } : undefined}
-        className={`col-start-1 row-start-1 relative bg-card w-full rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col max-h-[min(86dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px)))] touch-pan-y ${
-          isMultiDayMode ? (isCenterCard ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : ''
-        }`}
-      >
+    const cardContent = (
+      <>
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-border bg-muted/40 flex justify-between items-center flex-shrink-0">
           <div className="min-w-0 pr-2 overflow-hidden text-left">
@@ -467,9 +536,9 @@ const WfhCheckinModal = ({
               className="w-full flex flex-col items-center justify-center py-2"
             >
               <AppleBalanceTicker
-                initialValue={remainingForSelected}
-                targetValue={selectedAction === 'office' ? remainingForSelected : Math.max(0, remainingForSelected - 1)}
-                totalQuota={selectedTotal}
+                initialValue={isLopSelected ? lopUsedThisYear : remainingForSelected}
+                targetValue={isLopSelected ? (lopUsedThisYear + 1) : (selectedAction === 'office' ? remainingForSelected : Math.max(0, remainingForSelected - 1))}
+                totalQuota={isLopSelected ? (lopUsedThisYear + 1) : selectedTotal}
                 leaveType={selectedAction}
                 leaveLabel={selectedLabel}
                 leaveColor={selectedColor}
@@ -631,22 +700,51 @@ const WfhCheckinModal = ({
                       <div className="grid grid-cols-2 gap-2">
                         {quickLeaves.map(q => {
                           const short = q.shortCode || getShortform(q.name);
+                          const isLop = q.id === 'lop';
+                          const remaining = getLeaveRemaining(q.id, q);
+                          const isAnnual = q.tier === 'annual' || q.id === 'el';
+                          // Attendance check-in requires 1 full day (1.0).
+                          // If leave has < 1 day remaining, or if it's an annual leave and totalAnnualBankRemaining < 1:
+                          const isExhausted = !isLop && (remaining < 1 || (isAnnual && totalAnnualBankRemaining < 1));
+
                           return (
                             <button
                               key={q.id}
                               type="button"
+                              disabled={isExhausted}
                               onClick={() => {
+                                if (isExhausted) return;
                                 hapticYes();
                                 setSelectedAction(q.id);
                               }}
-                              className="p-2.5 bg-card hover:bg-muted border border-border/80 hover:border-border rounded-xl flex items-center gap-2 text-left transition-all active:scale-95 cursor-pointer"
+                              className={`p-2.5 bg-card border rounded-xl flex items-center gap-2 text-left transition-all ${
+                                isExhausted
+                                  ? 'opacity-35 cursor-not-allowed pointer-events-none bg-muted/20 border-dashed border-border/50 text-muted-foreground'
+                                  : isLop
+                                    ? 'border-zinc-500/40 bg-zinc-500/10 hover:border-zinc-500/60 active:scale-95 cursor-pointer hover:bg-muted'
+                                    : 'border-border/80 hover:border-border hover:bg-muted active:scale-95 cursor-pointer'
+                              }`}
                             >
-                              <span className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center font-mono text-[10px] font-black text-foreground border border-border">
+                              <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono text-[10px] font-black border flex-shrink-0 ${
+                                isExhausted
+                                  ? 'bg-muted/40 text-muted-foreground/50 border-border/40'
+                                  : isLop
+                                    ? 'bg-zinc-500/20 text-zinc-700 dark:text-zinc-200 border-zinc-500/40'
+                                    : 'bg-muted text-foreground border-border'
+                              }`}>
                                 {short}
                               </span>
                               <div className="min-w-0 flex-1">
                                 <div className="text-xs font-bold text-foreground truncate">{q.name}</div>
-                                <div className="text-[10px] text-muted-foreground font-mono">{q.quota} {q.cadence === 'month' ? '/mo' : '/yr'}</div>
+                                <div className="text-[10px] font-mono truncate">
+                                  {isExhausted ? (
+                                    <span className="text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">0 left • Exhausted</span>
+                                  ) : isLop ? (
+                                    <span className="text-muted-foreground">{q.quota} taken • Loss of Pay</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">{remaining} left • {q.cadence === 'month' ? '/mo' : '/yr'}</span>
+                                  )}
+                                </div>
                               </div>
                             </button>
                           );
@@ -679,6 +777,51 @@ const WfhCheckinModal = ({
             </div>
           )}
         </div>
+      </>
+    );
+
+    if (isDesktop) {
+      return (
+        <motion.div
+          key={cardDateStr}
+          custom={direction}
+          variants={desktopCardVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          style={{ zIndex: 30 }}
+          className="col-start-1 row-start-1 relative bg-card w-full rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col max-h-[min(86dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px)))]"
+        >
+          {cardContent}
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        key={cardDateStr}
+        initial={false}
+        animate={{
+          x: offsetPx,
+          scale: cardScale,
+          opacity: cardOpacity
+        }}
+        transition={
+          isDragging
+            ? { duration: 0 }
+            : { type: 'spring', stiffness: 360, damping: 32, mass: 0.85 }
+        }
+        style={{ zIndex: cardZIndex }}
+        onClick={!isCenterCard ? () => {
+          if (swipeRef.current.wasSwiped) return;
+          if (idx < activeCardIndex) handlePrevCard();
+          else if (idx > activeCardIndex) handleNextCard();
+        } : undefined}
+        className={`col-start-1 row-start-1 relative bg-card w-full rounded-[32px] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col max-h-[min(86dvh,calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px)))] touch-pan-y ${
+          isMultiDayMode ? (isCenterCard ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') : ''
+        }`}
+      >
+        {cardContent}
       </motion.div>
     );
   };
@@ -708,7 +851,7 @@ const WfhCheckinModal = ({
             {/* Top Multi-Day Stack Header / Counter */}
             {isMultiDayMode && (
               <div 
-                className="w-[84vw] max-w-[336px] sm:max-w-[400px] flex items-center justify-between px-3 py-2 mb-2.5 bg-card rounded-2xl border border-border/80 text-xs shadow-lg z-30"
+                className={`${isDesktop ? 'w-full max-w-md' : 'w-[84vw] max-w-[336px] sm:max-w-[400px]'} flex items-center justify-between px-3 py-2 mb-2.5 bg-card rounded-2xl border border-border/80 text-xs shadow-lg z-30`}
               >
                 <div className="flex items-center gap-2 font-mono">
                   <div className="p-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -744,21 +887,27 @@ const WfhCheckinModal = ({
             {/* Horizontal Multi-Card Carousel Stage */}
             <div
               ref={carouselStageRef}
-              onTouchStart={isMultiDayMode ? handleCardTouchStart : undefined}
-              onTouchMove={isMultiDayMode ? handleCardTouchMove : undefined}
-              onTouchEnd={isMultiDayMode ? handleCardTouchEnd : undefined}
-              onTouchCancel={isMultiDayMode ? handleCardTouchEnd : undefined}
-              onMouseDown={isMultiDayMode ? handleCardMouseDown : undefined}
-              onMouseMove={isMultiDayMode ? handleCardMouseMove : undefined}
-              onMouseUp={isMultiDayMode ? handleCardMouseUp : undefined}
-              onMouseLeave={isMultiDayMode ? handleCardMouseUp : undefined}
-              onClickCapture={isMultiDayMode ? handleCardClickCapture : undefined}
-              className={`relative ${isMultiDayMode ? 'w-[84vw] max-w-[336px] sm:max-w-[400px]' : 'w-full max-w-md'} grid grid-cols-1 grid-rows-1 items-center justify-items-center overflow-visible`}
+              onTouchStart={!isDesktop && isMultiDayMode ? handleCardTouchStart : undefined}
+              onTouchMove={!isDesktop && isMultiDayMode ? handleCardTouchMove : undefined}
+              onTouchEnd={!isDesktop && isMultiDayMode ? handleCardTouchEnd : undefined}
+              onTouchCancel={!isDesktop && isMultiDayMode ? handleCardTouchEnd : undefined}
+              onMouseDown={!isDesktop && isMultiDayMode ? handleCardMouseDown : undefined}
+              onMouseMove={!isDesktop && isMultiDayMode ? handleCardMouseMove : undefined}
+              onMouseUp={!isDesktop && isMultiDayMode ? handleCardMouseUp : undefined}
+              onMouseLeave={!isDesktop && isMultiDayMode ? handleCardMouseUp : undefined}
+              onClickCapture={!isDesktop && isMultiDayMode ? handleCardClickCapture : undefined}
+              className={`relative ${isMultiDayMode ? (isDesktop ? 'w-full max-w-md' : 'w-[84vw] max-w-[336px] sm:max-w-[400px]') : 'w-full max-w-md'} grid grid-cols-1 grid-rows-1 items-center justify-items-center overflow-visible`}
             >
-              {dayStack.map((cardDateStr, idx) => {
-                if (Math.abs(idx - activeCardIndex) > 2) return null;
-                return renderCarouselCard(cardDateStr, idx);
-              })}
+              {isDesktop ? (
+                <AnimatePresence mode="popLayout" custom={direction} initial={false}>
+                  {dayStack[activeCardIndex] && renderCarouselCard(dayStack[activeCardIndex], activeCardIndex)}
+                </AnimatePresence>
+              ) : (
+                dayStack.map((cardDateStr, idx) => {
+                  if (Math.abs(idx - activeCardIndex) > 2) return null;
+                  return renderCarouselCard(cardDateStr, idx);
+                })
+              )}
             </div>
 
             {/* Multi-day Interactive Dots */}
@@ -772,6 +921,7 @@ const WfhCheckinModal = ({
                       onClick={() => {
                         if (idx === activeCardIndex) return;
                         hapticSwipeCard();
+                        setDirection(idx > activeCardIndex ? 1 : -1);
                         setIsDragging(false);
                         setDragDeltaX(0);
                         setActiveCardIndex(idx);

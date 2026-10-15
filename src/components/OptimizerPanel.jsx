@@ -113,14 +113,25 @@ const OptimizerPanel = ({
   onExecuteAction
 }) => {
   const brandTheme = useMemo(() => getBrandTheme(companyName), [companyName]);
-  const plRem = leaves?.pl ? (leaves.pl.total - leaves.pl.used) : 15;
-  const elRem = leaves?.el ? (leaves.el.total - leaves.el.used) : 10;
-  const rhRem = leaves?.rh ? (leaves.rh.total - leaves.rh.used) : 1;
-  const maxUsableLeaves = Math.max(1, Math.floor(plRem + Math.min(elRem, 2) + Math.min(rhRem, 1)));
+  
+  const totalAnnualRemaining = useMemo(() => {
+    if (Array.isArray(leaveConfigs) && leaveConfigs.length > 0) {
+      const annuals = leaveConfigs.filter(c => c.tier === 'annual' && c.enabled);
+      if (annuals.length > 0) {
+        return annuals.reduce((sum, c) => sum + Math.max(0, (leaves?.[c.id]?.total ?? c.quota ?? 0) - (leaves?.[c.id]?.used ?? 0)), 0);
+      }
+    }
+    const plR = leaves?.pl ? Math.max(0, leaves.pl.total - leaves.pl.used) : 15;
+    const elR = leaves?.el ? Math.max(0, leaves.el.total - leaves.el.used) : 10;
+    const rhR = leaves?.rh ? Math.max(0, leaves.rh.total - leaves.rh.used) : 1;
+    return plR + Math.min(elR, 2) + Math.min(rhR, 1);
+  }, [leaveConfigs, leaves]);
+
+  const maxUsableLeaves = Math.max(0, Math.floor(totalAnnualRemaining));
 
   const [optimizerMode, setOptimizerMode] = useState('best'); // 'best' | 'manual'
   const [leaveFilterTier, setLeaveFilterTier] = useState('all'); // 'all' | '1-2' | '3-4' | '5+'
-  const [targetLeaves, setTargetLeaves] = useState(Math.min(2, maxUsableLeaves));
+  const [targetLeaves, setTargetLeaves] = useState(() => Math.min(2, Math.max(1, maxUsableLeaves)));
   const [targetDuration, setTargetDuration] = useState(null);
   const [targetMonth, setTargetMonth] = useState('all');
   const [suggestions, setSuggestions] = useState([]);
@@ -347,8 +358,12 @@ const OptimizerPanel = ({
   }, [optimizerMode, leaveFilterTier, targetLeaves, targetMonth, targetDuration, bookedDates, maxUsableLeaves]);
 
   const handleOptimize = () => {
+    if (maxUsableLeaves <= 0) {
+      setSuggestions([]);
+      return;
+    }
     const results = findOptimalWindows({
-      targetLeaves: optimizerMode === 'best' ? maxUsableLeaves : targetLeaves,
+      targetLeaves: optimizerMode === 'best' ? maxUsableLeaves : Math.min(targetLeaves, maxUsableLeaves),
       targetDuration,
       targetMonth,
       bookedDates,
@@ -628,12 +643,28 @@ const OptimizerPanel = ({
           <Lightbulb size={13} className="text-amber-500" />
           {panelViewMode === 'ai' ? 'Live Optimization Picks' : (optimizerMode === 'best' ? 'Best Ratio Picks' : `${targetLeaves}-Day Optimizations`)}
         </span>
-        <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-          Max {maxUsableLeaves} Usable
+        <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+          maxUsableLeaves === 0 
+            ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30' 
+            : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+        }`}>
+          {maxUsableLeaves === 0 ? '0 Leaves Left' : `Max ${maxUsableLeaves} Usable`}
         </span>
       </div>
 
-      {suggestions.length === 0 ? (
+      {maxUsableLeaves <= 0 ? (
+        <div className="p-6 text-center text-muted-foreground flex flex-col items-center gap-2.5 bg-muted/20 border border-border/60 rounded-2xl my-2">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center">
+            <Compass size={20} className="stroke-2" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-foreground font-mono">0 Leaves Available</h4>
+            <p className="text-[11px] text-muted-foreground max-w-xs leading-relaxed">
+              All annual leave balance is currently exhausted. No trip suggestions are possible until additional leave quota is added or existing leaves are unbooked.
+            </p>
+          </div>
+        </div>
+      ) : suggestions.length === 0 ? (
         <div className="p-6 text-center text-muted-foreground flex flex-col items-center gap-2">
           <Compass size={24} className="text-muted-foreground/40 stroke-1" />
           <p className="text-xs font-medium">No optimal leave windows found for selected criteria.</p>
@@ -1635,24 +1666,30 @@ const OptimizerPanel = ({
                   className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5"
                 >
                   {[
-                    { id: 'all', label: '🌟 All Tiers' },
-                    { id: '1-2', label: '⚡ 1-2 Leaves' },
-                    { id: '3-4', label: '✈️ 3-4 Leaves' },
-                    { id: '5+', label: '🏝️ 5+ Leaves' }
-                  ].map(tier => (
-                    <button
-                      key={tier.id}
-                      type="button"
-                      onClick={() => setLeaveFilterTier(tier.id)}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-xl transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
-                        leaveFilterTier === tier.id
-                          ? 'bg-primary text-primary-foreground font-black shadow-xs'
-                          : 'bg-card text-muted-foreground border border-border/80 hover:text-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {tier.label}
-                    </button>
-                  ))}
+                    { id: 'all', label: '🌟 All Tiers', minRequired: 0 },
+                    { id: '1-2', label: '⚡ 1-2 Leaves', minRequired: 1 },
+                    { id: '3-4', label: '✈️ 3-4 Leaves', minRequired: 3 },
+                    { id: '5+', label: '🏝️ 5+ Leaves', minRequired: 5 }
+                  ].map(tier => {
+                    const isDisabled = maxUsableLeaves < tier.minRequired;
+                    return (
+                      <button
+                        key={tier.id}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => !isDisabled && setLeaveFilterTier(tier.id)}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-xl transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                          isDisabled
+                            ? 'opacity-30 cursor-not-allowed bg-muted text-muted-foreground border border-border/40'
+                            : leaveFilterTier === tier.id
+                            ? 'bg-primary text-primary-foreground font-black shadow-xs'
+                            : 'bg-card text-muted-foreground border border-border/80 hover:text-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {tier.label}
+                      </button>
+                    );
+                  })}
                 </motion.div>
               ) : (
                 <motion.div 
@@ -1667,16 +1704,18 @@ const OptimizerPanel = ({
                   <div className="flex items-center gap-3">
                     <button 
                       type="button"
+                      disabled={targetLeaves <= 1 || maxUsableLeaves <= 0}
                       onClick={() => setTargetLeaves(Math.max(1, targetLeaves - 1))}
-                      className="w-7 h-7 rounded-xl bg-muted border border-border flex items-center justify-center text-foreground hover:bg-muted/80 active:scale-95 transition-all cursor-pointer"
+                      className="w-7 h-7 rounded-xl bg-muted border border-border flex items-center justify-center text-foreground hover:bg-muted/80 active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Minus size={14} />
                     </button>
-                    <span className="font-mono font-black text-sm text-foreground w-4 text-center">{targetLeaves}</span>
+                    <span className="font-mono font-black text-sm text-foreground w-4 text-center">{maxUsableLeaves === 0 ? 0 : targetLeaves}</span>
                     <button 
                       type="button"
+                      disabled={targetLeaves >= maxUsableLeaves || maxUsableLeaves <= 0}
                       onClick={() => setTargetLeaves(Math.min(maxUsableLeaves, targetLeaves + 1))}
-                      className="w-7 h-7 rounded-xl bg-muted border border-border flex items-center justify-center text-foreground hover:bg-muted/80 active:scale-95 transition-all cursor-pointer"
+                      className="w-7 h-7 rounded-xl bg-muted border border-border flex items-center justify-center text-foreground hover:bg-muted/80 active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Plus size={14} />
                     </button>

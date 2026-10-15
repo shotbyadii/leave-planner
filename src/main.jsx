@@ -4,25 +4,18 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
-// Register PWA service worker (production only; unregister in dev to ensure fresh HMR)
+// Register PWA service worker for notifications, offline, and WebAPK installation
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  if (import.meta.env.DEV) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const registration of registrations) {
-        registration.unregister();
-      }
+  const registerSW = () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => {
+      console.warn('Service worker registration failed:', err);
     });
-    if ('caches' in window) {
-      caches.keys().then((keys) => {
-        keys.forEach((key) => caches.delete(key));
-      });
-    }
+  };
+
+  if (document.readyState === 'complete') {
+    registerSW();
   } else {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
-        console.warn('Service worker registration failed:', err);
-      });
-    });
+    window.addEventListener('load', registerSW);
   }
 }
 

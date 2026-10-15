@@ -165,7 +165,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       d.setDate(d.getDate() - 1);
       const prevDateStr = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const prevLeave = bookedDates.find(b => b.date === prevDateStr);
-      const isActualLeaveBooked = prevLeave && ['pl', 'el', 'rh'].includes(prevLeave.type);
+      const isActualLeaveBooked = prevLeave && prevLeave.type !== 'wfh' && prevLeave.type !== 'office';
       if (isActualLeaveBooked || isWeekend(prevDateStr) || isHoliday(prevDateStr)) {
         tripDates.unshift(prevDateStr);
       } else {
@@ -177,7 +177,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
       d.setDate(d.getDate() + 1);
       const nextDateStr = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const nextLeave = bookedDates.find(b => b.date === nextDateStr);
-      const isActualLeaveBooked = nextLeave && ['pl', 'el', 'rh'].includes(nextLeave.type);
+      const isActualLeaveBooked = nextLeave && nextLeave.type !== 'wfh' && nextLeave.type !== 'office';
       if (isActualLeaveBooked || isWeekend(nextDateStr) || isHoliday(nextDateStr)) {
         tripDates.push(nextDateStr);
       } else {
@@ -349,7 +349,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           } else {
             // Universal leave coloring: syncs to user's choice for any leave type
             const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
-            const colorId = cfg?.color || leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'blue');
+            const colorId = (type === 'lop' ? 'zinc' : null) || cfg?.color || leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'blue');
             const theme = getLeaveTheme(colorId);
             baseClasses += `${theme.activeBoxBg} border ${theme.activeBoxBorder} ${theme.activeText} font-black cursor-pointer shadow-sm`;
           }
@@ -398,7 +398,7 @@ const Calendar = ({ holidays, bookedDates, setBookedDates, leaves, setLeaves, lo
           } else {
             // Universal leave coloring
             const cfg = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === type) : null;
-            const colorId = cfg?.color || leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'blue');
+            const colorId = (type === 'lop' ? 'zinc' : null) || cfg?.color || leaveColors?.[type] || (type === 'pl' ? 'blue' : type === 'el' ? 'orange' : type === 'rh' ? 'green' : 'blue');
             const theme = getLeaveTheme(colorId);
             baseClasses += `${theme.bg} text-white font-medium cursor-pointer shadow-sm ring-1 ring-white/20`;
           }

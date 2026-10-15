@@ -61,8 +61,9 @@ export const ExistingLeaveDetailContent = ({
     actualLeavesCount = Math.max(0, totalDays - weekendsCount - holidaysCount);
   }
 
-  const activeConfig = Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leaveType) : null;
-  const themeColorId = activeConfig?.color || leaveColors?.[leaveType] || (leaveType === 'pl' ? 'blue' : leaveType === 'el' ? 'orange' : leaveType === 'rh' ? 'green' : 'blue');
+  const isLop = leaveType === 'lop';
+  const activeConfig = isLop ? null : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === leaveType) : null);
+  const themeColorId = isLop ? 'zinc' : (activeConfig?.color || leaveColors?.[leaveType] || (leaveType === 'pl' ? 'blue' : leaveType === 'el' ? 'orange' : leaveType === 'rh' ? 'green' : 'blue'));
   const theme = getLeaveTheme(themeColorId);
   const bannerTheme = isOffice 
     ? 'bg-slate-50/60 dark:bg-slate-500/10 border-slate-200/80 dark:border-slate-500/30 text-slate-700 dark:text-slate-300'
@@ -71,7 +72,7 @@ export const ExistingLeaveDetailContent = ({
     ? 'bg-slate-100 dark:bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-500/40'
     : theme.activeBadge;
 
-  const leaveTypeName = activeConfig?.name || (leaveNames && leaveNames[leaveType]) || (leaves && leaves[leaveType] && (leaves[leaveType].name || leaves[leaveType].label)) || `${leaveType.toUpperCase()} Leave`;
+  const leaveTypeName = isLop ? 'Unpaid Leave (LOP)' : (activeConfig?.name || (leaveNames && leaveNames[leaveType]) || (leaves && leaves[leaveType] && (leaves[leaveType].name || leaves[leaveType].label)) || `${leaveType.toUpperCase()} Leave`);
 
   const handleTriggerCancelLeave = () => {
     const type = leaveType;
@@ -91,6 +92,25 @@ export const ExistingLeaveDetailContent = ({
         leaveLabel: leaveNames?.wfh || 'Work From Home',
         leaveColor: leaveColors?.wfh || 'cyan',
         deductedCount: 1,
+        actionType: 'restore',
+        onDone: () => onCancelLeave && onCancelLeave(targetDateStr)
+      });
+      return;
+    }
+    if (type === 'lop') {
+      const curYear = new Date().getFullYear();
+      const currentLopUsed = Array.isArray(bookedDates)
+        ? bookedDates.filter(b => b && b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(String(curYear))).reduce((sum, b) => sum + (b.duration || 1), 0)
+        : 1;
+      const targetLopUsed = Math.max(0, currentLopUsed - amount);
+      setTickerData({
+        initialValue: currentLopUsed,
+        targetValue: targetLopUsed,
+        totalQuota: currentLopUsed,
+        leaveType: 'lop',
+        leaveLabel: 'Unpaid Leave (LOP)',
+        leaveColor: 'zinc',
+        deductedCount: amount,
         actionType: 'restore',
         onDone: () => onCancelLeave && onCancelLeave(targetDateStr)
       });
@@ -158,6 +178,25 @@ export const ExistingLeaveDetailContent = ({
     if (!associatedPlan) return;
     const type = (associatedPlan.type || targetLeave?.type || 'pl').toLowerCase();
     const amount = actualLeavesCount || 1;
+    if (type === 'lop') {
+      const curYear = new Date().getFullYear();
+      const currentLopUsed = Array.isArray(bookedDates)
+        ? bookedDates.filter(b => b && b.type === 'lop' && typeof b.date === 'string' && b.date.startsWith(String(curYear))).reduce((sum, b) => sum + (b.duration || 1), 0)
+        : 1;
+      const targetLopUsed = Math.max(0, currentLopUsed - amount);
+      setTickerData({
+        initialValue: currentLopUsed,
+        targetValue: targetLopUsed,
+        totalQuota: currentLopUsed,
+        leaveType: 'lop',
+        leaveLabel: 'Unpaid Leave (LOP)',
+        leaveColor: 'zinc',
+        deductedCount: amount,
+        actionType: 'restore',
+        onDone: () => onCancelPlan && onCancelPlan(associatedPlan.id)
+      });
+      return;
+    }
     const curBalance = (leaves && leaves[type]) ? (leaves[type].total - leaves[type].used) : 10;
     const total = (leaves && leaves[type]) ? leaves[type].total : 15;
     const targetBalance = Math.min(total, curBalance + amount);
