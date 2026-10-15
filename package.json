@@ -12,6 +12,7 @@
     "push:attendance": "node scripts/send-attendance-reminders.js",
     "test:audit": "node scripts/run-audit.js",
     "test:e2e": "playwright test",
+    "publish:releases": "node scripts/publish-all-releases.js",
     "push": "git add . && git commit -m \"UI/UX refinements and calendar revert\" && git push origin main"
   },
   "dependencies": {
