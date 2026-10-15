@@ -2,6 +2,55 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.7] - 2026-10-16
+### Added
+- **Domain Hook & Layout Architecture Modularization**:
+  - Dismantled the 5,072-line `App.jsx` "God Component" down to 926 lines (82% reduction).
+  - Extracted 4 focused custom hooks: `useAuthUser.js`, `useAttendanceManager.js`, `useLeaveManagement.js`, and `useMobileBooking.js`.
+  - Extracted 8 dedicated mobile bottom-dock sheets (`MobileBottomNav`, `MobileFloatingDock`, `MobileLeaveBookingSheet`, `MobileLeaveDetailSheet`, `MobileMenuSheet`, `MobileProfileSheet`, `MobileSelectionBar`, `MobileSettingsSheet`).
+  - Extracted isolated layout shells: `DesktopHeader.jsx`, `MobileHeader.jsx`, and modal coordinator `AppModals.jsx`.
+- **Database & Security Hardening**:
+  - Added `supabase_security_hardening.sql` production migration with strict per-user Row Level Security (`auth.uid() = user_id`), unique compound index `leaves_user_date_idx (user_id, date)`, performance indexes, and automatic profile provisioning trigger.
+  - Scoped data reset actions in `leaveService.js` to prevent unauthenticated wildcard deletion.
+
+### Fixed
+- **Bottom-Up Mobile Morphing & Physics**:
+  - Anchored transform origin to `bottom center` with harmonized directional vectors (`y: 12` on entry and exit), ensuring all modal sheets expand from the navbar upwards and collapse back down into the navbar in the exact same direction.
+  - Adopted Apple fluid spring-curve easing (`cubic-bezier(0.32, 0.72, 0, 1)`) with `layout="size"` on the dock capsule for stable, zero-jitter transitions.
+- **Tracker Auto-Scroll Isolation**:
+  - Replaced native `scrollIntoView()` on policy tabs with container-confined `scrollTo()`, eliminating rogue page-down auto-scrolling when opening the Tracker tab on mobile.
+  - Added reliable scroll-to-top resets upon view switching in `App.jsx` and `LeaveTracker.jsx`.
+
+---
+
+## [v0.8.6] - 2026-10-16
+### Added
+- **Smart Notification Suite**:
+  - Service worker background notifications for single-day attendance check-ins, multi-day catch-up reminders, evening-before leave departure reminders, and holiday announcements.
+  - ColorOS 15/16 Fluid Cloud & Live Alert capsule styling tailored for Android/Oppo devices.
+- **Unpaid Leave (Loss of Pay / LOP) Fallback**:
+  - Dynamic automatic fallback to Unpaid Leave (LOP) with dedicated Zinc styling when the annual vacation bank is exhausted.
+  - Real-time annual bank calculation and LOP tracking across Desktop Topbar, Mobile Drawer, and Leave Tracker dashboard.
+
+### Fixed
+- **Optimizer Zero-Leave Guard**: Prevented empty recommendation states and crashes when annual leave balance is zero.
+
+---
+
+## [v0.8.5] - 2026-10-14
+### Added
+- **Multi-Card Attendance Swipe Carousel**:
+  - Side-peeking 3D tilted card stack with visual depth, drag elasticity, and interactive pagination indicators.
+- **Focused Month Carousel**:
+  - Seamless horizontal paging between consecutive calendar months with fluid Framer Motion slide transitions.
+- **Tactile Web Haptics**:
+  - Integrated `navigator.vibrate` feedback patterns across calendar date picks, swipe dismissals, and quick check-in actions.
+
+### Fixed
+- **Ultra-Compact Viewport Layout**: Resolved clipping and scroll paddings on small-screen mobile devices.
+
+---
+
 ## [v0.8.4] - 2026-10-12
 ### Added
 - **Multi-Day Attendance Catch-Up Cards**:
