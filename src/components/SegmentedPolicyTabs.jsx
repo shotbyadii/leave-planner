@@ -57,12 +57,18 @@ export const SegmentedPolicyTabs = ({
     if (activeTabRef.current && scrollContainerRef.current) {
       const el = activeTabRef.current;
       const container = scrollContainerRef.current;
-      const cRect = container.getBoundingClientRect();
-      const aRect = el.getBoundingClientRect();
+      const elLeft = el.offsetLeft;
+      const elRight = elLeft + el.offsetWidth;
+      const cScrollLeft = container.scrollLeft;
+      const cWidth = container.clientWidth;
 
-      // Only scroll into view if outside the visible container bounds
-      if (aRect.left < cRect.left + 12 || aRect.right > cRect.right - 12) {
-        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      // Only scroll the internal horizontal container if tab is outside visible area
+      // Avoid calling native el.scrollIntoView() which scrolls ancestor page containers vertically
+      if (elLeft < cScrollLeft + 12 || elRight > cScrollLeft + cWidth - 12) {
+        container.scrollTo({
+          left: Math.max(0, elLeft - (cWidth / 2) + (el.offsetWidth / 2)),
+          behavior: 'smooth'
+        });
       }
     }
     checkScroll();

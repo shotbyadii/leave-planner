@@ -249,10 +249,6 @@ export const resetAllLeaves = async (userId = null) => {
     const { error: leaveError } = await supabase.from('leaves').delete().eq('user_id', targetUserId);
     if (leaveError) console.error('Supabase reset user leaves error:', leaveError);
   } else {
-    const { error: planError } = await supabase.from('leave_plans').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (planError) console.error('Supabase reset plans error:', planError);
-
-    const { error } = await supabase.from('leaves').delete().neq('date', '1900-01-01');
-    if (error) console.error('Supabase reset error:', error);
+    console.warn('Supabase reset aborted: No authenticated user_id provided.');
   }
 };

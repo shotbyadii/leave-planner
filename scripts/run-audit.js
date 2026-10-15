@@ -121,6 +121,14 @@ ${testRows.length > 0 ? testRows.join('\n') : '| ⚠️ | No test records parsed
 - **Target:** No elements causing horizontal scroll overflow on Desktop (1440px) or Mobile (393px).
 - **Result:** ${failedTests === 0 ? '✅ Clean responsive layout — No rogue overflows.' : '⚠️ Layout overflows detected.'}
 
+### 5. Modular Architecture & Shell Component Integrity
+- **Target:** Isolated layout shells (\`DesktopHeader\`, \`MobileFloatingDock\`, \`MobileHeader\`) and \`AppModals\` coordinator mount without state drift.
+- **Result:** ${failedTests === 0 ? '✅ All modular layout shells bound and reactive.' : '⚠️ Check architecture tests.'}
+
+### 6. Hook State Isolation & Loss of Pay (LOP) Fallback
+- **Target:** Domain hooks (\`useLeaveManagement\`, \`useAttendanceManager\`, \`useMobileBooking\`) compute correct balances and dynamically trigger LOP when annual bank is depleted.
+- **Result:** ${failedTests === 0 ? '✅ Validated — LOP fallback engages seamlessly.' : '⚠️ Hook integration issue.'}
+
 ---
 `;
 

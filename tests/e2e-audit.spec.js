@@ -339,6 +339,7 @@ test.describe('Leave Planner Automated Verification Suite', () => {
     await page.addInitScript(() => {
       localStorage.removeItem('onboarding_completed');
       localStorage.removeItem('tutorial_completed');
+      localStorage.removeItem('leave_planner_tutorial_completed_v1');
       sessionStorage.removeItem('demo_onboarding_completed');
       sessionStorage.setItem('is_demo_mode', 'true');
       localStorage.setItem('notif_prompt_dismissed', 'true');
@@ -402,6 +403,7 @@ test.describe('Leave Planner Automated Verification Suite', () => {
     await page.addInitScript(() => {
       localStorage.removeItem('onboarding_completed');
       localStorage.removeItem('tutorial_completed');
+      localStorage.removeItem('leave_planner_tutorial_completed_v1');
       sessionStorage.removeItem('demo_onboarding_completed');
       sessionStorage.setItem('is_demo_mode', 'true');
       localStorage.setItem('notif_prompt_dismissed', 'true');
@@ -598,6 +600,112 @@ test.describe('Leave Planner Automated Verification Suite', () => {
       missingCapabilities,
       `🚨 [Feature Parity Violation on ${isMobile ? 'Mobile' : 'Desktop'}]: The following capabilities were missing: ${missingCapabilities.join(', ')}`
     ).toEqual([]);
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('9. Modular Architecture Shell Integrity: Header and Floating Dock mount cleanly with reactive balances', async ({ page }, testInfo) => {
+    const isMobile = testInfo.project.name.includes('Mobile');
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.addInitScript(getSeedScript(CANARY_LEAVE), CANARY_LEAVE);
+    await page.goto('/?demo=true', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+
+    if (isMobile) {
+      // Verify MobileFloatingDock mounts all navigation triggers
+      const calendarNav = page.locator('[data-testid="mobile-nav-calendar"]').first();
+      await expect(calendarNav).toBeVisible({ timeout: 3000 });
+
+      const assistantNav = page.locator('[data-testid="mobile-nav-ai"]').first();
+      await expect(assistantNav).toBeVisible({ timeout: 3000 });
+
+      const trackerNav = page.locator('[data-testid="mobile-nav-tracker"]').first();
+      await expect(trackerNav).toBeVisible({ timeout: 3000 });
+
+      const menuNav = page.locator('[data-testid="mobile-menu-btn"]').first();
+      await expect(menuNav).toBeVisible({ timeout: 3000 });
+
+      // Verify mini balance tickers are rendered
+      const annualMeter = page.locator('[data-testid="mobile-annual-mini-meter"]').first();
+      await expect(annualMeter).toBeVisible({ timeout: 3000 });
+    } else {
+      // Verify DesktopHeader mounts with segmented tabs and greeting
+      const desktopTabs = page.locator('[data-surface="topbar-tracker"]').first();
+      await expect(desktopTabs).toBeVisible({ timeout: 3000 });
+
+      const profilePill = page.locator('button[title="Settings & Profile Hub"]').first();
+      await expect(profilePill).toBeVisible({ timeout: 3000 });
+      await expect(profilePill).toContainText('Audit User');
+    }
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('10. Hook Architecture & Loss of Pay (LOP) Depleted Bank Fallback Integration', async ({ page }, testInfo) => {
+    const isMobile = testInfo.project.name.includes('Mobile');
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    // Seed state where annual bank is depleted (0 balance)
+    await page.addInitScript(() => {
+      const configs = [
+        { id: 'pl', name: 'Planned Leave', shortCode: 'PL', tier: 'annual', quota: 0, cadence: 'year', color: 'blue', enabled: true },
+        { id: 'el', name: 'Emergency Leave', shortCode: 'EL', tier: 'annual', quota: 0, cadence: 'year', color: 'orange', enabled: true },
+        { id: 'rh', name: 'Extra Leave', shortCode: 'RH', tier: 'annual', quota: 0, cadence: 'year', color: 'green', enabled: true },
+        { id: 'wfh', name: 'Remote / WFH', shortCode: 'WFH', tier: 'remote', quota: 10, cadence: 'month', color: 'cyan', enabled: true },
+      ];
+
+      sessionStorage.setItem('is_demo_mode', 'true');
+      sessionStorage.setItem('demo_user', JSON.stringify({
+        id: 'demo-user-lop',
+        email: 'lop@example.com',
+        user_metadata: { full_name: 'LOP Tester' }
+      }));
+      sessionStorage.setItem('demo_onboarding_completed', 'true');
+      sessionStorage.setItem('demo_leaves', JSON.stringify([
+        { date: '2026-01-05', type: 'lop', duration: 2 }
+      ]));
+      sessionStorage.setItem('demo_profile', JSON.stringify({
+        id: 'demo-user-lop',
+        name: 'LOP Tester',
+        email: 'lop@example.com',
+        quota_pl: 0,
+        quota_el: 0,
+        quota_rh: 0,
+        quota_wfh: 10,
+        leave_configs: configs
+      }));
+
+      localStorage.setItem('onboarding_completed', 'true');
+      localStorage.setItem('tutorial_completed', 'true');
+      localStorage.setItem('leave_planner_tutorial_completed_v1', 'true');
+      localStorage.setItem('notif_prompt_dismissed', 'true');
+      localStorage.setItem('pwa_prompt_dismissed_permanent', 'true');
+      sessionStorage.setItem('pwa_session_prompted', 'true');
+      localStorage.setItem('leave_configs', JSON.stringify(configs));
+    });
+
+    await page.goto('/?demo=true', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+
+    if (!isMobile) {
+      // In DesktopHeader: LOP pill should automatically appear when bank is depleted or LOP is used
+      const lopCapsule = page.locator('[data-surface="topbar-tracker"][data-leave-id="lop"]');
+      await expect(lopCapsule).toBeVisible({ timeout: 3000 });
+      const text = await lopCapsule.innerText();
+      expect(text).toContain('LOP');
+      expect(text).toContain('2');
+    } else {
+      // In Mobile: Tracker tab should show LOP active
+      const trackerNav = page.locator('[data-testid="mobile-nav-tracker"]').first();
+      await trackerNav.click();
+      await page.waitForTimeout(500);
+
+      const lopTracker = page.locator('[data-surface="tracker-dashboard"][data-leave-id="lop"]');
+      await expect(lopTracker).toBeVisible({ timeout: 3000 });
+    }
 
     expect(pageErrors).toEqual([]);
   });

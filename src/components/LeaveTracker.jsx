@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2, Pencil, Check, X, CalendarDays, ArrowUpDown, ChevronUp, ChevronDown, Home, Sparkles, FileText, AlertTriangle, Shield } from 'lucide-react';
 import { isHoliday, isWeekend } from '../data/holidays';
@@ -45,6 +45,12 @@ const LeaveTracker = ({
   maxWfh = 10
 }) => {
   const [trackerTierTab, setTrackerTierTab] = useState('annual'); // 'annual' | 'special'
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, 0);
+    }
+  }, []);
 
   // Dynamic Annual & Special Categories derived from 3-Tier System
   const annualConfigs = useMemo(() => {
