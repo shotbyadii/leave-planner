@@ -40,10 +40,19 @@ export function useAttendanceManager({
 
   const checkAndTriggerAttendancePrompt = () => {
     const todayStr = getTodayStr();
-    if (isHoliday(todayStr) || isWeekend(todayStr)) return;
+    if (isHoliday(todayStr, holidays) || isWeekend(todayStr)) return;
 
-    const missingDays = getMissingAttendanceDays(bookedDates, todayStr, 14);
-    const hasLogToday = bookedDates.some(b => b.date === todayStr);
+    const missingDays = getMissingAttendanceDays({
+      todayDate: todayStr,
+      bookedDates,
+      holidays,
+      promptHour: wfhPromptHour,
+      devDateOverride: devDateStr,
+      mode: attendanceCatchupMode
+    });
+    setMissingAttendanceDays(missingDays);
+
+    const hasLogToday = (bookedDates || []).some(b => b && b.date === todayStr);
 
     const now = new Date();
     const currentHour = now.getHours();
@@ -51,7 +60,7 @@ export function useAttendanceManager({
 
     // Daily Check-in Prompt
     if (!hasLogToday && currentHour >= targetHour && !hasPromptedWfh) {
-      if (attendanceCatchupMode === 'multi_day' && missingDays.length > 1) {
+      if (attendanceCatchupMode === 'multi_day' && missingDays.length > 0) {
         setMissingAttendanceDays(missingDays);
         setWfhTargetDate(missingDays[0]);
       } else {
@@ -113,6 +122,24 @@ export function useAttendanceManager({
       }
     }
   };
+
+  // Keep missingAttendanceDays strictly synced with registered leaves
+  useEffect(() => {
+    if (!isLeavesLoaded) return;
+    const todayStr = getTodayStr();
+    const missing = getMissingAttendanceDays({
+      todayDate: todayStr,
+      bookedDates,
+      holidays,
+      promptHour: wfhPromptHour,
+      devDateOverride: devDateStr,
+      mode: attendanceCatchupMode
+    });
+    setMissingAttendanceDays(missing);
+    if (missing.length === 0 && wfhModalOpen) {
+      setWfhModalOpen(false);
+    }
+  }, [isLeavesLoaded, bookedDates, holidays, wfhPromptHour, devDateStr, attendanceCatchupMode, wfhModalOpen]);
 
   // Sync listener and interval checks
   useEffect(() => {

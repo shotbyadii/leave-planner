@@ -155,6 +155,12 @@ export const isHoliday = (dateString, customList = null) => {
 };
 
 export const isWeekend = (dateString) => {
+  if (typeof dateString === 'string' && dateString.includes('-')) {
+    const [y, m, d] = dateString.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  }
   const date = new Date(dateString);
   const day = date.getDay();
   return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday

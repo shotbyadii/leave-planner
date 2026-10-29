@@ -16,6 +16,12 @@ export default defineConfig({
     screenshot: 'on',
     video: 'off',
   },
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 30000,
+  },
   projects: [
     {
       name: 'Desktop Chrome',

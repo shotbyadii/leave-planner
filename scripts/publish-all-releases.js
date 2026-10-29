@@ -36,7 +36,8 @@ const releaseMetadata = {
   'v0.8.4': { title: 'v0.8.4 - Multi-Day Attendance Catch-Up Cards, Mobile AI Settings & Error Reporting', date: 'October 12, 2026' },
   'v0.8.5': { title: 'v0.8.5 - Multi-Card Attendance Carousel, Focused Month Carousel & Tactile Haptics', date: 'October 14, 2026' },
   'v0.8.6': { title: 'v0.8.6 - Smart Notification Suite, Attendance Catch-Up Actions & LOP Fallback', date: 'October 16, 2026' },
-  'v0.8.7': { title: 'v0.8.7 - Modular Domain Architecture, Bottom-Up Morphing & Tracker Scroll Isolation', date: 'October 16, 2026' }
+  'v0.8.7': { title: 'v0.8.7 - Modular Domain Architecture, Bottom-Up Morphing & Tracker Scroll Isolation', date: 'October 16, 2026' },
+  'v0.8.8': { title: 'v0.8.8 - Multi-Day Attendance Catch-Up Calculation & State Synchronization Fix', date: 'October 29, 2026' }
 };
 
 // Strict chronological sequence from oldest to newest
@@ -55,7 +56,8 @@ const chronologicalTags = [
   'v0.8.4',
   'v0.8.5',
   'v0.8.6',
-  'v0.8.7'
+  'v0.8.7',
+  'v0.8.8'
 ];
 
 async function fetchWithRetry(url, options = {}, retries = 4) {

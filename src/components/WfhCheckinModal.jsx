@@ -56,13 +56,24 @@ const WfhCheckinModal = ({
   const [stageWidth, setStageWidth] = useState(336);
   const carouselStageRef = useRef(null);
 
-  // Active stack of missing days: fallback to [todayStr] if missingDays is empty
+  // Active stack of missing days: filter out any dates that are already registered in bookedDates
   const computedDayStack = useMemo(() => {
-    if (Array.isArray(missingDays) && missingDays.length > 0) {
-      return missingDays;
+    const bookedSet = new Set(
+      (bookedDates || []).map(b => (typeof b === 'string' ? b.slice(0, 10) : b?.date ? String(b.date).slice(0, 10) : null)).filter(Boolean)
+    );
+    const candidateDays = Array.isArray(missingDays) && missingDays.length > 0
+      ? missingDays.filter(d => !bookedSet.has(d))
+      : (todayStr && !bookedSet.has(todayStr) ? [todayStr] : []);
+
+    return candidateDays;
+  }, [missingDays, bookedDates, todayStr]);
+
+  // Auto-close modal if all days are resolved
+  useEffect(() => {
+    if (isOpen && computedDayStack.length === 0) {
+      onClose?.();
     }
-    return todayStr ? [todayStr] : [];
-  }, [missingDays, todayStr]);
+  }, [isOpen, computedDayStack.length, onClose]);
 
   // Freeze dayStack during exit animation so closing the modal after logging the last day doesn't jump mid-exit
   const frozenStackRef = useRef(computedDayStack);

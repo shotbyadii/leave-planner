@@ -2,6 +2,18 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.8] - 2026-10-29
+### Fixed
+- **Multi-Day Attendance Catch-Up Parameter & Calculation Fix**:
+  - Fixed an invocation mismatch in [`useAttendanceManager.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/hooks/useAttendanceManager.js) where `getMissingAttendanceDays` was called with positional arguments `(bookedDates, todayStr, 14)` instead of the structured options object `{ todayDate, bookedDates, holidays, ... }`. Because `bookedDates` was destructured as an options object, `bookedDates` evaluated to `undefined` and defaulted to an empty array, treating all 18 working days of the month as unlogged.
+  - Made [`getMissingAttendanceDays`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/utils/attendanceCatchupUtils.js) polymorphic and backwards-compatible to gracefully support both named options objects and positional argument calls.
+  - Added strict date-normalization in `attendanceCatchupUtils` to handle string date prefixes and avoid timezone discrepancies.
+  - Added an active synchronization effect in `useAttendanceManager` to keep `missingAttendanceDays` state reactive and immediately dismiss/update the modal as dates are logged.
+  - Added defensive filtering in [`WfhCheckinModal.jsx`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/components/WfhCheckinModal.jsx) to ensure dates already present in `bookedDates` (whether WFH, Planned Leave, or other leave categories) are never surfaced in the catch-up stack, auto-closing the modal once all unlogged days are resolved.
+  - Added `webServer` configuration to [`playwright.config.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/playwright.config.js) to automate dev server lifecycle during audit test execution.
+
+---
+
 ## [v0.8.7] - 2026-10-16
 ### Added
 - **Domain Hook & Layout Architecture Modularization**:
