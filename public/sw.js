@@ -1,5 +1,5 @@
 // Service Worker for Leave Vault PWA Installation, Auto-Update & Offline Support
-const CACHE_NAME = 'leave-vault-v0.8.9';
+const CACHE_NAME = 'leave-vault-v0.8.10';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

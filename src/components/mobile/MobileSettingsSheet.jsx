@@ -328,8 +328,8 @@ export default function MobileSettingsSheet({
                       ))}
                     </div>
 
-                    {/* Add Custom Annual Category — Pinned at bottom with gradient fade */}
-                    <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-card via-card/95 to-transparent z-10">
+                    {/* Add Custom Annual Category */}
+                    <div className="pt-2 pb-4">
                       {showMobileAddAnnual ? (
                         <div className="p-3 bg-card border border-border rounded-xl flex flex-col gap-2 shadow-lg">
                           <span className="text-[11px] font-bold text-foreground font-mono">New Annual Leave Category</span>
@@ -799,8 +799,8 @@ export default function MobileSettingsSheet({
                       })}
                     </div>
 
-                    {/* Add Custom Special Benefit — Pinned at bottom with gradient fade */}
-                    <div className="sticky bottom-0 pt-3 pb-1 bg-gradient-to-t from-card via-card/95 to-transparent z-10">
+                    {/* Add Custom Special Benefit */}
+                    <div className="pt-2 pb-4">
                       {showMobileAddSpecial ? (
                         <div className="p-3 bg-card border border-border rounded-xl flex flex-col gap-2.5 shadow-lg">
                           <span className="text-[11px] font-bold text-foreground font-mono">New Special Benefit Category</span>

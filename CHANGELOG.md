@@ -2,6 +2,16 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.10] - 2026-11-07
+### Fixed
+- **VAPID Public Key Fallback for Production PWA**:
+  - Added embedded `DEFAULT_VAPID_PUBLIC_KEY` fallback in [`notificationService.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/utils/notificationService.js) and generated root `.env` client configuration so production PWA builds never fail with `missing_vapid_key` when hosting environments do not inject `.env.local`.
+- **Mobile Quotas Tumbler Stepper & Add Button Collision**:
+  - Removed rogue `sticky bottom-0 z-10` container on "Add Custom Annual Category" and "Add Custom Special Benefit" in [`MobileSettingsSheet.jsx`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/components/mobile/MobileSettingsSheet.jsx).
+  - Restored natural in-flow spacing below the last quota card, eliminating visual overlap with the AppleWheelPicker stepper buttons (`-` and `+`).
+
+---
+
 ## [v0.8.9] - 2026-11-06
 ### Added
 - **Mobile Dual-Surface Web Push Parity**:

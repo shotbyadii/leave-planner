@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
  * Supports background push notifications on iOS 16.4+ (Home Screen PWA), Android (WebAPK/Chrome), and Desktop.
  */
 
+export const DEFAULT_VAPID_PUBLIC_KEY = "BEjRlDDLNS_FxYWjYgT7nJGet-yvNYOc7V5-gB7qfRShZE0hfX22iHZOBhkSLk5cOELRRu7STSZgSMdHlbajDmA";
+
 export const urlBase64ToUint8Array = (base64String) => {
   if (!base64String) return new Uint8Array();
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -84,7 +86,7 @@ export const subscribeUserToPush = async (userId = null) => {
     return { success: false, reason: 'push_not_supported' };
   }
 
-  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
   if (!vapidPublicKey) {
     console.warn('[NotificationService] VITE_VAPID_PUBLIC_KEY is not defined in environment.');
     return { success: false, reason: 'missing_vapid_key' };
