@@ -1,5 +1,5 @@
-// Basic Service Worker for Leave Vault PWA Installation & Offline Support
-const CACHE_NAME = 'leave-vault-v2';
+// Service Worker for Leave Vault PWA Installation, Auto-Update & Offline Support
+const CACHE_NAME = 'leave-vault-v0.8.9';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -27,11 +27,38 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass through fetch with cache fallback if offline
   if (event.request.method !== 'GET') return;
+
+  // Network-first strategy for HTML navigations: ensures PWA loads latest deployed bundle when online
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first with background network revalidation
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
     })
   );
 });
@@ -260,4 +287,3 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('notificationclose', (event) => {
   // Notification dismissed by user
 });
-
