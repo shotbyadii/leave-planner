@@ -4,6 +4,7 @@ import { addLeave } from '../services/leaveService';
 import { LOP_CONFIG } from '../services/leaveConfigService';
 import { 
   showAttendanceLiveActivity, 
+  showAttendanceReminderNotification,
   showAttendanceCatchupNotification,
   showUpcomingLeaveNotification,
   showHolidayNotification,
@@ -80,6 +81,22 @@ export function useAttendanceManager({
       if (localStorage.getItem(todayPromptKey) !== 'true') {
         showAttendanceLiveActivity({ dateStr: todayStr, userId: currentUser?.id });
         localStorage.setItem(todayPromptKey, 'true');
+      }
+    }
+
+    // Follow-up Reminder Notification: A few hours (3 hours) after user's preferred time if still unlogged
+    const followUpHour = Math.min(19, targetHour + 3);
+    if (currentHour >= followUpHour && !hasLogToday) {
+      const followUpPromptKey = `notif_followup_reminder_${todayStr}`;
+      if (localStorage.getItem(followUpPromptKey) !== 'true') {
+        showAttendanceReminderNotification({ dateStr: todayStr, userId: currentUser?.id });
+        localStorage.setItem(followUpPromptKey, 'true');
+
+        // Also prompt the attendance modal again if user is actively using the app
+        if (!wfhModalOpen) {
+          setWfhTargetDate(todayStr);
+          setWfhModalOpen(true);
+        }
       }
     }
 

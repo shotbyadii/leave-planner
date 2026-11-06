@@ -14,9 +14,33 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     }
   });
 
+  const notifyUpdate = (reg) => {
+    window.__pwaRegistration = reg;
+    window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: { registration: reg } }));
+  };
+
   const registerSW = () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then((reg) => {
+        window.__pwaRegistration = reg;
+
+        // If a waiting service worker is already installed from a background fetch
+        if (reg.waiting) {
+          notifyUpdate(reg);
+        }
+
+        // Detect new worker being downloaded and installed
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                notifyUpdate(reg);
+              }
+            });
+          }
+        });
+
         // Proactively check for an updated service worker immediately on boot
         reg.update().catch(() => {});
 

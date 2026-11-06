@@ -1,5 +1,5 @@
 // Service Worker for Leave Vault PWA Installation, Auto-Update & Offline Support
-const CACHE_NAME = 'leave-vault-v0.8.10';
+const CACHE_NAME = 'leave-vault-v0.8.11';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -286,4 +286,11 @@ self.addEventListener('notificationclick', (event) => {
 
 self.addEventListener('notificationclose', (event) => {
   // Notification dismissed by user
+});
+
+// Explicit update trigger from App Modal ("Refresh App")
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

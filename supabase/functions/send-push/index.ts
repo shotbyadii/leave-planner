@@ -97,9 +97,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (action === "send_attendance" || action === "cron_attendance") {
+    if (action === "send_attendance" || action === "cron_attendance" || action === "send_reminder") {
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
+      const isReminder = action === "send_reminder" || Boolean(body.isReminder);
 
       // Fetch all subscriptions
       const { data: subscriptions, error: subError } = await supabase
@@ -124,11 +125,13 @@ Deno.serve(async (req: Request) => {
         }
 
         const payload = JSON.stringify({
-          title: "Leave Vault",
-          body: "Daily Attendance Check-in: Please confirm whether today is Work From Home or In-Office.",
+          title: isReminder ? "Attendance Reminder" : "Leave Vault",
+          body: isReminder
+            ? "You haven't checked in yet today. Are you Working From Home or In-Office?"
+            : "Daily Attendance Check-in: Please confirm whether today is Work From Home or In-Office.",
           icon: "/app-icon-192.png",
           badge: "/app-icon-192.png",
-          tag: `wfh-checkin-${todayStr}`,
+          tag: isReminder ? `wfh-reminder-${todayStr}` : `wfh-checkin-${todayStr}`,
           data: { url: "/?action=attendance" }
         });
 

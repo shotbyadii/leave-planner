@@ -291,6 +291,52 @@ export const showAttendanceLiveActivity = async ({ dateStr = null, userId = null
 };
 
 /**
+ * Triggers a follow-up reminder notification when attendance is still unlogged
+ * several hours after the user's preferred check-in time.
+ */
+export const showAttendanceReminderNotification = async ({ dateStr = null, userId = null } = {}) => {
+  if (!isNotificationSupported()) {
+    return false;
+  }
+
+  const effectiveDate = dateStr || new Date().toISOString().split('T')[0];
+
+  let dateLabel = 'today';
+  try {
+    const [y, m, d] = effectiveDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  } catch (_) {}
+
+  const title = 'Attendance Reminder';
+  const body = `Still haven't logged attendance for ${dateLabel}. Are you Working From Home or In-Office?`;
+
+  const options = {
+    body,
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
+    tag: 'leave-vault-attendance-reminder',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 200],
+    actions: [
+      { action: 'action_wfh', title: '🏠 WFH' },
+      { action: 'action_office', title: '🏢 Office' },
+      { action: 'action_leave', title: '🌴 Leave' }
+    ],
+    data: {
+      url: `/?action=attendance&date=${effectiveDate}`,
+      date: effectiveDate,
+      userId: userId || null,
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY
+    }
+  };
+
+  return await showAppNotification(title, options);
+};
+
+/**
  * Triggers a smart catch-up notification when multiple past working days are unrecorded.
  * Provides quick actions to review swipe cards or record all as In-Office.
  */

@@ -2,6 +2,17 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.11] - 2026-11-07
+### Added
+- **PWA Update Ready Dismissable Modal**:
+  - Implemented [`UpdateAvailableModal.jsx`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/components/modals/UpdateAvailableModal.jsx) with a dismissable Slate-styled prompt providing instant **"Refresh App"** and **"Later"** options whenever a new build is detected in memory.
+  - Wired `pwa-update-available` custom event listeners and `SKIP_WAITING` service worker message handlers in [`src/main.jsx`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/main.jsx) and [`public/sw.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/public/sw.js).
+- **Automated Follow-Up Attendance Reminder**:
+  - Added smart follow-up reminder notification in [`useAttendanceManager.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/hooks/useAttendanceManager.js) scheduled 3 hours after the user's preferred check-in time if today's attendance has still not been recorded.
+  - Added `showAttendanceReminderNotification` in [`notificationService.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/utils/notificationService.js) and updated `send-push` edge function (v5) with support for reminder dispatches.
+
+---
+
 ## [v0.8.10] - 2026-11-07
 ### Fixed
 - **VAPID Public Key Fallback for Production PWA**:

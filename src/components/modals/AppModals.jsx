@@ -15,6 +15,7 @@ import SplashScreen from '../SplashScreen';
 import OnboardingModal from '../OnboardingModal';
 import TutorialOverlay from '../TutorialOverlay';
 import DevToolsModal from '../DevToolsModal';
+import UpdateAvailableModal from './UpdateAvailableModal';
 
 export default function AppModals({
   // Reset Confirmation
@@ -498,6 +499,9 @@ export default function AppModals({
           }}
         />
       )}
+
+      {/* PWA New Version Update Modal */}
+      <UpdateAvailableModal />
 
       {/* Developer Control Suite (Local DEV Only) */}
       {import.meta.env.DEV && (
