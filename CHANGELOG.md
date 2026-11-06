@@ -2,7 +2,22 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
-## [v0.8.8] - 2026-10-29
+## [v0.8.9] - 2026-11-06
+### Added
+- **Mobile Dual-Surface Web Push Parity**:
+  - Integrated the **Web Push Background Alerts** control card into [`MobileSettingsSheet.jsx`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/components/mobile/MobileSettingsSheet.jsx), ensuring 1:1 dual-surface feature parity with desktop settings.
+  - Added live subscription status badge (`Active ✓` vs `Inactive`), **"Enable Background Web Push"** permission and registration trigger, **"Send Test Push"** dispatcher, and **"Disable"** action.
+- **Passive Web Push Registration & Session Resilience**:
+  - Added passive push subscription auto-sync in [`useAttendanceManager.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/hooks/useAttendanceManager.js) to ensure granted notification permissions automatically register the device push endpoint with Supabase without requiring user navigation into settings.
+  - Hardened [`subscribeUserToPush`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/utils/notificationService.js) and `triggerTestWebPush` to automatically resolve authenticated Supabase user IDs.
+
+### Fixed
+- **Edge Function Push Target Resolution**:
+  - Deployed version 4 of the `send-push` Edge Function to query subscriptions matching either explicit `user_id` or anonymous endpoints (`user_id.is.null`), ensuring test pushes are reliably dispatched to newly registered PWA devices.
+- **Late-Night Audit Test Timing**:
+  - Fixed test 10 in [`tests/e2e-audit.spec.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/tests/e2e-audit.spec.js) to isolate the WFH prompt hour during late-night test executions, ensuring 20/20 tests pass cleanly.
+
+---
 ### Fixed
 - **Multi-Day Attendance Catch-Up Parameter & Calculation Fix**:
   - Fixed an invocation mismatch in [`useAttendanceManager.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/hooks/useAttendanceManager.js) where `getMissingAttendanceDays` was called with positional arguments `(bookedDates, todayStr, 14)` instead of the structured options object `{ todayDate, bookedDates, holidays, ... }`. Because `bookedDates` was destructured as an options object, `bookedDates` evaluated to `undefined` and defaulted to an empty array, treating all 18 working days of the month as unlogged.

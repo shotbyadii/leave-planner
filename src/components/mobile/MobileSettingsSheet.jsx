@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronLeft, X, SlidersHorizontal, Sparkles, Clock, FileText, 
   Check, Save, Plus, Trash2, Edit3, AlertTriangle, Key, ExternalLink, 
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, Download, 
-  FileSpreadsheet, Upload, Info, Heart
+  FileSpreadsheet, Upload, Info, Heart, Bell
 } from 'lucide-react';
 import SegmentedPolicyTabs from '../SegmentedPolicyTabs';
 import AppleWheelPicker from '../AppleWheelPicker';
@@ -23,6 +23,12 @@ import {
 } from '../../services/aiAssistantService';
 import { exportUserDataToJson, exportUserDataToCsv, importUserDataFromJson } from '../../utils/dataMigration';
 import { fetchBookedLeaves, fetchLeavePlans } from '../../services/leaveService';
+import { 
+  getExistingPushSubscription, 
+  subscribeUserToPush, 
+  unsubscribeUserFromPush, 
+  triggerTestWebPush 
+} from '../../utils/notificationService';
 
 export default function MobileSettingsSheet({
   onClose,
@@ -77,6 +83,17 @@ export default function MobileSettingsSheet({
     confirmStaging: null,
     discardStaging: null
   });
+
+  // Web Push State (Dual-Surface Parity)
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [testPushStatus, setTestPushStatus] = useState('');
+
+  useEffect(() => {
+    getExistingPushSubscription()
+      .then(sub => setPushSubscribed(Boolean(sub)))
+      .catch(() => {});
+  }, []);
 
   const mobileAnnualConfigs = (mobileLeaveConfigs || []).filter(c => c.tier === 'annual');
   const mobileSpecialConfigs = (mobileLeaveConfigs || []).filter(c => c.tier === 'special');
@@ -449,6 +466,89 @@ export default function MobileSettingsSheet({
                         <option value="multi_day">Multi-day Cards</option>
                         <option value="current_day">Today Only</option>
                       </select>
+                    </div>
+
+                    {/* Web Push Background Notifications Card */}
+                    <div className="p-3 bg-muted/40 border border-border/80 rounded-xl flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground font-mono flex items-center gap-1.5">
+                          <Bell size={13} className="text-purple-500" /> Web Push Background Alerts
+                        </span>
+                        <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                          pushSubscribed 
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+                            : 'bg-muted text-muted-foreground border-border/80'
+                        }`}>
+                          {pushSubscribed ? 'Active ✓' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        Receive attendance check-in reminders on your phone even when Leave Vault is completely closed.
+                      </p>
+                      {testPushStatus && (
+                        <div className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-semibold px-2 py-1 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                          {testPushStatus}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 pt-1">
+                        {pushSubscribed ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setTestPushStatus('Dispatching test push to phone...');
+                                const res = await triggerTestWebPush(currentUser?.id);
+                                if (res && res.success) {
+                                  setTestPushStatus('✅ Test push sent! Check notification shade.');
+                                } else {
+                                  setTestPushStatus(res?.error || res?.message || 'Failed to dispatch test push');
+                                }
+                                setTimeout(() => setTestPushStatus(''), 5000);
+                              }}
+                              className="flex-1 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-xl text-xs font-bold transition-all text-center cursor-pointer"
+                            >
+                              Send Test Push
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pushLoading}
+                              onClick={async () => {
+                                setPushLoading(true);
+                                await unsubscribeUserFromPush();
+                                setPushSubscribed(false);
+                                setPushLoading(false);
+                                setTestPushStatus('Web Push disabled.');
+                                setTimeout(() => setTestPushStatus(''), 3000);
+                              }}
+                              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                            >
+                              Disable
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={pushLoading}
+                            onClick={async () => {
+                              setPushLoading(true);
+                              setTestPushStatus('Requesting push permission...');
+                              const res = await subscribeUserToPush(currentUser?.id);
+                              if (res && res.success) {
+                                setPushSubscribed(true);
+                                setTestPushStatus('✅ Background Web Push enabled!');
+                              } else {
+                                setTestPushStatus(res?.reason || res?.error || 'Failed to enable push');
+                              }
+                              setPushLoading(false);
+                              setTimeout(() => setTestPushStatus(''), 5000);
+                            }}
+                            className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {pushLoading ? <Loader2 size={13} className="animate-spin" /> : <Bell size={13} />}
+                            Enable Background Web Push
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}

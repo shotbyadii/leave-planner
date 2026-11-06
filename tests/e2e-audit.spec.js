@@ -684,6 +684,7 @@ test.describe('Leave Planner Automated Verification Suite', () => {
       localStorage.setItem('notif_prompt_dismissed', 'true');
       localStorage.setItem('pwa_prompt_dismissed_permanent', 'true');
       sessionStorage.setItem('pwa_session_prompted', 'true');
+      localStorage.setItem('wfh_prompt_hour', '99');
       localStorage.setItem('leave_configs', JSON.stringify(configs));
     });
 

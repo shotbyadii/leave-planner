@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
       const targetUserId = body.userId;
       let query = supabase.from("push_subscriptions").select("*");
       if (targetUserId) {
-        query = query.eq("user_id", targetUserId);
+        query = query.or(`user_id.eq.${targetUserId},user_id.is.null`);
       } else {
         query = query.order("created_at", { ascending: false }).limit(5);
       }

@@ -104,8 +104,16 @@ export const subscribeUserToPush = async (userId = null) => {
 
     const subJson = subscription.toJSON();
     if (subJson && subJson.keys) {
+      let effectiveUserId = userId;
+      if (!effectiveUserId) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.id) effectiveUserId = user.id;
+        } catch (_) {}
+      }
+
       const payload = {
-        user_id: userId || null,
+        user_id: effectiveUserId || null,
         endpoint: subJson.endpoint,
         p256dh: subJson.keys.p256dh,
         auth: subJson.keys.auth,
@@ -119,6 +127,7 @@ export const subscribeUserToPush = async (userId = null) => {
 
       if (error) {
         console.warn('[NotificationService] Could not store subscription in Supabase:', error);
+        return { success: false, error: error.message };
       } else {
         localStorage.setItem('push_subscribed', 'true');
       }
@@ -212,10 +221,17 @@ export const showAppNotification = async (title, options = {}) => {
  */
 export const triggerTestWebPush = async (userId = null) => {
   try {
+    let effectiveUserId = userId;
+    if (!effectiveUserId) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) effectiveUserId = user.id;
+      } catch (_) {}
+    }
     const { data, error } = await supabase.functions.invoke('send-push', {
       body: {
         action: 'test',
-        userId: userId || null
+        userId: effectiveUserId || null
       }
     });
     if (error) throw error;

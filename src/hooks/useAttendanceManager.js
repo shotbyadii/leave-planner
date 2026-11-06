@@ -7,7 +7,10 @@ import {
   showAttendanceCatchupNotification,
   showUpcomingLeaveNotification,
   showHolidayNotification,
-  showQuotaAlertNotification
+  showQuotaAlertNotification,
+  isNotificationGranted,
+  isPushSupported,
+  subscribeUserToPush
 } from '../utils/notificationService';
 import { getMissingAttendanceDays } from '../utils/attendanceCatchupUtils';
 
@@ -170,6 +173,15 @@ export function useAttendanceManager({
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [isLeavesLoaded, bookedDates, hasPromptedWfh, devDateStr, wfhPromptHour, attendanceCatchupMode, currentUser]);
+
+  // Passive Web Push Registration: If notifications were already granted by user, ensure device endpoint is synced to Supabase
+  useEffect(() => {
+    if (isNotificationGranted() && isPushSupported()) {
+      subscribeUserToPush(currentUser?.id).catch((err) => {
+        console.warn('[useAttendanceManager] Passive push subscription sync error:', err);
+      });
+    }
+  }, [currentUser?.id]);
 
   const handleWfhStatusSelect = async (statusType, targetDateStr = null) => {
     const targetDate = targetDateStr || getTodayStr();
