@@ -12,7 +12,8 @@ import {
   ChevronUp, 
   ChevronLeft, 
   ChevronRight,
-  Layers
+  Layers,
+  CheckCircle2
 } from 'lucide-react';
 import { getShortform } from '../utils/colorUtils';
 import AppleBalanceTicker from './AppleBalanceTicker';
@@ -56,8 +57,12 @@ const WfhCheckinModal = ({
   const [stageWidth, setStageWidth] = useState(336);
   const carouselStageRef = useRef(null);
 
-  // Active stack of missing days: filter out any dates that are already registered in bookedDates
-  const computedDayStack = useMemo(() => {
+  // Stable session stack & optimistic status map so multi-day carousel indices and states do not jump/shift mid-flow
+  const [sessionDays, setSessionDays] = useState([]);
+  const [sessionMarkedStatus, setSessionMarkedStatus] = useState({});
+
+  // Initial candidate days computed from props
+  const initialCandidateDays = useMemo(() => {
     const bookedSet = new Set(
       (bookedDates || []).map(b => (typeof b === 'string' ? b.slice(0, 10) : b?.date ? String(b.date).slice(0, 10) : null)).filter(Boolean)
     );
@@ -68,19 +73,40 @@ const WfhCheckinModal = ({
     return candidateDays;
   }, [missingDays, bookedDates, todayStr]);
 
-  // Auto-close modal if all days are resolved
+  // Keep sessionDays stable once the modal opens, preventing auto-swipe card jumping as entries are saved to DB
   useEffect(() => {
-    if (isOpen && computedDayStack.length === 0) {
+    if (isOpen) {
+      setSessionDays(prev => {
+        if (prev.length === 0 && initialCandidateDays.length > 0) {
+          return initialCandidateDays;
+        }
+        return prev;
+      });
+    } else {
+      setSessionDays([]);
+      setSessionMarkedStatus({});
+      setSelectedAction(null);
+      setShowQuickLeaves(false);
+      setActiveCardIndex(0);
+      setDragDeltaX(0);
+      setIsDragging(false);
+    }
+  }, [isOpen, initialCandidateDays]);
+
+  // Auto-close modal if no candidate days to check in when opened
+  useEffect(() => {
+    if (isOpen && sessionDays.length === 0 && initialCandidateDays.length === 0) {
       onClose?.();
     }
-  }, [isOpen, computedDayStack.length, onClose]);
+  }, [isOpen, sessionDays.length, initialCandidateDays.length, onClose]);
 
   // Freeze dayStack during exit animation so closing the modal after logging the last day doesn't jump mid-exit
-  const frozenStackRef = useRef(computedDayStack);
-  if (isOpen) {
-    frozenStackRef.current = computedDayStack;
+  const dayStack = sessionDays.length > 0 ? sessionDays : initialCandidateDays;
+  const frozenStackRef = useRef(dayStack);
+  if (isOpen && dayStack.length > 0) {
+    frozenStackRef.current = dayStack;
   }
-  const dayStack = isOpen ? computedDayStack : frozenStackRef.current;
+  const effectiveDayStack = isOpen && dayStack.length > 0 ? dayStack : frozenStackRef.current;
 
   // Measure carousel card width so adjacent cards sit at an exact pixel stride
   useEffect(() => {
@@ -98,14 +124,14 @@ const WfhCheckinModal = ({
       window.removeEventListener('resize', measure);
       clearTimeout(t);
     };
-  }, [isOpen, dayStack.length]);
+  }, [isOpen, effectiveDayStack.length]);
 
-  // Clamp activeCardIndex when dayStack length changes while open
+  // Clamp activeCardIndex when effectiveDayStack length changes while open
   useEffect(() => {
-    if (isOpen && activeCardIndex >= dayStack.length && dayStack.length > 0) {
-      setActiveCardIndex(Math.max(0, dayStack.length - 1));
+    if (isOpen && activeCardIndex >= effectiveDayStack.length && effectiveDayStack.length > 0) {
+      setActiveCardIndex(Math.max(0, effectiveDayStack.length - 1));
     }
-  }, [isOpen, dayStack.length, activeCardIndex]);
+  }, [isOpen, effectiveDayStack.length, activeCardIndex]);
 
   // Reset states when modal opens
   useEffect(() => {
@@ -118,8 +144,8 @@ const WfhCheckinModal = ({
     }
   }, [isOpen]);
 
-  const activeDateStr = dayStack[activeCardIndex] || todayStr;
-  const isMultiDayMode = dayStack.length > 1;
+  const activeDateStr = effectiveDayStack[activeCardIndex] || todayStr;
+  const isMultiDayMode = effectiveDayStack.length > 1;
   const stridePx = Math.round(stageWidth * 0.93);
 
   const formatHour = (hourStr) => {
@@ -174,8 +200,25 @@ const WfhCheckinModal = ({
   const effectiveMaxWfh = wfhConfig ? wfhConfig.quota : maxWfh;
   const maxConsecutiveWfh = wfhConfig?.constraints?.maxConsecutive || null;
 
-  const remainingWfh = Math.max(0, effectiveMaxWfh - wfhUsedThisMonth);
-  const isOverQuota = wfhUsedThisMonth >= effectiveMaxWfh;
+  // Newly logged WFH in current session not yet synced into bookedDates
+  const sessionWfhCountThisMonth = useMemo(() => {
+    const bookedWfhSet = new Set(
+      (bookedDates || []).filter(b => b && b.type === 'wfh' && b.date).map(b => b.date.slice(0, 10))
+    );
+    const activeDate = effectiveDayStack[activeCardIndex] || todayStr;
+    const curMonthPrefix = activeDate ? activeDate.slice(0, 7) : '';
+    let count = 0;
+    Object.entries(sessionMarkedStatus).forEach(([d, status]) => {
+      if (status === 'wfh' && (!curMonthPrefix || d.startsWith(curMonthPrefix)) && !bookedWfhSet.has(d)) {
+        count++;
+      }
+    });
+    return count;
+  }, [sessionMarkedStatus, bookedDates, effectiveDayStack, activeCardIndex, todayStr]);
+
+  const effectiveWfhUsedThisMonth = wfhUsedThisMonth + sessionWfhCountThisMonth;
+  const remainingWfh = Math.max(0, effectiveMaxWfh - effectiveWfhUsedThisMonth);
+  const isOverQuota = effectiveWfhUsedThisMonth >= effectiveMaxWfh;
   const isWarning = !isOverQuota && remainingWfh <= 2;
 
   // Annual Bank Depletion Check for Loss of Pay (LOP) Fallback
@@ -221,17 +264,18 @@ const WfhCheckinModal = ({
 
   const getLeaveRemaining = useCallback((leaveId, cfg) => {
     if (leaveId === 'lop') return lopUsedThisYear;
+    const sessionCount = Object.values(sessionMarkedStatus).filter(s => s === leaveId).length;
     if (leaves && leaves[leaveId]) {
       const tot = leaves[leaveId].total ?? cfg?.quota ?? 0;
       const u = leaves[leaveId].used ?? 0;
-      return Math.max(0, tot - u);
+      return Math.max(0, tot - u - sessionCount);
     }
     const tot = cfg?.quota || 0;
     const u = bookedDates
       .filter(b => b && b.type === leaveId && typeof b.date === 'string' && b.date.startsWith(String(curYear)))
       .reduce((s, b) => s + (b.duration || 1), 0);
-    return Math.max(0, tot - u);
-  }, [leaves, bookedDates, curYear, lopUsedThisYear]);
+    return Math.max(0, tot - u - sessionCount);
+  }, [leaves, bookedDates, curYear, lopUsedThisYear, sessionMarkedStatus]);
 
   // Currently selected action item details
   const isLopSelected = selectedAction === 'lop';
@@ -250,14 +294,31 @@ const WfhCheckinModal = ({
     ? lopUsedThisYear
     : (selectedAction === 'wfh' ? remainingWfh : (selectedAction === 'office' ? 0 : getLeaveRemaining(selectedAction, activeSelectedConfig)));
 
-  // Map booked dates in current month by date string YYYY-MM-DD
+  // Map booked dates, overlaying sessionMarkedStatus optimistically so UI updates instantly
   const bookedMap = useMemo(() => {
     const map = {};
-    bookedDates.forEach(b => {
+    (bookedDates || []).forEach(b => {
       if (b && b.date) map[b.date] = b.type;
     });
+    Object.entries(sessionMarkedStatus).forEach(([dateStr, status]) => {
+      map[dateStr] = status;
+    });
     return map;
-  }, [bookedDates]);
+  }, [bookedDates, sessionMarkedStatus]);
+
+  // Combined booked dates list for consecutive calculations and evaluations
+  const effectiveBookedDates = useMemo(() => {
+    const dates = [...(bookedDates || [])];
+    Object.entries(sessionMarkedStatus).forEach(([d, status]) => {
+      const existingIdx = dates.findIndex(b => b && (b.date === d || b === d));
+      if (existingIdx >= 0) {
+        dates[existingIdx] = { ...dates[existingIdx], type: status };
+      } else {
+        dates.push({ date: d, type: status, duration: 1 });
+      }
+    });
+    return dates;
+  }, [bookedDates, sessionMarkedStatus]);
 
   const alertStyle = !isWfhEnabled
     ? 'bg-muted border-border text-muted-foreground'
@@ -281,7 +342,7 @@ const WfhCheckinModal = ({
   }, [activeCardIndex]);
 
   const handleNextCard = useCallback(() => {
-    if (activeCardIndex < dayStack.length - 1) {
+    if (activeCardIndex < effectiveDayStack.length - 1) {
       hapticSwipeCard();
       setDirection(1);
       setIsDragging(false);
@@ -290,7 +351,7 @@ const WfhCheckinModal = ({
       setSelectedAction(null);
       setShowQuickLeaves(false);
     }
-  }, [activeCardIndex, dayStack.length]);
+  }, [activeCardIndex, effectiveDayStack.length]);
 
   const handleDismissModal = useCallback(() => {
     hapticNo();
@@ -351,7 +412,7 @@ const WfhCheckinModal = ({
       if (Math.abs(dx) > 14) {
         swipeRef.current.wasSwiped = true;
       }
-      const atBoundary = (activeCardIndex === 0 && dx > 0) || (activeCardIndex === dayStack.length - 1 && dx < 0);
+      const atBoundary = (activeCardIndex === 0 && dx > 0) || (activeCardIndex === effectiveDayStack.length - 1 && dx < 0);
       const dampedDx = atBoundary ? dx * 0.25 : dx * 0.88;
       setDragDeltaX(dampedDx);
     }
@@ -374,7 +435,7 @@ const WfhCheckinModal = ({
     setDragDeltaX(0);
 
     if (wasHoriz) {
-      if ((dx < -38 || vx < -220) && activeCardIndex < dayStack.length - 1) {
+      if ((dx < -38 || vx < -220) && activeCardIndex < effectiveDayStack.length - 1) {
         hapticSwipeCard();
         setActiveCardIndex(prev => prev + 1);
         setSelectedAction(null);
@@ -435,11 +496,18 @@ const WfhCheckinModal = ({
   };
 
   const handleActionComplete = (status) => {
+    const completedDate = activeDateStr;
+    // Immediately record optimistic status before moving to next card so swiped card reflects updated status
+    setSessionMarkedStatus(prev => ({
+      ...prev,
+      [completedDate]: status
+    }));
+
     if (onSelectStatus) {
-      onSelectStatus(status, activeDateStr);
+      onSelectStatus(status, completedDate);
     }
     // If there are more cards after this one, advance index, else close
-    if (activeCardIndex < dayStack.length - 1) {
+    if (activeCardIndex < effectiveDayStack.length - 1) {
       hapticSwipeCard();
       setDirection(1);
       setIsDragging(false);
@@ -500,7 +568,7 @@ const WfhCheckinModal = ({
     const cardDateNum = cardDateObj.getDate();
 
     const cardConsecutiveWfhCount = cardDateStr
-      ? countConsecutiveWorkingDays([cardDateStr], 'wfh', bookedDates)
+      ? countConsecutiveWorkingDays([cardDateStr], 'wfh', effectiveBookedDates)
       : 0;
     const isCardConsecutiveExceeded = Boolean(maxConsecutiveWfh && cardConsecutiveWfhCount > maxConsecutiveWfh);
 
@@ -596,7 +664,7 @@ const WfhCheckinModal = ({
                     {cardMonthName}
                   </span>
                   <span className="text-[10px] font-bold font-mono text-cyan-500 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
-                    {wfhUsedThisMonth} / {effectiveMaxWfh} WFH Used
+                    {effectiveWfhUsedThisMonth} / {effectiveMaxWfh} WFH Used
                   </span>
                 </div>
 
@@ -614,7 +682,7 @@ const WfhCheckinModal = ({
                     const dateStr = `${cardYear}-${String(cardMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                     const isActiveCardDay = dayNum === cardDateNum;
                     const bookedType = bookedMap[dateStr];
-                    const isMissingStackDay = dayStack.includes(dateStr);
+                    const isMissingStackDay = effectiveDayStack.includes(dateStr) && !bookedType;
 
                     let cellBg = "text-muted-foreground/60";
                     let cellBorder = "border-transparent";
@@ -648,6 +716,14 @@ const WfhCheckinModal = ({
                 </div>
               </div>
 
+              {/* Card Status Indicator if already logged */}
+              {bookedMap[cardDateStr] && (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold animate-in fade-in duration-200">
+                  <CheckCircle2 size={13} />
+                  <span>Logged: {bookedMap[cardDateStr] === 'wfh' ? 'Work From Home' : bookedMap[cardDateStr] === 'office' ? 'In-Office' : (leaveNames[bookedMap[cardDateStr]] || bookedMap[cardDateStr].toUpperCase())}</span>
+                </div>
+              )}
+
               {/* Prompt Caption */}
               <p className="text-xs font-bold text-muted-foreground mt-0.5">
                 {isCardToday 
@@ -658,18 +734,20 @@ const WfhCheckinModal = ({
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full">
                 <button
-                  disabled={!isWfhEnabled || isOverQuota}
+                  disabled={!isWfhEnabled || (isOverQuota && bookedMap[cardDateStr] !== 'wfh')}
                   onClick={() => {
                     hapticYes();
                     setSelectedAction('wfh');
                   }}
                   className={`py-2.5 sm:py-3 px-3 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
-                    !isWfhEnabled || isOverQuota
+                    !isWfhEnabled || (isOverQuota && bookedMap[cardDateStr] !== 'wfh')
                       ? 'bg-muted text-muted-foreground/50 border border-border cursor-not-allowed opacity-60'
+                      : bookedMap[cardDateStr] === 'wfh'
+                      ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20 ring-2 ring-cyan-300'
                       : 'bg-cyan-500 hover:bg-cyan-600 text-black shadow-lg shadow-cyan-500/20'
                   }`}
                 >
-                  <Home size={15} /> {!isWfhEnabled ? 'WFH Disabled' : 'Work From Home'}
+                  <Home size={15} /> {!isWfhEnabled ? 'WFH Disabled' : bookedMap[cardDateStr] === 'wfh' ? '✓ Work From Home' : 'Work From Home'}
                 </button>
 
                 <button
@@ -677,9 +755,13 @@ const WfhCheckinModal = ({
                     hapticYes();
                     setSelectedAction('office');
                   }}
-                  className="py-2.5 sm:py-3 px-3 bg-muted border border-border hover:bg-muted/80 text-foreground font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                  className={`py-2.5 sm:py-3 px-3 border hover:bg-muted/80 text-foreground font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                    bookedMap[cardDateStr] === 'office'
+                      ? 'bg-muted border-foreground/30 ring-2 ring-foreground/20'
+                      : 'bg-muted border-border'
+                  }`}
                 >
-                  <Building2 size={15} /> In-Office
+                  <Building2 size={15} /> {bookedMap[cardDateStr] === 'office' ? '✓ In-Office' : 'In-Office'}
                 </button>
               </div>
 
@@ -869,7 +951,7 @@ const WfhCheckinModal = ({
                     <Layers size={14} />
                   </div>
                   <span className="font-bold text-foreground">
-                    Day {activeCardIndex + 1} of {dayStack.length}
+                    Day {activeCardIndex + 1} of {effectiveDayStack.length}
                   </span>
                 </div>
 
@@ -885,7 +967,7 @@ const WfhCheckinModal = ({
                   </button>
                   <button
                     onClick={handleNextCard}
-                    disabled={activeCardIndex === dayStack.length - 1}
+                    disabled={activeCardIndex === effectiveDayStack.length - 1}
                     className="p-1.5 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
                     title="Next day"
                   >
@@ -911,10 +993,10 @@ const WfhCheckinModal = ({
             >
               {isDesktop ? (
                 <AnimatePresence mode="popLayout" custom={direction} initial={false}>
-                  {dayStack[activeCardIndex] && renderCarouselCard(dayStack[activeCardIndex], activeCardIndex)}
+                  {effectiveDayStack[activeCardIndex] && renderCarouselCard(effectiveDayStack[activeCardIndex], activeCardIndex)}
                 </AnimatePresence>
               ) : (
-                dayStack.map((cardDateStr, idx) => {
+                effectiveDayStack.map((cardDateStr, idx) => {
                   if (Math.abs(idx - activeCardIndex) > 2) return null;
                   return renderCarouselCard(cardDateStr, idx);
                 })
@@ -922,34 +1004,37 @@ const WfhCheckinModal = ({
             </div>
 
             {/* Multi-day Interactive Dots */}
-            {isMultiDayMode && dayStack.length > 1 && (
+            {isMultiDayMode && effectiveDayStack.length > 1 && (
               <div className="flex items-center justify-center mt-2.5 z-30">
                 <div className="flex items-center gap-1.5 p-1 bg-card rounded-full border border-border/70 shadow-md">
-                  {dayStack.map((d, idx) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => {
-                        if (idx === activeCardIndex) return;
-                        hapticSwipeCard();
-                        setDirection(idx > activeCardIndex ? 1 : -1);
-                        setIsDragging(false);
-                        setDragDeltaX(0);
-                        setActiveCardIndex(idx);
-                        setSelectedAction(null);
-                        setShowQuickLeaves(false);
-                      }}
-                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                        idx === activeCardIndex
-                          ? 'w-5 bg-cyan-400 shadow-sm shadow-cyan-400/50'
-                          : idx < activeCardIndex
-                          ? 'w-1.5 bg-muted-foreground/60 hover:bg-muted-foreground'
-                          : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60'
-                      }`}
-                      title={`Jump to day ${idx + 1} (${formatCatchupDate(d).shortDate})`}
-                      aria-label={`Jump to day ${idx + 1}`}
-                    />
-                  ))}
+                  {effectiveDayStack.map((d, idx) => {
+                    const isMarked = Boolean(bookedMap[d]);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          if (idx === activeCardIndex) return;
+                          hapticSwipeCard();
+                          setDirection(idx > activeCardIndex ? 1 : -1);
+                          setIsDragging(false);
+                          setDragDeltaX(0);
+                          setActiveCardIndex(idx);
+                          setSelectedAction(null);
+                          setShowQuickLeaves(false);
+                        }}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                          idx === activeCardIndex
+                            ? 'w-5 bg-cyan-400 shadow-sm shadow-cyan-400/50'
+                            : isMarked
+                            ? 'w-2 bg-emerald-500/80 hover:bg-emerald-400'
+                            : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60'
+                        }`}
+                        title={`Jump to day ${idx + 1} (${formatCatchupDate(d).shortDate})${isMarked ? ' • Logged' : ''}`}
+                        aria-label={`Jump to day ${idx + 1}`}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}

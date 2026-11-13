@@ -2,6 +2,19 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.14] - 2026-11-13
+### Fixed
+- **Multi-Day Attendance Check-in Optimistic Status & Stack Stability**:
+  - Resolved race condition where logging an attendance card (e.g. marking Nov 11 as WFH) did not reflect on the mini calendar overview, WFH monthly quota counters, or balance tickers before the next card (Nov 12) auto-swiped in:
+    - Added synchronous `sessionMarkedStatus` tracking in [`WfhCheckinModal.jsx`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/components/WfhCheckinModal.jsx) that optimistically overlays newly logged dates onto `bookedMap` and `effectiveBookedDates` before advancing to the next card.
+    - Updated the mini calendar cell renderer so that any date logged in the current session immediately displays its status styling (cyan for WFH, muted for In-Office, category color for leaves) instead of remaining marked as pending/unmarked amber (`isMissingStackDay`).
+    - Made the session day stack (`sessionDays` / `effectiveDayStack`) stable for the lifetime of the open modal session, eliminating auto-swipe index jumping, skipping subsequent days (e.g., Nov 12 skipping directly to Nov 13), and race condition card shifting while database writes resolve in the background.
+    - Bound `effectiveWfhUsedThisMonth` to include newly logged session days without double-counting, ensuring the mini calendar badge, banner quota, and subsequent balance tickers display accurate deduction values.
+    - Added interactive checkmark indicators (`CheckCircle2`) and status badges when reviewing previously logged days within the carousel.
+    - Added optimistic removal of logged dates in [`useAttendanceManager.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/hooks/useAttendanceManager.js) to keep parent attendance state instantly synchronized.
+
+---
+
 ## [v0.8.13] - 2026-11-13
 ### Added
 - **Per-User Attendance Time Window & Reminder Offset Dispatching**:

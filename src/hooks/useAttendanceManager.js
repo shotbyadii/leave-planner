@@ -218,6 +218,9 @@ export function useAttendanceManager({
       }
     }
 
+    // Optimistically update missing attendance days immediately
+    setMissingAttendanceDays(prev => prev.filter(d => d !== targetDate));
+
     const note = isWfh ? 'Work From Home' : (isOffice ? 'In-Office' : (isLop ? 'Unpaid Leave (LOP)' : (activeCfg?.name || leaveNames[statusType] || statusType.toUpperCase())));
     await addLeave(targetDate, statusType, note, null, 1, currentUser?.id);
     if (loadLeaves) await loadLeaves();
@@ -260,6 +263,9 @@ export function useAttendanceManager({
     const isWfh = statusType === 'wfh';
     const isOffice = statusType === 'office';
     const activeCfg = isLop ? LOP_CONFIG : (Array.isArray(leaveConfigs) ? leaveConfigs.find(c => c.id === statusType) : null);
+    // Optimistically update missing attendance days immediately
+    setMissingAttendanceDays(prev => prev.filter(d => !targetDates.includes(d)));
+
     const note = isWfh ? 'Work From Home' : (isOffice ? 'In-Office' : (isLop ? 'Unpaid Leave (LOP)' : (activeCfg?.name || leaveNames[statusType] || statusType.toUpperCase())));
 
     for (const d of targetDates) {
