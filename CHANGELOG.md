@@ -2,6 +2,26 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.13] - 2026-11-13
+### Added
+- **Per-User Attendance Time Window & Reminder Offset Dispatching**:
+  - Upgraded Edge Function `send-push` to Version 6 with per-user timezone and check-in time gating:
+    - Queries each subscriber's profile preferences (`wfh_prompt_hour`, `timezone`).
+    - Dispatches the daily check-in prompt only during the user's selected hour slot (e.g. 9:00 AM, 10:00 AM, 12:00 PM).
+    - Automatically calculates the reminder offset (3 hours after prompt time, capped at 7:00 PM) and sends the reminder if attendance remains unrecorded.
+    - Uses `Intl.DateTimeFormat` with local user timezone calculations to guard against weekend notifications.
+    - Integrated zero-leak calendar date deduplication (`last_prompt_date`, `last_reminder_date`) on `push_subscriptions`.
+- **Dynamic Half-Hourly Cron Dispatcher**:
+  - Replaced static daily `pg_cron` jobs with `attendance-hourly-dispatcher` running `0,30 2-14 * * 1-5`.
+  - Accurately triggers both whole-hour and half-hour offset timezones (e.g. IST UTC+5:30) throughout the workday without redundant dispatches.
+  - Updated GitHub Actions backup scheduler (`.github/workflows/scheduled-attendance-push.yml`) to invoke `cron_attendance` every 30 minutes on weekdays.
+- **Client Timezone Sync**:
+  - Enhanced [`subscribeUserToPush`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/src/utils/notificationService.js) to detect and persist `Intl.DateTimeFormat().resolvedOptions().timeZone` directly with subscription payloads.
+- **Automated Function Deployment Script**:
+  - Added [`scripts/deploy-edge-function.js`](file:///c:/Users/anush/.gemini/antigravity/scratch/leave-planner/scripts/deploy-edge-function.js) to programmatically deploy Supabase edge functions via the Management API without external CLI dependencies.
+
+---
+
 ## [v0.8.12] - 2026-11-13
 ### Added
 - **Automated Cloud Attendance Push Schedulers**:

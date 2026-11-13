@@ -97,42 +97,103 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (action === "send_attendance" || action === "cron_attendance" || action === "send_reminder") {
+    if (action === "send_attendance" || action === "cron_attendance" || action === "send_reminder" || action === "hourly_check") {
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
-      const isReminder = action === "send_reminder" || Boolean(body.isReminder);
+      const forceAll = body.force === true || action === "send_attendance" || action === "send_reminder";
+      const forceReminder = action === "send_reminder" || Boolean(body.isReminder);
 
-      // Fetch all subscriptions
+      // Fetch all subscriptions with linked user profile preferences
       const { data: subscriptions, error: subError } = await supabase
         .from("push_subscriptions")
-        .select("*");
+        .select("*, profiles:user_id(wfh_prompt_hour, timezone)");
 
       if (subError) throw subError;
 
       const sent = [];
       for (const sub of subscriptions || []) {
+        const userProfile = sub.profiles || {};
+        const userTz = sub.timezone || userProfile.timezone || "Asia/Kolkata";
+
+        let localHour = 12;
+        let localDateStr = now.toISOString().split("T")[0];
+        let isWeekend = false;
+
+        try {
+          const formatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: userTz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "numeric",
+            hourCycle: "h23",
+            weekday: "short"
+          });
+          const parts = formatter.formatToParts(now);
+          const partMap: Record<string, string> = {};
+          parts.forEach(p => { partMap[p.type] = p.value; });
+
+          localHour = parseInt(partMap.hour, 10);
+          localDateStr = `${partMap.year}-${partMap.month}-${partMap.day}`;
+          if (partMap.weekday === "Sat" || partMap.weekday === "Sun") {
+            isWeekend = true;
+          }
+        } catch (_) {}
+
+        if (!forceAll && isWeekend) {
+          continue; // Weekend in user's timezone: skip attendance checks
+        }
+
+        // User's configured preferred prompt hour (defaults to 12 PM if unset)
+        const targetHour = parseInt(userProfile.wfh_prompt_hour || "12", 10);
+        // User's offset reminder hour: 3 hours after requested time, capped at 19 (7 PM)
+        const reminderHour = Math.min(19, targetHour + 3);
+
+        const isPromptWindow = forceAll || (localHour === targetHour);
+        const isReminderWindow = forceReminder || (!forceAll && localHour === reminderHour);
+
+        if (!isPromptWindow && !isReminderWindow) {
+          // Neither the user's prompt hour nor reminder hour: skip!
+          continue;
+        }
+
+        const isReminder = forceReminder || isReminderWindow;
+
+        // Dedup check: Ensure we don't repeat the same notification type on the same date
+        if (!forceAll) {
+          if (!isReminder && sub.last_prompt_date === localDateStr) {
+            continue; // Already prompted today!
+          }
+          if (isReminder && sub.last_reminder_date === localDateStr) {
+            continue; // Already reminded today!
+          }
+        }
+
+        // Check if user already booked attendance today in leaves table
         if (sub.user_id) {
           const { data: existingLeaves } = await supabase
             .from("leaves")
             .select("id")
             .eq("user_id", sub.user_id)
-            .eq("date", todayStr)
+            .eq("date", localDateStr)
             .limit(1);
 
           if (existingLeaves && existingLeaves.length > 0) {
-            continue;
+            continue; // Attendance already recorded for today!
           }
         }
 
+        const title = isReminder ? "Attendance Reminder" : "Attendance Check-in";
+        const bodyText = isReminder
+          ? "Still haven't logged attendance for today. Are you Working From Home or In-Office?"
+          : "Where are you working today? Tap to record attendance.";
+
         const payload = JSON.stringify({
-          title: isReminder ? "Attendance Reminder" : "Leave Vault",
-          body: isReminder
-            ? "You haven't checked in yet today. Are you Working From Home or In-Office?"
-            : "Daily Attendance Check-in: Please confirm whether today is Work From Home or In-Office.",
+          title,
+          body: bodyText,
           icon: "/app-icon-192.png",
           badge: "/app-icon-192.png",
-          tag: isReminder ? `wfh-reminder-${todayStr}` : `wfh-checkin-${todayStr}`,
-          data: { url: "/?action=attendance" }
+          tag: isReminder ? `wfh-reminder-${localDateStr}` : `wfh-checkin-${localDateStr}`,
+          data: { url: `/?action=attendance&date=${localDateStr}`, date: localDateStr }
         });
 
         const pushSubscription = {
@@ -145,7 +206,19 @@ Deno.serve(async (req: Request) => {
 
         try {
           const res = await webpush.sendNotification(pushSubscription, payload);
-          sent.push({ endpoint: sub.endpoint, status: res.statusCode || 201 });
+          sent.push({
+            endpoint: sub.endpoint,
+            user_id: sub.user_id,
+            status: res.statusCode || 201,
+            localHour,
+            targetHour,
+            reminderHour,
+            type: isReminder ? 'reminder' : 'prompt'
+          });
+
+          // Mark date sent in database for idempotency
+          const updateField = isReminder ? { last_reminder_date: localDateStr } : { last_prompt_date: localDateStr };
+          await supabase.from("push_subscriptions").update(updateField).eq("id", sub.id);
         } catch (err: any) {
           if (err.statusCode === 404 || err.statusCode === 410) {
             await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
@@ -155,7 +228,12 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, sentCount: sent.length, results: sent }),
+        JSON.stringify({
+          success: true,
+          processed: subscriptions?.length || 0,
+          sentCount: sent.length,
+          results: sent
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

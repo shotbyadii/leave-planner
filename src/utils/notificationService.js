@@ -114,12 +114,14 @@ export const subscribeUserToPush = async (userId = null) => {
         } catch (_) {}
       }
 
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
       const payload = {
         user_id: effectiveUserId || null,
         endpoint: subJson.endpoint,
         p256dh: subJson.keys.p256dh,
         auth: subJson.keys.auth,
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        timezone: userTimezone,
         updated_at: new Date().toISOString()
       };
 
