@@ -2,6 +2,21 @@
 
 All notable changes to the **Leave Planner** project will be documented in this file using [Semantic Versioning](https://semver.org/).
 
+## [v0.8.12] - 2026-11-13
+### Added
+- **Automated Cloud Attendance Push Schedulers**:
+  - Enabled `pg_cron` and `pg_net` extensions in Supabase PostgreSQL and configured 3 recurring cron jobs:
+    - 9:00 AM IST (`daily-attendance-checkin`): sends daily check-in prompt to all registered devices.
+    - 12:00 PM IST (`daily-attendance-reminder`): sends follow-up reminder if today's attendance remains unrecorded.
+    - 5:30 PM IST (`daily-attendance-evening`): sends final evening catch-up reminder for any unrecorded days.
+  - Added GitHub Actions cron workflow (`.github/workflows/scheduled-attendance-push.yml`) as an external cloud dispatcher.
+
+### Fixed
+- **Service Role Subscriptions Access**:
+  - Updated `scripts/send-attendance-reminders.js` to use `SUPABASE_SERVICE_ROLE_KEY` to prevent Row Level Security (RLS) from filtering out registered user push endpoints during background dispatches.
+
+---
+
 ## [v0.8.11] - 2026-11-07
 ### Added
 - **PWA Update Ready Dismissable Modal**:

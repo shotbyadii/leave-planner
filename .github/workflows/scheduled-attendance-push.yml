@@ -1,0 +1,31 @@
+name: Scheduled Attendance Push Reminders
+
+on:
+  schedule:
+    # 9:00 AM IST (03:30 UTC) Monday to Friday
+    - cron: '30 3 * * 1-5'
+    # 12:00 PM IST (06:30 UTC) Monday to Friday
+    - cron: '30 6 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Push action to trigger'
+        required: true
+        default: 'send_attendance'
+        type: choice
+        options:
+          - send_attendance
+          - send_reminder
+          - test
+
+jobs:
+  dispatch-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Web Push Edge Function
+        run: |
+          ACTION="${{ github.event.inputs.action || 'send_attendance' }}"
+          echo "Triggering action: $ACTION"
+          curl -s -X POST https://vyuiuhlzxjeqwzhwocbg.supabase.co/functions/v1/send-push \
+            -H "Content-Type: application/json" \
+            -d "{\"action\": \"$ACTION\"}"
